@@ -1,0 +1,5 @@
+{
+  "name": "Q-BOT",
+  "description": "A responsive real estate chatbot interface powered by Gemini, designed to qualify leads for Sky Habitat Homes.",
+  "requestFramePermissions": []
+}

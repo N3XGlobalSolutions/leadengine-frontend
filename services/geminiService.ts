@@ -1,6 +1,5 @@
-
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
-import { MessageRole, SummaryData } from '../types';
+import { SummaryData } from '../types';
 import { brandConfig } from '../config';
 
 const SYSTEM_INSTRUCTION = `
@@ -43,72 +42,86 @@ When all data is collected, output a JSON block:
 Tone: Professional, helpful, but focused on the goal.
 `;
 
-let chatSession: Chat | null = null;
-let genAI: GoogleGenAI | null = null;
+export interface ServiceResponse {
+    text: string;
+    summary?: SummaryData;
+    showActions?: boolean;
+    error?: boolean;
+}
 
-export const initializeChat = () => {
-  if (!process.env.API_KEY) {
-    console.error("API Key is missing!");
-    return;
-  }
-  
-  genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  chatSession = genAI.chats.create({
-    model: 'gemini-2.5-flash',
-    config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      temperature: 0.7,
-    },
-  });
-};
+export class GeminiChatService {
+  private chatSession: Chat | null = null;
+  private genAI: GoogleGenAI;
 
-export const sendMessageToGemini = async (message: string): Promise<{ text: string, summary?: SummaryData, showActions?: boolean }> => {
-  if (!chatSession) {
-    initializeChat();
-  }
-  
-  if (!chatSession) {
-    return { text: "Error: Chat session could not be initialized." };
-  }
-
-  try {
-    const response: GenerateContentResponse = await chatSession.sendMessage({ message });
-    let text = response.text || "";
-    let summary: SummaryData | undefined;
-    let showActions = false;
-
-    // Check for JSON summary block
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1]);
-        if (parsed.summary) {
-          summary = parsed.summary;
-        }
-        if (parsed.message) {
-          text = parsed.message; // Use the cleaner message from JSON
-        }
-        // If we have a summary, we likely want to show the call to action buttons
-        if (text.toLowerCase().includes("schedule a quick call")) {
-          showActions = true;
-        }
-      } catch (e) {
-        console.error("Failed to parse JSON from Gemini response", e);
-      }
-    } else {
-        // Fallback detection for actions if no JSON
-        if (text.toLowerCase().includes("schedule a quick call")) {
-            showActions = true;
-        }
+  constructor(apiKey: string) {
+    if (!apiKey) {
+        throw new Error("API Key is required to initialize GeminiChatService");
     }
-    
-    // Cleanup: Remove the code block from text if we parsed it, or if it wasn't replaced yet
-    text = text.replace(/```json[\s\S]*?```/, '').trim();
-
-    return { text, summary, showActions };
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    return { text: "I'm having trouble connecting to the server right now. Please try again later." };
+    this.genAI = new GoogleGenAI({ apiKey });
+    this.initializeChat();
   }
-};
+
+  private initializeChat() {
+    try {
+        this.chatSession = this.genAI.chats.create({
+          model: 'gemini-2.5-flash',
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            temperature: 0.7,
+          },
+        });
+    } catch (error) {
+        console.error("Failed to create chat session:", error);
+        this.chatSession = null;
+    }
+  }
+
+  public async sendMessage(message: string): Promise<ServiceResponse> {
+    if (!this.chatSession) {
+      return { text: "System Error: Chat session not initialized. Please check API configuration.", error: true };
+    }
+
+    try {
+      const response: GenerateContentResponse = await this.chatSession.sendMessage({ message });
+      let text = response.text || "";
+      let summary: SummaryData | undefined;
+      let showActions = false;
+
+      // Check for JSON summary block
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          if (parsed.summary) {
+            summary = parsed.summary;
+          }
+          if (parsed.message) {
+            text = parsed.message; // Use the cleaner message from JSON
+          }
+          // If we have a summary, we likely want to show the call to action buttons
+          if (text.toLowerCase().includes("schedule a quick call")) {
+            showActions = true;
+          }
+        } catch (e) {
+          console.error("Failed to parse JSON from Gemini response", e);
+        }
+      } else {
+          // Fallback detection for actions if no JSON
+          if (text.toLowerCase().includes("schedule a quick call")) {
+              showActions = true;
+          }
+      }
+      
+      // Cleanup: Remove the code block from text if we parsed it, or if it wasn't replaced yet
+      text = text.replace(/```json[\s\S]*?```/, '').trim();
+
+      return { text, summary, showActions, error: false };
+    } catch (error) {
+      console.error("Gemini API Error:", error);
+      return { 
+          text: "I'm having trouble connecting to the server right now. The API Key might be invalid or quota exceeded.", 
+          error: true 
+      };
+    }
+  }
+}

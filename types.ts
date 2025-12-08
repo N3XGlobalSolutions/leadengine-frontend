@@ -6,6 +6,7 @@ export enum MessageRole {
 }
 
 export interface SummaryData {
+  sessionId?: string; // Unique ID for this specific conversation
   name?: string;
   phone?: string;
   location?: string;

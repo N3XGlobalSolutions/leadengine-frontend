@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Sparkles, MessageSquare } from 'lucide-react';
 import { brandConfig } from '../config';
@@ -54,6 +53,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
              </React.Fragment>
          ))}
       </div>
+      
+      <p className="mt-16 text-[10px] text-gray-300 max-w-xs mx-auto leading-tight">
+        Disclaimer: This is an AI-powered assistant. While we strive for accuracy, please verify all details with our sales representatives.
+      </p>
     </div>
   );
 };

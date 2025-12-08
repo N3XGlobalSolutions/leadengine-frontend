@@ -15,7 +15,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
   
   return (
     <div className={`flex w-full mb-2 animate-fade-in-up ${isBot ? 'justify-start' : 'justify-end'}`}>
-      <div className={`max-w-[85%] sm:max-w-lg flex flex-col ${isBot ? 'items-start' : 'items-end'}`}>
+      <div className={`flex flex-col max-w-[85%] md:max-w-xl ${isBot ? 'items-start' : 'items-end'}`}>
         
         {/* Sender Name */}
         <span className="text-[10px] text-gray-400 mb-1 px-1">
@@ -25,7 +25,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
         {/* Message Content */}
         <div 
           className={`
-            px-5 py-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm
+            px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap
             ${isBot 
               ? 'bg-white text-gray-800 rounded-bl-none border border-gray-100' 
               : 'bg-white text-gray-800 rounded-br-none border border-gray-100'

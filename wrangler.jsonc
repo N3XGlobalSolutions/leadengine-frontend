@@ -1,0 +1,7 @@
+{
+  "name": "qbot", // Matches the CI system's expected name ("qbot") to fix the warning
+  "compatibility_date": "2025-12-09",
+  "assets": {
+    "directory": "./dist"
+  }
+}

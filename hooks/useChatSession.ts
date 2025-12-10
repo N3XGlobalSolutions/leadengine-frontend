@@ -18,7 +18,7 @@ export const useChatSession = () => {
 
     // Initialize error state lazily to verify config without side effects in render
     const [systemError, setSystemError] = useState<string | null>(() => {
-        if (!import.meta.env.VITE_GEMINI_API_KEY && !process.env.API_KEY) {
+        if (!import.meta.env.VITE_GEMINI_API_KEY) {
             const errorMsg = 'Configuration Error: API Key is missing.';
             console.error(errorMsg);
             return errorMsg;
@@ -40,7 +40,7 @@ export const useChatSession = () => {
     const chatServiceRef = useRef<GeminiChatService | null>(null);
 
     useEffect(() => {
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
         // If no key, error is already set in initial state
         if (!apiKey) return;
 

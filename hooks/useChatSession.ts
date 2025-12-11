@@ -18,6 +18,11 @@ export const useChatSession = () => {
 
     // Initialize error state lazily to verify config without side effects in render
     const [systemError, setSystemError] = useState<string | null>(() => {
+        console.log('DEBUG ENV:', {
+            hasViteKey: !!import.meta.env.VITE_GEMINI_API_KEY,
+            keys: Object.keys(import.meta.env),
+            mode: import.meta.env.MODE
+        });
         if (!import.meta.env.VITE_GEMINI_API_KEY) {
             const errorMsg = 'Configuration Error: API Key is missing.';
             console.error(errorMsg);

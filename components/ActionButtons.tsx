@@ -11,7 +11,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ onSchedule, onLater }) =>
     <div className="flex gap-3 justify-end mb-4 animate-fade-in-up w-full max-w-[85%] md:max-w-xl ml-auto">
       <button 
         onClick={onSchedule}
-        className="flex-1 bg-brand-purple hover:bg-indigo-600 text-white font-medium py-3 px-5 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-sm"
+        className="flex-1 bg-purple hover:bg-indigo-600 text-white font-medium py-3 px-5 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-sm"
       >
         Yes, schedule a call
       </button>

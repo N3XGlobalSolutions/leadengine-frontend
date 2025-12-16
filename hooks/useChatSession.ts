@@ -182,10 +182,10 @@ export const useChatSession = () => {
         if (!hasStarted) {
             setHasStarted(true);
             addMessage(MessageRole.User, text);
-            await handleBotResponse();
+            await handleBotResponse(text);
         } else {
             addMessage(MessageRole.User, text);
-            await handleBotResponse();
+            await handleBotResponse(text);
         }
     };
 

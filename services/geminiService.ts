@@ -1,9 +1,9 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { SummaryData } from '../types';
-import { brandConfig } from '../config';
+import { TenantConfig } from '../types/config';
 
-const createSystemInstruction = () => {
-  const questions = brandConfig.leadQualification.questions;
+const createSystemInstruction = (config: TenantConfig) => {
+  const questions = config.leadQualification.questions;
 
   const steps = questions.map((q, index) =>
     `${index + 1}.  **${q.label}:** ${q.instruction}`
@@ -20,7 +20,7 @@ const createSystemInstruction = () => {
   }, "");
 
   return `
-You are ${brandConfig.botName}, the AI sales assistant for "${brandConfig.companyName}".
+You are ${config.botName}, the AI sales assistant for "${config.companyName}".
 Your objective is to qualify leads coming from social media ads by collecting specific details.
 
 **Lead Qualification Flow (Strict Order):**
@@ -59,11 +59,13 @@ export interface ServiceResponse {
 export class GeminiChatService {
   private chatSession: Chat | null = null;
   private genAI: GoogleGenAI;
+  private config: TenantConfig;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, config: TenantConfig) {
     if (!apiKey) {
       throw new Error("API Key is required to initialize GeminiChatService");
     }
+    this.config = config;
     this.genAI = new GoogleGenAI({ apiKey });
     this.initializeChat();
   }
@@ -73,7 +75,7 @@ export class GeminiChatService {
       this.chatSession = this.genAI.chats.create({
         model: 'gemini-2.5-flash',
         config: {
-          systemInstruction: createSystemInstruction(),
+          systemInstruction: createSystemInstruction(this.config),
           temperature: 0.7,
         },
       });

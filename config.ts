@@ -13,7 +13,7 @@ export const brandConfig = {
     secondary: "indigo" // Used for buttons/accents
   },
 
-  // Welcome Screen Content
+  // Welcome Screen Content 
   welcome: {
     headline: "Welcome to",
     highlightedHeadline: "Sky Habitat Homes",

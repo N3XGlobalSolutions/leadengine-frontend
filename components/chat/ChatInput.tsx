@@ -21,8 +21,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, placeholder }) 
 
   return (
     <div className="w-full">
-      <form 
-        onSubmit={handleSubmit} 
+      <form
+        onSubmit={handleSubmit}
         className="relative flex items-center w-full"
       >
         <input
@@ -38,8 +38,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, placeholder }) 
           disabled={!input.trim() || disabled}
           className={`
             absolute right-3 p-2.5 rounded-lg flex items-center justify-center transition-all duration-200
-            ${input.trim() && !disabled 
-              ? 'bg-brand-purple text-white hover:bg-indigo-600 shadow-md' 
+            ${input.trim() && !disabled
+              ? 'bg-brand-purple text-white hover:bg-indigo-600 shadow-md'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }
           `}

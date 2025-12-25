@@ -1,0 +1,64 @@
+{
+  "companyName": "Test Corp",
+  "shortName": "Testcorp",
+  "botName": "Q-Bot",
+  "botDisplayName": "Assistant",
+  "botAvatar": "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
+  "colors": {
+    "primary": "#e64c5c",
+    "secondary": "#e50606"
+  },
+  "welcome": {
+    "headline": "Welcome to",
+    "highlightedHeadline": "Test Corp",
+    "subheadline": "How can I help you today?",
+    "startBtnText": "Start Conversation",
+    "features": [
+      "Test"
+    ]
+  },
+  "leadQualification": {
+    "options": {},
+    "questions": [
+      {
+        "id": "q1",
+        "label": "Question 1",
+        "instruction": "Ask the user for Current insurance",
+        "collects": [],
+        "options": []
+      },
+      {
+        "id": "q2",
+        "label": "Question 2",
+        "instruction": "Ask the user for Current insurance budget",
+        "collects": [],
+        "options": []
+      },
+      {
+        "id": "q3",
+        "label": "Question 3",
+        "instruction": "Ask the user for Current insurance company",
+        "collects": [],
+        "options": []
+      },
+      {
+        "id": "q4",
+        "label": "Question 4",
+        "instruction": "Ask the user for Current insurance type",
+        "collects": [],
+        "options": []
+      },
+      {
+        "id": "q5",
+        "label": "Question 5",
+        "instruction": "Ask the user if they willing to try Test corp insurance",
+        "collects": [],
+        "options": []
+      }
+    ]
+  },
+  "messages": {
+    "scheduleSuccess": "Thank you! Our team will be in touch shortly.",
+    "maybeLater": "No problem! Feel free to reach out whenever you are ready."
+  }
+}

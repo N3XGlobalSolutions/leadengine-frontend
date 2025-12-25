@@ -1,63 +1,138 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, MessageRole, SummaryData } from '../types';
-import { GeminiChatService } from '../services/geminiService';
-import { brandConfig } from '../config';
+import { BedrockService } from '../services/bedrockService';
+
+import { TenantConfig } from '../types/config';
 import { getCookie, setCookie } from '../utils/cookies';
 
 const generateSessionId = () => {
     return 'sess_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
 };
 
-export const useChatSession = () => {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [hasStarted, setHasStarted] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [leadData, setLeadData] = useState<SummaryData | null>(null);
-    const [quickReplies, setQuickReplies] = useState<string[]>([]);
-    const [isChatEnded, setIsChatEnded] = useState(false);
+// Storage keys
+const getStorageKey = (sessionId: string, key: string) => `qbot_${sessionId}_${key}`;
+const SESSION_EXPIRY_HOURS = 24;
 
-    // Initialize error state lazily to verify config without side effects in render
-    const [systemError, setSystemError] = useState<string | null>(() => {
-        console.log('DEBUG ENV:', {
-            hasViteKey: !!import.meta.env.VITE_GEMINI_API_KEY,
-            keys: Object.keys(import.meta.env),
-            mode: import.meta.env.MODE
-        });
-        if (!import.meta.env.VITE_GEMINI_API_KEY) {
-            const errorMsg = 'Configuration Error: API Key is missing.';
-            console.error(errorMsg);
-            return errorMsg;
+interface PersistedChatState {
+    messages: Message[];
+    hasStarted: boolean;
+    isChatEnded: boolean;
+    leadData: SummaryData | null;
+    createdAt: number; // Timestamp when session was created
+}
+
+const saveChatState = (sessionId: string, state: PersistedChatState) => {
+    try {
+        localStorage.setItem(getStorageKey(sessionId, 'chat'), JSON.stringify(state));
+    } catch (e) {
+        console.error('Failed to save chat state:', e);
+    }
+};
+
+const loadChatState = (sessionId: string): PersistedChatState | null => {
+    try {
+        const stored = localStorage.getItem(getStorageKey(sessionId, 'chat'));
+        if (stored) {
+            const parsed = JSON.parse(stored);
+
+            // Check if session has expired (24 hours)
+            const now = Date.now();
+            const sessionAge = now - (parsed.createdAt || 0);
+            const expiryMs = SESSION_EXPIRY_HOURS * 60 * 60 * 1000;
+
+            if (sessionAge > expiryMs) {
+                console.log('Session expired after 24 hours, clearing...');
+                clearChatState(sessionId);
+                return null;
+            }
+
+            // Check if chat has ended - don't restore ended sessions
+            if (parsed.isChatEnded) {
+                console.log('Previous session ended, clearing for fresh start...');
+                clearChatState(sessionId);
+                return null;
+            }
+
+            // Convert timestamp strings back to Date objects
+            if (parsed.messages) {
+                parsed.messages = parsed.messages.map((msg: any) => ({
+                    ...msg,
+                    timestamp: new Date(msg.timestamp)
+                }));
+            }
+            return parsed;
         }
-        return null;
-    });
+    } catch (e) {
+        console.error('Failed to load chat state:', e);
+    }
+    return null;
+};
 
+const clearChatState = (sessionId: string) => {
+    try {
+        localStorage.removeItem(getStorageKey(sessionId, 'chat'));
+    } catch (e) {
+        console.error('Failed to clear chat state:', e);
+    }
+};
+
+export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     const [sessionId] = useState(() => {
-        const existingSession = getCookie('qbot_session_id');
+        const cookieName = `qbot_session_${clientSlug}`;
+        const existingSession = getCookie(cookieName);
         if (existingSession) {
             console.log('Resuming existing session:', existingSession);
             return existingSession;
         }
         const newSession = generateSessionId();
-        setCookie('qbot_session_id', newSession, 7);
+        setCookie(cookieName, newSession, 7);
         return newSession;
     });
 
-    const chatServiceRef = useRef<GeminiChatService | null>(null);
+    // Load persisted state on init
+    const [persistedState] = useState(() => loadChatState(sessionId));
 
+    const [messages, setMessages] = useState<Message[]>(persistedState?.messages || []);
+    const [hasStarted, setHasStarted] = useState(persistedState?.hasStarted || false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [leadData, setLeadData] = useState<SummaryData | null>(persistedState?.leadData || null);
+    const [quickReplies, setQuickReplies] = useState<string[]>([]);
+    const [isChatEnded, setIsChatEnded] = useState(persistedState?.isChatEnded || false);
+    const [systemError, setSystemError] = useState<string | null>(null);
+
+    const chatServiceRef = useRef<BedrockService | null>(null);
+
+    // Track when the session was created (for 24h expiry)
+    const [sessionCreatedAt] = useState(() => persistedState?.createdAt || Date.now());
+
+    // Save state whenever it changes
     useEffect(() => {
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-        // If no key, error is already set in initial state
-        if (!apiKey) return;
+        if (hasStarted) {
+            saveChatState(sessionId, {
+                messages,
+                hasStarted,
+                isChatEnded,
+                leadData,
+                createdAt: sessionCreatedAt
+            });
+        }
+    }, [messages, hasStarted, isChatEnded, leadData, sessionId, sessionCreatedAt]);
 
+    // Re-initialize service if config changes
+    useEffect(() => {
         try {
-            chatServiceRef.current = new GeminiChatService(apiKey);
-            console.log(`Initialized chat service for session: ${sessionId}`);
+            chatServiceRef.current = new BedrockService(config, sessionId);
+            console.log(`Initialized Bedrock service for session: ${sessionId}`);
+
+            // If we have persisted messages, restore chat history to the service
+            if (persistedState?.messages && persistedState.messages.length > 0) {
+                chatServiceRef.current.restoreHistory(persistedState.messages);
+            }
         } catch (err) {
-            console.error('Failed to initialize GeminiChatService:', err);
-            // eslint-disable-next-line react-hooks/set-state-in-effect
+            console.error('Failed to initialize BedrockService:', err);
             setSystemError('Failed to initialize chat service. Please refresh.');
         }
-    }, [sessionId]);
+    }, [sessionId, config]);
 
     const addMessage = useCallback(
         (role: MessageRole, text: string, options?: Partial<Message>) => {
@@ -77,42 +152,43 @@ export const useChatSession = () => {
     const determineQuickReplies = (text: string): string[] => {
         const lowerText = text.toLowerCase();
         if (lowerText.includes('location') || lowerText.includes('area') || lowerText.includes('where')) {
-            return brandConfig.leadQualification.options.locations;
+            return config.leadQualification.options?.locations || [];
         }
         if (lowerText.includes('budget') || lowerText.includes('price range')) {
-            return brandConfig.leadQualification.options.budgets;
+            return config.leadQualification.options?.budgets || [];
         }
         if (
             lowerText.includes('type') ||
             lowerText.includes('bhk') ||
             lowerText.includes('configuration')
         ) {
-            return brandConfig.leadQualification.options.types;
+            return config.leadQualification.options?.types || [];
         }
         if (
             lowerText.includes('move-in') ||
             lowerText.includes('timeline') ||
             lowerText.includes('possession')
         ) {
-            return brandConfig.leadQualification.options.moveIn;
+            return config.leadQualification.options?.moveIn || [];
         }
         if (
             lowerText.includes('loan') ||
             lowerText.includes('financing') ||
             lowerText.includes('funding')
         ) {
-            return brandConfig.leadQualification.options.financing;
+            return config.leadQualification.options?.financing || [];
         }
         return [];
     };
 
-    const handleBotResponse = async (prompt?: string) => {
+    const handleBotResponse = async (userMessageText: string) => {
         if (systemError) return;
 
         setIsLoading(true);
         setQuickReplies([]);
 
-        if (messages.length === 0 && prompt) {
+        // Handle initial start
+        if (messages.length === 0 && userMessageText.includes('Hello!')) {
             await new Promise((resolve) => setTimeout(resolve, 600));
 
             if (!chatServiceRef.current) {
@@ -121,7 +197,7 @@ export const useChatSession = () => {
                 return;
             }
 
-            const response = await chatServiceRef.current.sendMessage(prompt);
+            const response = await chatServiceRef.current.sendMessage(userMessageText);
             setIsLoading(false);
 
             if (response.error) {
@@ -138,7 +214,6 @@ export const useChatSession = () => {
             return;
         }
 
-        const lastUserMsg = messages.filter((m) => m.role === MessageRole.User).pop()?.text;
 
         if (!chatServiceRef.current) {
             setIsLoading(false);
@@ -146,7 +221,7 @@ export const useChatSession = () => {
             return;
         }
 
-        const response = await chatServiceRef.current.sendMessage(prompt || lastUserMsg || 'Hello');
+        const response = await chatServiceRef.current.sendMessage(userMessageText);
         setIsLoading(false);
 
         if (response.error) {
@@ -173,7 +248,8 @@ export const useChatSession = () => {
     const handleStart = async () => {
         if (systemError) return;
         setHasStarted(true);
-        await handleBotResponse(`Hello! I'm interested in ${brandConfig.companyName}.`);
+        const startMsg = `Hello! I'm interested in ${config.companyName}.`;
+        await handleBotResponse(startMsg);
     };
 
     const handleSendMessage = async (text: string) => {
@@ -193,6 +269,7 @@ export const useChatSession = () => {
         console.log('------------------------------------------------');
         console.log('🚀 CRM SUBMISSION SIMULATION');
         console.log('------------------------------------------------');
+        console.log('Client Slug:', clientSlug);
         console.log('Session ID:', sessionId);
         console.log(
             'Lead Status:',
@@ -212,7 +289,7 @@ export const useChatSession = () => {
         submitToCRM('scheduled');
         setIsChatEnded(true);
         setTimeout(() => {
-            addMessage(MessageRole.Bot, brandConfig.messages.scheduleSuccess);
+            addMessage(MessageRole.Bot, config.messages.scheduleSuccess);
         }, 1000);
     };
 
@@ -222,7 +299,7 @@ export const useChatSession = () => {
         submitToCRM('later');
         setIsChatEnded(true);
         setTimeout(() => {
-            addMessage(MessageRole.Bot, brandConfig.messages.maybeLater);
+            addMessage(MessageRole.Bot, config.messages.maybeLater);
         }, 1000);
     };
 
@@ -231,6 +308,19 @@ export const useChatSession = () => {
             prev.map((msg) => (msg.id === messageId ? { ...msg, feedback: feedbackType } : msg))
         );
         console.log('FEEDBACK:', { sessionId, messageId, feedbackType });
+    };
+
+    const handleNewChat = () => {
+        // Clear persisted state and start fresh
+        clearChatState(sessionId);
+        setMessages([]);
+        setHasStarted(false);
+        setIsChatEnded(false);
+        setLeadData(null);
+        setQuickReplies([]);
+        if (chatServiceRef.current) {
+            chatServiceRef.current.clearHistory();
+        }
     };
 
     return {
@@ -247,5 +337,6 @@ export const useChatSession = () => {
         handleScheduleCall,
         handleMaybeLater,
         handleFeedback,
+        handleNewChat,
     };
 };

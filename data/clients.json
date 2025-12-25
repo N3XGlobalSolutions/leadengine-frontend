@@ -1,0 +1,202 @@
+[
+  {
+    "id": "4",
+    "name": "Sky Habitat",
+    "slug": "sky-habitat",
+    "status": "Active",
+    "onboardedDate": "2025-03-01",
+    "totalUsers": 85,
+    "plan": "Enterprise",
+    "config": {
+      "companyName": "Sky Habitat Homes",
+      "shortName": "Sky Habitat",
+      "botName": "Q-Lead",
+      "botDisplayName": "Q-BOT",
+      "botAvatar": "https://cdn-icons-png.flaticon.com/32/4712/4712109.png",
+      "colors": {
+        "primary": "blue",
+        "secondary": "indigo"
+      },
+      "welcome": {
+        "headline": "Welcome to",
+        "highlightedHeadline": "Sky Habitat Homes",
+        "subheadline": "Hi there! I'm Q-Lead, your personal AI real estate assistant. I can help check availability, pricing, and schedule tours for our premium properties.",
+        "startBtnText": "Start Conversation",
+        "features": [
+          "Premium 2BHK",
+          "Luxury 3BHK",
+          "Whitefield"
+        ]
+      },
+      "leadQualification": {
+        "options": {
+          "locations": [
+            "Whitefield",
+            "Sarjapur Road",
+            "Electronic City",
+            "North Bangalore"
+          ],
+          "budgets": [
+            "< ₹80 Lakhs",
+            "₹80L - ₹1.2 Cr",
+            "₹1.2 Cr - ₹2 Cr",
+            "Flexible"
+          ],
+          "types": [
+            "2 BHK",
+            "2.5 BHK",
+            "3 BHK",
+            "Luxury 4 BHK"
+          ],
+          "moveIn": [
+            "Ready to Move",
+            "Within 3 Months",
+            "6 Months",
+            "Investment"
+          ],
+          "financing": [
+            "Yes, need home loan",
+            "No, self-funded"
+          ]
+        },
+        "questions": [
+          {
+            "id": "contact",
+            "label": "Introduction & Contact",
+            "instruction": "Greet warmly, introduce the company, and ask for the user's **Name and Phone Number**.",
+            "collects": [
+              "name",
+              "phone"
+            ]
+          },
+          {
+            "id": "location",
+            "label": "Location",
+            "instruction": "Ask for their preferred location.",
+            "collects": [
+              "location"
+            ],
+            "optionsKey": "locations"
+          },
+          {
+            "id": "budget",
+            "label": "Budget",
+            "instruction": "Ask for their budget range.",
+            "collects": [
+              "budget"
+            ],
+            "optionsKey": "budgets"
+          },
+          {
+            "id": "type",
+            "label": "Type",
+            "instruction": "Ask for the apartment type (e.g., 2BHK, 3BHK).",
+            "collects": [
+              "type"
+            ],
+            "optionsKey": "types"
+          },
+          {
+            "id": "moveIn",
+            "label": "Move-in",
+            "instruction": "Ask for their move-in timeline.",
+            "collects": [
+              "moveIn"
+            ],
+            "optionsKey": "moveIn"
+          },
+          {
+            "id": "financing",
+            "label": "Financing",
+            "instruction": "Ask if they need home loan assistance.",
+            "collects": [
+              "financing"
+            ],
+            "optionsKey": "financing"
+          }
+        ]
+      },
+      "messages": {
+        "scheduleSuccess": "Fantastic! I've forwarded your details to our priority sales team. They will call you shortly to confirm the appointment. Have a great day!",
+        "maybeLater": "No problem! I've saved your preferences. Feel free to reach out whenever you're ready to visit Sky Habitat Homes."
+      }
+    },
+    "createdAt": "2025-02-25",
+    "updatedAt": "2025-03-20"
+  },
+  {
+    "name": "Test Corp",
+    "slug": "test-corp",
+    "plan": "Starter",
+    "config": {
+      "companyName": "Test Corp",
+      "shortName": "Testcorp",
+      "botName": "Q-Bot",
+      "botDisplayName": "Assistant",
+      "botAvatar": "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
+      "colors": {
+        "primary": "#e64c5c",
+        "secondary": "#e50606"
+      },
+      "welcome": {
+        "headline": "Welcome to",
+        "highlightedHeadline": "Test Corp",
+        "subheadline": "How can I help you today?",
+        "startBtnText": "Start Conversation",
+        "features": [
+          "Test"
+        ]
+      },
+      "leadQualification": {
+        "options": {},
+        "questions": [
+          {
+            "id": "q1",
+            "label": "Question 1",
+            "instruction": "Ask the user for Current insurance",
+            "collects": [],
+            "options": []
+          },
+          {
+            "id": "q2",
+            "label": "Question 2",
+            "instruction": "Ask the user for Current insurance budget",
+            "collects": [],
+            "options": []
+          },
+          {
+            "id": "q3",
+            "label": "Question 3",
+            "instruction": "Ask the user for Current insurance company",
+            "collects": [],
+            "options": []
+          },
+          {
+            "id": "q4",
+            "label": "Question 4",
+            "instruction": "Ask the user for Current insurance type",
+            "collects": [],
+            "options": []
+          },
+          {
+            "id": "q5",
+            "label": "Question 5",
+            "instruction": "Ask the user if they willing to try Test corp insurance",
+            "collects": [],
+            "options": []
+          }
+        ]
+      },
+      "messages": {
+        "scheduleSuccess": "Thank you! Our team will be in touch shortly.",
+        "maybeLater": "No problem! Feel free to reach out whenever you are ready."
+      }
+    },
+    "id": "40a29976-b8d2-4808-84a5-edc1e6d84cf1",
+    "status": "Active",
+    "onboardedDate": "2025-12-24",
+    "totalUsers": 0,
+    "createdAt": "2025-12-24",
+    "updatedAt": "2025-12-24"
+  }
+]

@@ -211,6 +211,24 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 summaryData: response.summary,
                 showActions: response.showActions,
             });
+
+            if (!response.showActions && !response.summary) {
+                let replies: string[] = [];
+                if (response.currentStepId) {
+                    const question = config.leadQualification.questions.find(q => q.id === response.currentStepId);
+                    if (question) {
+                        if (question.optionsKey && config.leadQualification.options) {
+                            replies = config.leadQualification.options[question.optionsKey] || [];
+                        } else if (question.options) {
+                            replies = question.options;
+                        }
+                    }
+                }
+                if (replies.length === 0) {
+                    replies = determineQuickReplies(response.text);
+                }
+                setQuickReplies(replies);
+            }
             return;
         }
 
@@ -240,7 +258,24 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         });
 
         if (!response.showActions && !response.summary) {
-            const replies = determineQuickReplies(response.text);
+            let replies: string[] = [];
+
+            if (response.currentStepId) {
+                const question = config.leadQualification.questions.find(q => q.id === response.currentStepId);
+                if (question) {
+                    if (question.optionsKey && config.leadQualification.options) {
+                        replies = config.leadQualification.options[question.optionsKey] || [];
+                    } else if (question.options) {
+                        replies = question.options;
+                    }
+                }
+            }
+
+            // Fallback to text matching if no step ID or no options found via ID
+            if (replies.length === 0) {
+                replies = determineQuickReplies(response.text);
+            }
+
             setQuickReplies(replies);
         }
     };

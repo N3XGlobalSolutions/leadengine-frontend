@@ -5,6 +5,7 @@ interface ServiceResponse {
     text: string;
     summary?: SummaryData;
     showActions?: boolean;
+    currentStepId?: string;
     error?: boolean;
 }
 
@@ -17,7 +18,7 @@ const createSystemInstruction = (config: TenantConfig) => {
     const questions = config.leadQualification.questions;
 
     const steps = questions.map((q, index) =>
-        `${index + 1}.  **${q.label}:** ${q.instruction}`
+        `${index + 1}.  **${q.label}:** ${q.instruction} (Tag: [STEP:${q.id}])`
     ).join('\n');
 
     const allCollectedFields = questions.flatMap(q => q.collects).join(', ');
@@ -40,6 +41,7 @@ ${questions.length + 1}.  **Closure:** Propose a site visit or call.
 **Critical Rules:**
 -   **Answering Queries:** If the user asks a question, answer it politely. **IMMEDIATELY AFTER ANSWERING**, ask the *next* pending question in the Lead Qualification Flow.
 -   **One Question at a Time:** Do not ask multiple qualifying questions in one message.
+-   **Context Tagging:** When asking a specific question from the Lead Qualification Flow, you MUST append the tag "[STEP:<id>]" at the very end of your response.
 -   **Completion:** Once you have collected ALL ${questions.length} data points (${allCollectedFields}), output the summary JSON.
 
 **Data Summary Format:**
@@ -109,6 +111,7 @@ export class BedrockService {
             let text = data.reply || "";
             let summary: SummaryData | undefined;
             let showActions = false;
+            let currentStepId: string | undefined;
 
             // Add model response to history
             this.history.push({ role: 'model', text: text });
@@ -141,12 +144,19 @@ export class BedrockService {
                 if (text.toLowerCase().includes("schedule a quick call") || text.toLowerCase().includes("schedule a call")) showActions = true;
             }
 
+            // Extract Step ID tag [STEP:...]
+            const stepMatch = text.match(/\[STEP:([\w-]+)\]/);
+            if (stepMatch && stepMatch[1]) {
+                currentStepId = stepMatch[1];
+                text = text.replace(stepMatch[0], '').trim();
+            }
+
             // Cleanup any JSON/code blocks from the displayed text
             text = text.replace(/```json[\s\S]*?```/g, '').trim();
             text = text.replace(/```[\s\S]*?```/g, '').trim();
             text = text.replace(/\{\s*"summary"\s*:\s*\{[\s\S]*?\}\s*,\s*"message"\s*:\s*"[^"]*"\s*\}/g, '').trim();
 
-            return { text, summary, showActions, error: false };
+            return { text, summary, showActions, currentStepId, error: false };
 
         } catch (error) {
             console.error("Bedrock Service Error:", error);

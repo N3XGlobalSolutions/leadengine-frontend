@@ -32,3 +32,26 @@ export interface ChatState {
   isLoading: boolean;
   conversationStarted: boolean;
 }
+
+// --- API Types ---
+
+export interface ChatResponse {
+  answer: string;
+  conversation_id: string;
+  message_id: string;
+  sources?: string[];
+  suggested_actions?: string[];
+}
+
+export interface Conversation {
+  conversation_id: string;
+  tenant_id: string;
+  user_identifier: string;
+  started_at: string;
+  last_message_at: string;
+  message_count: number;
+  is_active: boolean;
+  lead_captured: boolean;
+  extracted_lead_data?: any;
+  lead_status: string;
+}

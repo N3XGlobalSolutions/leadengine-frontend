@@ -49,17 +49,12 @@ const SafeColorMap: Record<string, {
     }
 };
 
-const ChatInterface = ({ clientSlug, config }: { clientSlug: string, config: any }) => {
-    // Config is now passed down, so memo creation based on slug is removed/simplified if needed
-    // But actually, we already have the config object here.
+const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) => {
+    // Config is now passed down.
 
     // ... existing ChatInterface logic ...
-    // Note: The original code used useMemo(()=>getTenantConfig) which returned a static object.
-    // Now we pass the object.
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    // ... (rest of ChatInterface remains mostly same, just remove the fetch) ...
 
     const {
         messages,
@@ -74,7 +69,7 @@ const ChatInterface = ({ clientSlug, config }: { clientSlug: string, config: any
         handleScheduleCall,
         handleMaybeLater,
         handleFeedback,
-    } = useChatSession(config, clientSlug);
+    } = useChatSession(config, tenantId);
 
     const themeKey = config.colors.primary in SafeColorMap ? config.colors.primary : 'default';
     const themeClasses = SafeColorMap[themeKey];
@@ -221,8 +216,8 @@ const ChatInterface = ({ clientSlug, config }: { clientSlug: string, config: any
 };
 
 export const ChatPage = () => {
-    const { clientSlug } = useParams<{ clientSlug: string }>();
-    const { config, loading } = useTenantConfig(clientSlug);
+    const { tenantId } = useParams<{ tenantId: string }>();
+    const { config, id, loading } = useTenantConfig(tenantId);
 
     if (loading) {
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -232,14 +227,14 @@ export const ChatPage = () => {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">404 - Tenant Not Found</h1>
-                <p className="text-gray-500">The client "{clientSlug}" does not exist.</p>
+                <p className="text-gray-500">The tenant "{tenantId}" does not exist.</p>
             </div>
         );
     }
 
     return (
         <ErrorBoundary>
-            <ChatInterface key={clientSlug} clientSlug={clientSlug!} config={config} />
+            <ChatInterface key={id || tenantId} tenantId={id || tenantId!} config={config} />
         </ErrorBoundary>
     );
 };

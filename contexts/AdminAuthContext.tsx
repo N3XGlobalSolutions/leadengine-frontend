@@ -1,14 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface User {
-    email: string;
-    name: string;
-}
+import { User, UserRole, UserRegister } from '../types/auth'; // Using correct types
+import { authService } from '../services/authService';
+import { jwtDecode } from 'jwt-decode';
 
 interface AdminAuthContextType {
     user: User | null;
     isAuthenticated: boolean;
-    login: (email: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<void>;
+    register: (data: UserRegister) => Promise<void>;
     logout: () => void;
     isLoading: boolean;
 }
@@ -19,32 +18,73 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Initial Load: Check for token
     useEffect(() => {
-        // Check for existing session
-        const storedUser = localStorage.getItem('qbot_admin_user');
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch (e) {
-                console.error('Failed to parse stored user', e);
-                localStorage.removeItem('qbot_admin_user');
+        const initAuth = async () => {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                try {
+                    // 1. Decode generic check
+                    const decoded: any = jwtDecode(token);
+                    const currentTime = Date.now() / 1000;
+
+                    if (decoded.exp < currentTime) {
+                        throw new Error("Token expired");
+                    }
+
+                    // 2. Fetch fresh user data from backend
+                    const userData = await authService.getCurrentUser();
+                    setUser(userData);
+                } catch (e) {
+                    console.error("Session restoration failed:", e);
+                    authService.logout();
+                }
             }
-        }
-        setIsLoading(false);
+            setIsLoading(false);
+        };
+
+        initAuth();
     }, []);
 
-    const login = async (email: string) => {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    const login = async (email: string, password: string) => {
+        setIsLoading(true);
+        try {
+            // 1. Call API
+            const tokens = await authService.login({ email, password });
 
-        const newUser = { email, name: 'Admin User' };
-        setUser(newUser);
-        localStorage.setItem('qbot_admin_user', JSON.stringify(newUser));
+            // 2. Storage
+            localStorage.setItem('access_token', tokens.access_token);
+            localStorage.setItem('refresh_token', tokens.refresh_token);
+
+            // 3. Set User State immediately (optimistic or fetch)
+            const userData = await authService.getCurrentUser();
+            setUser(userData);
+        } catch (error) {
+            console.error("Login failed:", error);
+            throw error; // Propagate to component for error handling
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const register = async (data: UserRegister) => {
+        setIsLoading(true);
+        try {
+            await authService.register(data);
+            // Auto login after register
+            await login(data.email, data.password);
+        } catch (error) {
+            console.error("Registration failed:", error);
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const logout = () => {
+        authService.logout();
         setUser(null);
-        localStorage.removeItem('qbot_admin_user');
+        // Optional: Redirect
     };
 
     return (
@@ -52,6 +92,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             user,
             isAuthenticated: !!user,
             login,
+            register,
             logout,
             isLoading
         }}>

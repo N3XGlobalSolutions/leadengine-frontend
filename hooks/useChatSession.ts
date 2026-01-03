@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, MessageRole, SummaryData } from '../types';
-import { BedrockService } from '../services/bedrockService';
+import { chatService } from '../services/chatService';
 
 import { TenantConfig } from '../types/config';
 import { getCookie, setCookie } from '../utils/cookies';
@@ -19,6 +19,7 @@ interface PersistedChatState {
     isChatEnded: boolean;
     leadData: SummaryData | null;
     createdAt: number; // Timestamp when session was created
+    conversationId: string | null; // Backend Conversation ID
 }
 
 const saveChatState = (sessionId: string, state: PersistedChatState) => {
@@ -99,8 +100,7 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     const [quickReplies, setQuickReplies] = useState<string[]>([]);
     const [isChatEnded, setIsChatEnded] = useState(persistedState?.isChatEnded || false);
     const [systemError, setSystemError] = useState<string | null>(null);
-
-    const chatServiceRef = useRef<BedrockService | null>(null);
+    const [conversationId, setConversationId] = useState<string | null>(persistedState?.conversationId || null);
 
     // Track when the session was created (for 24h expiry)
     const [sessionCreatedAt] = useState(() => persistedState?.createdAt || Date.now());
@@ -113,26 +113,11 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 hasStarted,
                 isChatEnded,
                 leadData,
-                createdAt: sessionCreatedAt
+                createdAt: sessionCreatedAt,
+                conversationId
             });
         }
-    }, [messages, hasStarted, isChatEnded, leadData, sessionId, sessionCreatedAt]);
-
-    // Re-initialize service if config changes
-    useEffect(() => {
-        try {
-            chatServiceRef.current = new BedrockService(config, sessionId);
-            console.log(`Initialized Bedrock service for session: ${sessionId}`);
-
-            // If we have persisted messages, restore chat history to the service
-            if (persistedState?.messages && persistedState.messages.length > 0) {
-                chatServiceRef.current.restoreHistory(persistedState.messages);
-            }
-        } catch (err) {
-            console.error('Failed to initialize BedrockService:', err);
-            setSystemError('Failed to initialize chat service. Please refresh.');
-        }
-    }, [sessionId, config]);
+    }, [messages, hasStarted, isChatEnded, leadData, sessionId, sessionCreatedAt, conversationId]);
 
     const addMessage = useCallback(
         (role: MessageRole, text: string, options?: Partial<Message>) => {
@@ -151,31 +136,22 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
 
     const determineQuickReplies = (text: string): string[] => {
         const lowerText = text.toLowerCase();
+        // Check if config options exist
+        if (!config.leadQualification?.options) return [];
+
         if (lowerText.includes('location') || lowerText.includes('area') || lowerText.includes('where')) {
             return config.leadQualification.options?.locations || [];
         }
         if (lowerText.includes('budget') || lowerText.includes('price range')) {
             return config.leadQualification.options?.budgets || [];
         }
-        if (
-            lowerText.includes('type') ||
-            lowerText.includes('bhk') ||
-            lowerText.includes('configuration')
-        ) {
+        if (lowerText.includes('type') || lowerText.includes('bhk') || lowerText.includes('configuration')) {
             return config.leadQualification.options?.types || [];
         }
-        if (
-            lowerText.includes('move-in') ||
-            lowerText.includes('timeline') ||
-            lowerText.includes('possession')
-        ) {
+        if (lowerText.includes('move-in') || lowerText.includes('timeline') || lowerText.includes('possession')) {
             return config.leadQualification.options?.moveIn || [];
         }
-        if (
-            lowerText.includes('loan') ||
-            lowerText.includes('financing') ||
-            lowerText.includes('funding')
-        ) {
+        if (lowerText.includes('loan') || lowerText.includes('financing') || lowerText.includes('funding')) {
             return config.leadQualification.options?.financing || [];
         }
         return [];
@@ -187,96 +163,76 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         setIsLoading(true);
         setQuickReplies([]);
 
-        // Handle initial start
-        if (messages.length === 0 && userMessageText.includes('Hello!')) {
-            await new Promise((resolve) => setTimeout(resolve, 600));
+        try {
+            // Call Chat Service
+            const response = await chatService.sendMessage({
+                query: userMessageText,
+                tenant_id: clientSlug, // clientSlug is used as tenant_id usually, or we should pass actual ID if different
+                conversation_id: conversationId,
+                user_identifier: sessionId // Using sessionId as a temporary user identifier
+            }, config.apiKey); // Pass API Key if available in config
 
-            if (!chatServiceRef.current) {
-                setSystemError('Chat service is not available.');
-                setIsLoading(false);
-                return;
-            }
-
-            const response = await chatServiceRef.current.sendMessage(userMessageText);
             setIsLoading(false);
 
-            if (response.error) {
-                setSystemError('Connection failed. Please check your API key or network.');
-                addMessage(MessageRole.Bot, response.text);
-                return;
+            // Update Conversation ID if new
+            if (response.conversation_id && !conversationId) {
+                setConversationId(response.conversation_id);
             }
 
-            addMessage(MessageRole.Bot, response.text, {
-                isSummary: !!response.summary,
-                summaryData: response.summary,
-                showActions: response.showActions,
+            // Check for lead capture
+            if (response.suggested_actions?.includes('lead_captured')) {
+                // If backend signaled lead capture, we can assume success
+                // We might want to construct summary data or just flag it
+                // For now, let's just log it or maybe trigger a thank you
+            }
+
+            addMessage(MessageRole.Bot, response.answer, {
+                // sources: response.sources
             });
 
-            if (!response.showActions && !response.summary) {
-                let replies: string[] = [];
-                if (response.currentStepId) {
-                    const question = config.leadQualification.questions.find(q => q.id === response.currentStepId);
-                    if (question) {
-                        if (question.optionsKey && config.leadQualification.options) {
-                            replies = config.leadQualification.options[question.optionsKey] || [];
-                        } else if (question.options) {
-                            replies = question.options;
-                        }
-                    }
-                }
-                if (replies.length === 0) {
-                    replies = determineQuickReplies(response.text);
-                }
-                setQuickReplies(replies);
-            }
-            return;
-        }
-
-
-        if (!chatServiceRef.current) {
-            setIsLoading(false);
-            setSystemError('Chat service disconnected.');
-            return;
-        }
-
-        const response = await chatServiceRef.current.sendMessage(userMessageText);
-        setIsLoading(false);
-
-        if (response.error) {
-            addMessage(MessageRole.Bot, response.text);
-            return;
-        }
-
-        if (response.summary) {
-            setLeadData({ ...response.summary, sessionId });
-        }
-
-        addMessage(MessageRole.Bot, response.text, {
-            isSummary: !!response.summary,
-            summaryData: { ...response.summary, sessionId },
-            showActions: response.showActions,
-        });
-
-        if (!response.showActions && !response.summary) {
-            let replies: string[] = [];
-
-            if (response.currentStepId) {
-                const question = config.leadQualification.questions.find(q => q.id === response.currentStepId);
-                if (question) {
-                    if (question.optionsKey && config.leadQualification.options) {
-                        replies = config.leadQualification.options[question.optionsKey] || [];
-                    } else if (question.options) {
-                        replies = question.options;
-                    }
-                }
-            }
-
-            // Fallback to text matching if no step ID or no options found via ID
-            if (replies.length === 0) {
-                replies = determineQuickReplies(response.text);
-            }
-
+            // Determine quick replies based on text keyword matching (fallback)
+            const replies = determineQuickReplies(response.answer);
             setQuickReplies(replies);
+
+        } catch (error: any) {
+            console.error("Chat Error:", error);
+
+            // Handle 404 (Conversation Not Found) - likely stale session ID
+            if (error.response?.status === 404 && conversationId) {
+                console.warn("Conversation not found (404), starting new session...");
+                setConversationId(null);
+
+                try {
+                    // Retry as new conversation
+                    const retryResponse = await chatService.sendMessage({
+                        query: userMessageText,
+                        tenant_id: clientSlug,
+                        conversation_id: null, // Force new
+                        user_identifier: sessionId
+                    }, config.apiKey);
+
+                    setIsLoading(false);
+                    if (retryResponse.conversation_id) {
+                        setConversationId(retryResponse.conversation_id);
+                    }
+
+                    addMessage(MessageRole.Bot, retryResponse.answer);
+                    const replies = determineQuickReplies(retryResponse.answer);
+                    setQuickReplies(replies);
+                    return;
+
+                } catch (retryError) {
+                    console.error("Retry failed:", retryError);
+                    setSystemError('Failed to start a new conversation.');
+                }
+            } else {
+                setSystemError(error.response?.data?.detail || 'Failed to connect to the chat server.');
+            }
+
+            setIsLoading(false);
+            if (!conversationId || error.response?.status !== 404) {
+                addMessage(MessageRole.Bot, "I'm having trouble connecting right now. Please try again later.");
+            }
         }
     };
 
@@ -284,6 +240,25 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         if (systemError) return;
         setHasStarted(true);
         const startMsg = `Hello! I'm interested in ${config.companyName}.`;
+        // Don't add user start message visually if we want bot to welcome first, 
+        // but usually handleStart implies user clicked "Start Chat" which sends the message.
+        // Actually, previous implementation relied on bot response WITHOUT user message shown for "Hello".
+        // Let's keep it consistent: send "Hello" implicitly to trigger bot welcome flow?
+        // Or if Welcome Screen is just a UI start, we send the first message now.
+        // Previous code: await handleBotResponse(startMsg); (without adding user message to UI?)
+        // Let's check previous impl logic:
+        // if (messages.length === 0 && userMessageText.includes('Hello!')) ...
+
+        // We will just send it as a user message to backend but maybe hide it? 
+        // Or just show it. Showing it is clearer.
+        // But if we want the BOT to speak first (after welcome screen), we send a hidden message.
+
+        // We'll mimic previous behavior: Send message to backend to get first bot response.
+        // We won't add it to UI if we want to mimic "System Init". 
+        // But for simplicity, let's treat it as user intent.
+
+        // Actually, let's just call handleBotResponse with the start text. 
+        // We WON'T add it to the UI messages list to keep the "Welcome" feel clean.
         await handleBotResponse(startMsg);
     };
 
@@ -292,70 +267,42 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         setQuickReplies([]);
         if (!hasStarted) {
             setHasStarted(true);
-            addMessage(MessageRole.User, text);
-            await handleBotResponse(text);
-        } else {
-            addMessage(MessageRole.User, text);
-            await handleBotResponse(text);
         }
-    };
-
-    const submitToCRM = (status: 'scheduled' | 'later') => {
-        console.log('------------------------------------------------');
-        console.log('🚀 CRM SUBMISSION SIMULATION');
-        console.log('------------------------------------------------');
-        console.log('Client Slug:', clientSlug);
-        console.log('Session ID:', sessionId);
-        console.log(
-            'Lead Status:',
-            status === 'scheduled' ? 'HOT LEAD - Call Scheduled' : 'WARM LEAD - Follow up later'
-        );
-        console.log('Captured Data:', leadData);
-        console.log(
-            'Chat Transcript:',
-            messages.map((m) => `[${m.role}]: ${m.text}`)
-        );
-        console.log('------------------------------------------------');
+        addMessage(MessageRole.User, text);
+        await handleBotResponse(text);
     };
 
     const handleScheduleCall = () => {
         setQuickReplies([]);
         addMessage(MessageRole.User, 'Yes, schedule a call.');
-        submitToCRM('scheduled');
+        // Backend handles lead capture automatically via chat now.
+        // We just send the intent.
+        handleSendMessage("Yes, I'd like to schedule a call.");
         setIsChatEnded(true);
-        setTimeout(() => {
-            addMessage(MessageRole.Bot, config.messages.scheduleSuccess);
-        }, 1000);
     };
 
     const handleMaybeLater = () => {
         setQuickReplies([]);
         addMessage(MessageRole.User, 'Maybe later.');
-        submitToCRM('later');
+        handleSendMessage("Maybe later.");
         setIsChatEnded(true);
-        setTimeout(() => {
-            addMessage(MessageRole.Bot, config.messages.maybeLater);
-        }, 1000);
     };
 
     const handleFeedback = (messageId: string, feedbackType: 'up' | 'down') => {
         setMessages((prev) =>
             prev.map((msg) => (msg.id === messageId ? { ...msg, feedback: feedbackType } : msg))
         );
-        console.log('FEEDBACK:', { sessionId, messageId, feedbackType });
+        // We could send feedback to backend if API existed
     };
 
     const handleNewChat = () => {
-        // Clear persisted state and start fresh
         clearChatState(sessionId);
         setMessages([]);
+        setConversationId(null);
         setHasStarted(false);
         setIsChatEnded(false);
         setLeadData(null);
         setQuickReplies([]);
-        if (chatServiceRef.current) {
-            chatServiceRef.current.clearHistory();
-        }
     };
 
     return {

@@ -1,8 +1,8 @@
-import { Client, DashboardStats, OnboardingData, CreateClientInput } from '@/types/admin';
+import { Client, DashboardStats, OnboardingData, CreateClientInput, TenantDocument, DashboardMetrics, DailyMetric, DashboardLead, SystemHealth, PlatformStats } from '@/types/admin';
+import { api } from './api';
+import { TenantConfig } from '@/types/config';
 
-const API_BASE = 'http://localhost:3001/api';
-
-// --- MOCK STATS (Still Mocked) ---
+// --- MOCK STATS (Backend doesn't have stats yet) ---
 const MOCK_STATS: DashboardStats = {
     totalActiveClients: 124,
     totalRevenue: 45200,
@@ -27,19 +27,116 @@ const MOCK_ONBOARDING_DATA_30_DAYS: OnboardingData[] = [
     { date: 'Week 4', count: 20 },
 ];
 
-// --- API Service Functions ---
+// Helper to map Backend Tenant -> Frontend Client
+const mapTenantToClient = (tenant: any): Client => {
+    // Backend returns config with flat fields (snake_case)
+    const backendConfig = tenant.config || {};
+
+    const planMap: Record<string, 'Starter' | 'Pro' | 'Enterprise'> = {
+        'S1': 'Starter',
+        'S2': 'Pro',
+        'S3': 'Enterprise'
+    };
+
+    // Transform to Frontend TenantConfig (nested, camelCase)
+    const frontendConfig: TenantConfig = {
+        companyName: backendConfig.bot_name || tenant.name,
+        shortName: backendConfig.bot_name || tenant.name,
+        botName: backendConfig.bot_name || 'QBot',
+        botDisplayName: backendConfig.bot_displayName || backendConfig.bot_name || 'Assistant',
+        botAvatar: backendConfig.avatar_url || '',
+
+        colors: {
+            primary: backendConfig.primary_color || '#4F46E5',
+            secondary: backendConfig.secondary_color || '#6366F1'
+        },
+
+        welcome: {
+            headline: backendConfig.headline_prefix || 'Welcome to',
+            highlightedHeadline: backendConfig.highlighted_headline || 'QBot',
+            subheadline: backendConfig.sub_headline || 'How can I help you today?',
+            startBtnText: 'Start Conversation',
+            features: backendConfig.key_features || []
+        },
+
+        leadQualification: {
+            options: {},
+            questions: backendConfig.qualification_questions?.map((q: any) => ({
+                id: q.id,
+                label: q.question,
+                instruction: q.question,
+                collects: [],
+                options: q.quick_replies?.map((qr: any) => qr.text) || []
+            })) || []
+        },
+
+        messages: {
+            scheduleSuccess: 'Thank you! Our team will be in touch shortly.',
+            maybeLater: 'No problem! Feel free to reach out whenever you are ready.'
+        }
+    };
+
+    return {
+        id: tenant.tenant_id,
+        name: tenant.name,
+        slug: backendConfig.url_slug || tenant.tenant_id,
+        status: tenant.is_active ? 'Active' : 'Inactive',
+        onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        totalUsers: 0,
+        plan: planMap[backendConfig.plan] || 'Starter',
+        config: frontendConfig
+    };
+};
+
+// --- Platform Stats ---
+export const getPlatformStats = async (): Promise<PlatformStats | null> => {
+    try {
+        const res = await api.get('/analytics/platform');
+        return res.data.data;
+    } catch (e) {
+        console.error("Error fetching platform stats:", e);
+        return null;
+    }
+};
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
-    // Keeping this mocked for now as we don't have a real DB trace yet
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return MOCK_STATS;
+    const platformStats = await getPlatformStats();
+
+    // Default fallback if API fails
+    if (!platformStats) {
+        return MOCK_STATS;
+    }
+
+    return {
+        totalActiveClients: platformStats.total_tenants,
+        totalRevenue: 45200, // Still mocked as requested
+        activeUsers: platformStats.total_users,
+        growthRate: platformStats.global_conversion_rate // Use conversion rate instead of growth
+    };
 };
 
 export const getClients = async (): Promise<Client[]> => {
     try {
-        const res = await fetch(`${API_BASE}/admin/clients`);
-        if (!res.ok) throw new Error('Failed to fetch clients');
-        return await res.json();
+        const res = await api.get('/tenants', {
+            params: { _t: Date.now() } // Cache buster
+        });
+
+        console.log('📦 Fetched Tenants:', res.data); // Debug log
+
+        if (!Array.isArray(res.data)) {
+            console.error('Expected array of tenants, got:', res.data);
+            return [];
+        }
+
+        return res.data.map((t: any) => {
+            try {
+                return mapTenantToClient(t);
+            } catch (err) {
+                console.error('Failed to map tenant:', t, err);
+                return null;
+            }
+        }).filter((c): c is Client => c !== null); // Filter out failed mappings
+
     } catch (e) {
         console.error("Error fetching clients:", e);
         return [];
@@ -47,60 +144,227 @@ export const getClients = async (): Promise<Client[]> => {
 };
 
 export const getClientById = async (id: string): Promise<Client | null> => {
-    // This is less efficient (fetch all), but fine for MVP
-    const clients = await getClients();
-    return clients.find(c => c.id === id) || null;
+    try {
+        const res = await api.get(`/tenants/${id}`);
+        return mapTenantToClient(res.data);
+    } catch (e) {
+        console.error(`Error fetching client ${id}:`, e);
+        return null;
+    }
 };
 
+
+
+// ... (existing imports/code up to updateClient)
+
 export const updateClient = async (client: Client): Promise<Client> => {
-    // Note: Backend 'POST' currently handles create-or-update mostly for the list logic?
-    // Actually the backend POST is primarily for Create. We didn't impl separate Update or PUT.
-    // For now, let's keep this as a "Soft" Mock until we enhance backend PUT.
-    // Ideally we should implement PUT /api/admin/clients/:id
-    console.warn("Update Client not fully implemented on backend yet");
-    return client;
+    // Map Frontend Client -> Backend TenantUpdate
+    // Structure: { name, config: { ... } }
+
+    // We reverse the mapping logic from mapTenantToClient
+    const backendConfig = {
+        plan: client.plan === 'Starter' ? 'S1' : client.plan === 'Pro' ? 'S2' : 'S3',
+        url_slug: client.slug,
+
+        // Bot Branding
+        bot_name: client.config?.botName,
+        avatar_url: client.config?.botAvatar,
+        primary_color: client.config?.colors?.primary,
+        secondary_color: client.config?.colors?.secondary,
+
+        // Welcome
+        headline_prefix: client.config?.welcome?.headline,
+        highlighted_headline: client.config?.welcome?.highlightedHeadline,
+        sub_headline: client.config?.welcome?.subheadline,
+        key_features: client.config?.welcome?.features,
+
+        // Qualifications
+        qualification_questions: client.config?.leadQualification?.questions?.map(q => ({
+            id: q.id,
+            question: q.label,
+            quick_replies: q.options?.map((opt, idx) => ({
+                id: String(idx + 1),
+                text: opt,
+                value: opt
+            })) || [],
+            required: true
+        })),
+
+        language: "en", // default for now
+        tone: "professional"
+    };
+
+    const payload = {
+        name: client.name,
+        is_active: client.status !== 'Inactive', // Basic status mapping
+        config: backendConfig
+    };
+
+    const res = await api.put(`/tenants/${client.id}`, payload);
+    return mapTenantToClient(res.data);
 };
 
 export const deleteClient = async (id: string): Promise<void> => {
-    console.warn("Delete Client not fully implemented on backend yet");
-    // TODO: Implement DELETE /api/admin/clients/:id
+    await api.delete(`/tenants/${id}`);
 };
 
 export const toggleClientPause = async (id: string): Promise<Client> => {
-    // TODO: Implement Status Toggle API
-    throw new Error('Toggle Pause not implemented yet');
+    // Backend doesn't support 'Pause' yet, only 'Active' (true/false) via is_active
+    // We can toggle is_active
+    const client = await getClientById(id);
+    if (!client) throw new Error("Client not found");
+
+    const newStatus = client.status === 'Active' ? false : true;
+
+    const res = await api.put(`/tenants/${id}`, {
+        is_active: newStatus
+    });
+
+    return mapTenantToClient(res.data);
 };
 
 export const createClient = async (clientData: CreateClientInput): Promise<Client> => {
-    const newClientPayload = {
-        ...clientData,
-        id: crypto.randomUUID(), // Valid ID generation
-        status: 'Active', // Default to Active for now so it works immediately
-        onboardedDate: new Date().toISOString().split('T')[0],
-        totalUsers: 0,
-        createdAt: new Date().toISOString().split('T')[0],
-        updatedAt: new Date().toISOString().split('T')[0]
+    // Map Frontend Input -> Backend TenantCreate
+    const backendPayload = {
+        name: clientData.name,
+        config: {
+            plan: clientData.plan === 'Starter' ? 'S1' : clientData.plan === 'Pro' ? 'S2' : 'S3',
+            url_slug: clientData.slug,
+            bot_name: clientData.config.botName,
+            avatar_url: clientData.config.botAvatar,
+            primary_color: clientData.config.colors.primary,
+            secondary_color: clientData.config.colors.secondary,
+
+            headline_prefix: clientData.config.welcome.headline,
+            highlighted_headline: clientData.config.welcome.highlightedHeadline,
+            sub_headline: clientData.config.welcome.subheadline,
+            key_features: clientData.config.welcome.features,
+
+            qualification_questions: clientData.config.leadQualification.questions.map(q => ({
+                id: q.id,
+                question: q.label, // Backend expects 'question'
+                quick_replies: q.options?.map((opt, idx) => ({
+                    id: String(idx + 1),
+                    text: opt,
+                    value: opt
+                })) || [],
+                required: true
+            })),
+
+            welcome_message: `${clientData.config.welcome.headline} ${clientData.config.welcome.highlightedHeadline}`,
+            language: "en",
+            tone: "professional"
+        }
     };
 
-    const res = await fetch(`${API_BASE}/admin/clients`, {
-        method: 'POST',
+    const res = await api.post('/tenants', backendPayload);
+    const createdTenant = res.data;
+    console.log('➕ Client created:', createdTenant.name);
+
+    return mapTenantToClient(createdTenant);
+};
+
+export const ingestDocument = async (tenantId: string, file: File): Promise<void> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    await api.post('/documents/ingest', formData, {
         headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newClientPayload)
+            'Content-Type': 'multipart/form-data',
+            'X-Tenant-ID': tenantId
+        }
     });
+};
 
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to create client');
+export const getTenantDocuments = async (tenantId: string): Promise<TenantDocument[]> => {
+    try {
+        const res = await api.get(`/documents/tenants/${tenantId}`);
+        return res.data;
+    } catch (e) {
+        console.error("Error fetching documents:", e);
+        return [];
     }
+};
 
-    const createdClient = await res.json();
-    console.log('➕ Client created:', createdClient.name);
-    return createdClient;
+export const deleteDocument = async (documentId: string, tenantId: string): Promise<void> => {
+    await api.delete(`/documents/${documentId}`, {
+        headers: {
+            'X-Tenant-ID': tenantId
+        }
+    });
 };
 
 export const getOnboardingData = async (range: '7d' | '30d' = '7d'): Promise<OnboardingData[]> => {
     await new Promise(resolve => setTimeout(resolve, 500));
     return range === '7d' ? MOCK_ONBOARDING_DATA_7_DAYS : MOCK_ONBOARDING_DATA_30_DAYS;
+};
+
+export const getDashboardMetrics = async (tenantId: string): Promise<DashboardMetrics | null> => {
+    try {
+        const res = await api.get('/analytics/dashboard', {
+            params: { tenant_id: tenantId }
+        });
+        return res.data.data;
+    } catch (e) {
+        console.error("Error fetching dashboard metrics:", e);
+        return null;
+    }
+};
+
+export const getDailyMetrics = async (tenantId: string, days: number = 7): Promise<DailyMetric[]> => {
+    try {
+        const res = await api.get('/analytics/daily', {
+            params: { tenant_id: tenantId, days }
+        });
+        return res.data.data;
+    } catch (e) {
+        console.error("Error fetching daily metrics:", e);
+        return [];
+    }
+};
+
+export const getRecentLeads = async (tenantId: string): Promise<DashboardLead[]> => {
+    try {
+        const res = await api.get(`/leads/tenants/${tenantId}/all`, {
+            params: { limit: 5 }
+        });
+        // Map backend Lead to DashboardLead
+        return res.data.map((lead: any) => ({
+            id: lead.lead_id,
+            name: lead.name || 'Anonymous',
+            status: lead.status, // e.g. 'new', 'qualified'
+            created_at: lead.created_at
+        }));
+    } catch (e) {
+        console.error("Error fetching recent leads:", e);
+        return [];
+    }
+};
+
+// --- API Key ---
+export const generateApiKey = async (tenantId: string): Promise<string> => {
+    try {
+        const res = await api.post(`/tenants/${tenantId}/generate-api-key`);
+        return res.data.api_key;
+    } catch (e) {
+        console.error("Error generating API key:", e);
+        throw e;
+    }
+};
+
+// --- System Health ---
+export const getSystemHealth = async (): Promise<SystemHealth> => {
+    try {
+        const response = await fetch('http://localhost:8000/health');
+        if (!response.ok) throw new Error('Health check failed');
+        return await response.json();
+    } catch (error) {
+        console.error("Health check error:", error);
+        return {
+            status: 'down',
+            latency_ms: 0,
+            details: { database: 'disconnected' },
+            version: 'unknown'
+        };
+    }
 };

@@ -1,29 +1,43 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import { useTenantConfig } from '../hooks/useTenantConfig';
-import { Users, CheckCircle, Calendar, ArrowUpRight, Clock, MoreHorizontal } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Users, CheckCircle, MessageSquare, ArrowUpRight, MoreHorizontal, Clock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const data = [
-    { name: 'Mon', leads: 4 },
-    { name: 'Tue', leads: 7 },
-    { name: 'Wed', leads: 5 },
-    { name: 'Thu', leads: 12 },
-    { name: 'Fri', leads: 9 },
-    { name: 'Sat', leads: 15 },
-    { name: 'Sun', leads: 11 },
-];
-
-const recentActivity = [
-    { id: 1, name: 'Rahul S.', action: 'Scheduled a call', time: '2 mins ago', status: 'success' },
-    { id: 2, name: 'Priya M.', action: 'Qualified lead', time: '15 mins ago', status: 'success' },
-    { id: 3, name: 'Amit K.', action: 'Started conversation', time: '1 hour ago', status: 'neutral' },
-    { id: 4, name: 'Sneha R.', action: 'requested callback', time: '3 hours ago', status: 'warning' },
-];
+import { getDashboardMetrics, getDailyMetrics, getRecentLeads, getClientById } from '../services/adminService';
+import { DashboardMetrics, DailyMetric, DashboardLead, Client } from '../types/admin';
 
 export const DashboardPage = () => {
-    const { clientSlug } = useParams<{ clientSlug: string }>();
-    const { config, loading } = useTenantConfig(clientSlug);
+    const { tenantId } = useParams<{ tenantId: string }>();
+    const navigate = useNavigate();
+
+    const [client, setClient] = useState<Client | null>(null);
+    const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+    const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
+    const [recentLeads, setRecentLeads] = useState<DashboardLead[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!tenantId) return;
+            setLoading(true);
+            try {
+                const [clientData, metricsData, dailyData, leadsData] = await Promise.all([
+                    getClientById(tenantId),
+                    getDashboardMetrics(tenantId),
+                    getDailyMetrics(tenantId, 7),
+                    getRecentLeads(tenantId)
+                ]);
+                setClient(clientData);
+                setMetrics(metricsData);
+                setDailyMetrics(dailyData);
+                setRecentLeads(leadsData);
+            } catch (err) {
+                console.error("Failed to fetch dashboard data", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [tenantId]);
 
     if (loading) {
         return (
@@ -33,9 +47,15 @@ export const DashboardPage = () => {
         );
     }
 
-    if (!config) {
-        return <div className="min-h-screen flex items-center justify-center">Client not found</div>;
+    if (!client || !metrics || !client.config) {
+        return <div className="min-h-screen flex items-center justify-center">Client or Data not found</div>;
     }
+
+    const config = client.config;
+    const hotLeads = metrics.leads_by_status.qualified + metrics.leads_by_status.converted;
+    const coldLeads = metrics.leads_by_status.new + metrics.leads_by_status.contacted + metrics.leads_by_status.lost;
+    const totalLeads = metrics.leads || 1; // Avoid div by zero
+    const qualRate = Math.round((hotLeads / totalLeads) * 100);
 
     return (
         <div className="min-h-screen bg-gray-50/50 p-8">
@@ -43,7 +63,7 @@ export const DashboardPage = () => {
                 {/* Header */}
                 <header className="flex justify-between items-end">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{config.companyName}</h1>
+                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{config.companyName || client.name}</h1>
                         <p className="text-gray-500 mt-1">Real-time performance overview</p>
                     </div>
                     <div className="flex gap-3">
@@ -57,72 +77,104 @@ export const DashboardPage = () => {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <StatsCard
+                        title="Total Conversations"
+                        value={metrics.conversations}
+                        trend="--"
+                        icon={MessageSquare}
+                        color="blue"
+                    />
+                    <StatsCard
                         title="Total Leads"
-                        value="124"
-                        trend="+12%"
+                        value={metrics.leads}
+                        trend="--"
                         icon={Users}
                         color="indigo"
                     />
                     <StatsCard
                         title="Qualified Leads"
-                        value="45"
-                        trend="+8%"
+                        value={metrics.leads_by_status.qualified}
+                        trend={`${qualRate}% Rate`}
                         icon={CheckCircle}
                         color="emerald"
-                    />
-                    <StatsCard
-                        title="Scheduled Calls"
-                        value="12"
-                        trend="+24%"
-                        icon={Calendar}
-                        color="blue"
                     />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Chart */}
-                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-semibold text-gray-900">Lead Volume Trend</h3>
-                            <button className="text-gray-400 hover:text-gray-600">
-                                <MoreHorizontal size={20} />
-                            </button>
+                    <div className="lg:col-span-2 space-y-8">
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="font-semibold text-gray-900">Lead Volume Trend</h3>
+                                <button className="text-gray-400 hover:text-gray-600">
+                                    <MoreHorizontal size={20} />
+                                </button>
+                            </div>
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={dailyMetrics}>
+                                        <defs>
+                                            <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.1} />
+                                                <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                                        <XAxis
+                                            dataKey="date"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                                            dy={10}
+                                            tickFormatter={(value) => value.slice(5)} // Show MM-DD
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="leads"
+                                            stroke="#4F46E5"
+                                            strokeWidth={3}
+                                            fillOpacity={1}
+                                            fill="url(#colorLeads)"
+                                            name="Leads"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
-                        <div className="h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data}>
-                                    <defs>
-                                        <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.1} />
-                                            <stop offset="95%" stopColor="#4F46E5" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                                        dy={10}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="leads"
-                                        stroke="#4F46E5"
-                                        strokeWidth={3}
-                                        fillOpacity={1}
-                                        fill="url(#colorLeads)"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
+
+                        {/* Recent Activity */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                            <h3 className="font-semibold text-gray-900 mb-4">Recent Leads</h3>
+                            <div className="space-y-4">
+                                {recentLeads.length === 0 ? (
+                                    <p className="text-gray-500 text-sm">No recent leads found.</p>
+                                ) : (
+                                    recentLeads.map((lead) => (
+                                        <div key={lead.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                                                    <Users size={16} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-900">{lead.name}</p>
+                                                    <p className="text-xs text-gray-500 capitalize">{lead.status} Lead</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center text-xs text-gray-400">
+                                                <Clock size={12} className="mr-1" />
+                                                {new Date(lead.created_at).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -133,20 +185,20 @@ export const DashboardPage = () => {
                             <h3 className="font-semibold text-gray-900 mb-4">Lead Quality</h3>
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm text-gray-500">Qualification Rate</span>
-                                <span className="text-lg font-bold text-gray-900">36%</span>
+                                <span className="text-lg font-bold text-gray-900">{qualRate}%</span>
                             </div>
                             <div className="w-full bg-gray-100 rounded-full h-2 mb-6">
-                                <div className="bg-indigo-600 h-2 rounded-full" style={{ width: '36%' }}></div>
+                                <div className="bg-indigo-600 h-2 rounded-full" style={{ width: `${qualRate}%` }}></div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="p-3 bg-emerald-50 rounded-xl">
                                     <p className="text-xs text-emerald-600 font-medium mb-1">Hot Lead</p>
-                                    <p className="text-xl font-bold text-gray-900">45</p>
+                                    <p className="text-xl font-bold text-gray-900">{hotLeads}</p>
                                 </div>
                                 <div className="p-3 bg-red-50 rounded-xl">
                                     <p className="text-xs text-red-600 font-medium mb-1">Cold Lead</p>
-                                    <p className="text-xl font-bold text-gray-900">79</p>
+                                    <p className="text-xl font-bold text-gray-900">{coldLeads}</p>
                                 </div>
                             </div>
                         </div>
@@ -155,11 +207,21 @@ export const DashboardPage = () => {
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                             <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
                             <div className="space-y-3">
-                                <button className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-indigo-600 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 transition-all group">
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/chat/${client.slug}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('Copied to clipboard!');
+                                    }}
+                                    className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-indigo-600 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 transition-all group"
+                                >
                                     <span className="font-medium text-sm">Copy Chatbot Link</span>
                                     <ArrowUpRight size={16} className="text-gray-400 group-hover:text-indigo-600" />
                                 </button>
-                                <button className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-indigo-600 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 transition-all group">
+                                <button
+                                    onClick={() => navigate(`/admin/client/${tenantId}?tab=qualifications`)}
+                                    className="w-full flex items-center justify-between p-3 rounded-xl border border-gray-200 hover:border-indigo-600 hover:bg-indigo-50 text-gray-600 hover:text-indigo-600 transition-all group"
+                                >
                                     <span className="font-medium text-sm">Edit Qualification Questions</span>
                                     <ArrowUpRight size={16} className="text-gray-400 group-hover:text-indigo-600" />
                                 </button>
@@ -185,10 +247,10 @@ const StatsCard = ({ title, value, trend, icon: Icon, color }: any) => {
                 <div className={`p-3 rounded-xl ${colorStyles[color as keyof typeof colorStyles]}`}>
                     <Icon size={24} />
                 </div>
-                <div className="flex items-center text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                {/* <div className="flex items-center text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
                     <ArrowUpRight size={14} className="mr-1" />
                     <span className="text-xs font-bold">{trend}</span>
-                </div>
+                </div> */}
             </div>
             <div>
                 <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>

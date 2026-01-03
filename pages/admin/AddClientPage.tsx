@@ -2,19 +2,20 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, ArrowRight, Check, Building2, Bot, MessageSquare,
-    HelpCircle, ClipboardCheck, Plus, X, Sparkles, Wand2
+    HelpCircle, ClipboardCheck, Plus, X, Sparkles, Wand2, FileText, Upload, AlertCircle
 } from 'lucide-react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { TenantConfig, DEFAULT_TENANT_CONFIG, Question } from '../../types/config';
-import { createClient } from '../../services/adminService';
+import { createClient, ingestDocument } from '../../services/adminService';
 
 const STEPS = [
     { id: 1, title: 'Basic Info', icon: Building2 },
     { id: 2, title: 'Bot Identity', icon: Bot },
     { id: 3, title: 'Welcome Screen', icon: MessageSquare },
-    { id: 4, title: 'Qualifications', icon: HelpCircle },
-    { id: 5, title: 'Review', icon: ClipboardCheck },
+    { id: 4, title: 'Knowledge Base', icon: FileText },
+    { id: 5, title: 'Qualifications', icon: HelpCircle },
+    { id: 6, title: 'Review', icon: ClipboardCheck },
 ];
 
 export const AddClientPage = () => {
@@ -23,6 +24,7 @@ export const AddClientPage = () => {
     const [currentStep, setCurrentStep] = useState(1);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     // Form state initialized with default 5 questions
     const [formData, setFormData] = useState<{
@@ -112,6 +114,9 @@ export const AddClientPage = () => {
             case 3:
                 return formData.config.welcome.highlightedHeadline.length >= 1;
             case 4:
+                // Knowledge Base - Optional for now
+                return true;
+            case 5:
                 // Ensure all 5 questions have at least a label and instruction
                 return formData.config.leadQualification.questions.every(q =>
                     q.label.trim().length > 0 && q.instruction.trim().length > 0
@@ -123,7 +128,7 @@ export const AddClientPage = () => {
 
     const handleNext = () => {
         if (validateStep(currentStep)) {
-            setCurrentStep(prev => Math.min(prev + 1, 5));
+            setCurrentStep(prev => Math.min(prev + 1, 6));
             setError('');
         } else {
             setError('Please fill in all required fields for this step.');
@@ -151,12 +156,24 @@ export const AddClientPage = () => {
                 }
             };
 
-            await createClient({
+            const createdClient = await createClient({
                 name: formData.name,
                 slug: formData.slug,
                 plan: formData.plan,
                 config: finalConfig
             });
+
+            // If a file was selected, upload it now using the new tenant ID
+            if (selectedFile) {
+                try {
+                    await ingestDocument(createdClient.id, selectedFile);
+                    console.log('📄 Document uploaded successfully');
+                } catch (docErr) {
+                    console.error('Failed to upload document', docErr);
+                    // We don't block success here, but we could warn the user
+                    // For now, proceed to list
+                }
+            }
 
             navigate('/admin/clients');
         } catch (e) {
@@ -376,8 +393,66 @@ export const AddClientPage = () => {
                     </div>
                 )}
 
-                {/* Step 4: Qualifications (The Dynamic Part) */}
+                {/* Step 4: Knowledge Base (RAG Upload) */}
                 {currentStep === 4 && (
+                    <div className={cardClass}>
+                        <h2 className={`text-lg font-semibold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>Knowledge Base</h2>
+                        <div className="space-y-6">
+                            <div className={`p-4 rounded-lg flex items-start gap-3 ${isDark ? 'bg-blue-900/20 border border-blue-800' : 'bg-blue-50 border border-blue-100'}`}>
+                                <FileText className="text-blue-500 mt-1" size={20} />
+                                <div>
+                                    <h3 className={`font-semibold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>Upload Documents</h3>
+                                    <p className={`text-sm ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                                        Upload a PDF, DOCX, or TXT file to train the bot. This allows the bot to answer questions based on your specific company data.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-colors ${isDark ? 'border-slate-700 hover:border-indigo-500 bg-slate-800/50' : 'border-gray-300 hover:border-indigo-500 bg-gray-50'
+                                }`}>
+                                <div className={`p-4 rounded-full mb-4 ${isDark ? 'bg-slate-700' : 'bg-white shadow-sm'}`}>
+                                    <Upload size={32} className={isDark ? 'text-slate-400' : 'text-gray-400'} />
+                                </div>
+                                <div className="text-center">
+                                    <p className={`font-medium mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                        {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
+                                    </p>
+                                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                        {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'PDF, DOCX, TXT up to 10MB'}
+                                    </p>
+                                </div>
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    id="file-upload"
+                                    accept=".pdf,.docx,.txt,.md"
+                                    onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            setSelectedFile(e.target.files[0]);
+                                        }
+                                    }}
+                                />
+                                <label
+                                    htmlFor="file-upload"
+                                    className="mt-6 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg cursor-pointer transition-colors"
+                                >
+                                    {selectedFile ? 'Change File' : 'Select File'}
+                                </label>
+                                {selectedFile && (
+                                    <button
+                                        onClick={() => setSelectedFile(null)}
+                                        className="mt-3 text-sm text-red-500 hover:underline"
+                                    >
+                                        Remove file
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 5: Qualifications (The Dynamic Part) */}
+                {currentStep === 5 && (
                     <div className="space-y-6">
                         <div className={`p-4 rounded-lg flex items-start gap-3 ${isDark ? 'bg-indigo-900/20 border border-indigo-800' : 'bg-indigo-50 border border-indigo-100'}`}>
                             <Wand2 className="text-indigo-500 mt-1" size={20} />
@@ -442,8 +517,8 @@ export const AddClientPage = () => {
                     </div>
                 )}
 
-                {/* Step 5: Review */}
-                {currentStep === 5 && (
+                {/* Step 6: Review */}
+                {currentStep === 6 && (
                     <div className={cardClass}>
                         <h2 className={`text-lg font-semibold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>Review & Create</h2>
 
@@ -452,6 +527,12 @@ export const AddClientPage = () => {
                                 <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">Details</h3>
                                 <p className={isDark ? 'text-white' : 'text-gray-900'}><strong>{formData.name}</strong> ({formData.plan})</p>
                                 <p className={`font-mono text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>/{formData.slug}</p>
+                                {selectedFile && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-indigo-500">
+                                        <FileText size={16} />
+                                        <span>File to ingest: {selectedFile.name}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="pt-4">
@@ -491,7 +572,7 @@ export const AddClientPage = () => {
                     <ArrowLeft size={18} /> Back
                 </button>
 
-                {currentStep < 5 ? (
+                {currentStep < 6 ? (
                     <button
                         onClick={handleNext}
                         className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20"
@@ -509,6 +590,6 @@ export const AddClientPage = () => {
                     </button>
                 )}
             </div>
-        </AdminLayout>
+        </AdminLayout >
     );
 };

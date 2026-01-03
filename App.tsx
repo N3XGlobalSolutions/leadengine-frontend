@@ -7,6 +7,9 @@ import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminClientsPage } from './pages/admin/AdminClientsPage';
 import { AddClientPage } from './pages/admin/AddClientPage';
 import { AdminClientDetailPage } from './pages/admin/AdminClientDetailPage';
+import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
+import { AdminGuidePage } from './pages/admin/AdminGuidePage';
+import { AdminSupportPage } from './pages/admin/AdminSupportPage';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { AdminThemeProvider } from './contexts/AdminThemeContext';
 import { ProtectedRoute } from './components/admin/ProtectedRoute';
@@ -39,10 +42,25 @@ export default function App() {
                 <AdminClientDetailPage />
               </ProtectedRoute>
             } />
+            <Route path="/admin/settings" element={
+              <ProtectedRoute>
+                <AdminSettingsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/guide" element={
+              <ProtectedRoute>
+                <AdminGuidePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/support" element={
+              <ProtectedRoute>
+                <AdminSupportPage />
+              </ProtectedRoute>
+            } />
 
             {/* Client Routes */}
-            <Route path="/:clientSlug/dashboard" element={<DashboardPage />} />
-            <Route path="/:clientSlug" element={<ChatPage />} />
+            <Route path="/:tenantId/dashboard" element={<DashboardPage />} />
+            <Route path="/:tenantId" element={<ChatPage />} />
 
             {/* Fallback / Root Redirect */}
             <Route path="/" element={<Navigate to="/sky-habitat" replace />} />

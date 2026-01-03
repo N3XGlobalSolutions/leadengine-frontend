@@ -13,6 +13,7 @@ export interface TenantConfig {
     botName: string;
     botDisplayName: string;
     botAvatar: string;
+    apiKey?: string; // Generated API key for the widget
 
     colors: {
         primary: string;

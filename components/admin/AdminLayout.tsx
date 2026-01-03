@@ -1,14 +1,19 @@
-import React from 'react';
-import { LayoutDashboard, Users, Settings, LogOut, Bell, Sun, Moon } from 'lucide-react';
+import React, { useState } from 'react';
+import { LayoutDashboard, Users, Settings, LogOut, Bell, Sun, Moon, HelpCircle } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
+import { NotificationPopover } from './NotificationPopover';
 
 export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { logout, user } = useAdminAuth();
     const { isDark, toggleTheme } = useAdminTheme();
     const navigate = useNavigate();
     const location = useLocation();
+    const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+    // Mock state for read status
+    const [unreadCount, setUnreadCount] = useState(2);
 
     const handleLogout = () => {
         logout();
@@ -38,8 +43,8 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
         <div className={`flex min-h-screen transition-colors duration-200 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
             {/* Sidebar */}
             <aside className={`w-64 fixed h-full z-10 hidden md:flex flex-col transition-colors duration-200 ${isDark
-                    ? 'bg-slate-800 border-r border-slate-700'
-                    : 'bg-white border-r border-gray-200'
+                ? 'bg-slate-800 border-r border-slate-700'
+                : 'bg-white border-r border-gray-200'
                 }`}>
                 <div className={`p-6 border-b ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
                     <div className="flex items-center space-x-2">
@@ -59,14 +64,17 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                         <Users size={20} />
                         <span>Clients</span>
                     </Link>
-                    <a href="#" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${isDark ? 'text-slate-400 hover:bg-slate-700 hover:text-white' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }`}>
+                    <Link to="/admin/settings" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/settings')}`}>
                         <Settings size={20} />
                         <span>Settings</span>
-                    </a>
+                    </Link>
                 </nav>
 
                 <div className={`p-4 border-t ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
+                    <Link to="/admin/support" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors mb-2 ${navLinkClass('/admin/support')}`}>
+                        <HelpCircle size={20} />
+                        <span>Support</span>
+                    </Link>
                     <button
                         onClick={handleLogout}
                         className={`flex items-center space-x-3 px-4 py-3 w-full transition-colors ${isDark
@@ -79,7 +87,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                     </button>
                     {user && (
                         <div className={`mt-2 px-4 text-xs text-center ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
-                            Logged in as {user.name}
+                            Logged in as {user.full_name}
                         </div>
                     )}
                 </div>
@@ -91,7 +99,10 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                     ? 'bg-slate-800 border-b border-slate-700'
                     : 'bg-white border-b border-gray-200'
                     }`}>
-                    <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-800'}`}>Dashboard</h2>
+                    <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                        {location.pathname.includes('/settings') ? 'Settings' :
+                            location.pathname.includes('/clients') ? 'Clients' : 'Dashboard'}
+                    </h2>
                     <div className="flex items-center space-x-4">
                         {/* Theme Toggle */}
                         <button
@@ -105,18 +116,32 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                             {isDark ? <Sun size={20} /> : <Moon size={20} />}
                         </button>
 
-                        <button className={`p-2 rounded-full transition-colors relative ${isDark
-                            ? 'text-slate-400 hover:text-white hover:bg-slate-700'
-                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                            }`}>
-                            <Bell size={20} />
-                            <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border border-white"></span>
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                                className={`p-2 rounded-full transition-colors relative ${isDark
+                                    ? 'text-slate-400 hover:text-white hover:bg-slate-700'
+                                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                                    }`}
+                            >
+                                <Bell size={20} />
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border border-white"></span>
+                                )}
+                            </button>
+
+                            <NotificationPopover
+                                isOpen={isNotifOpen}
+                                onClose={() => setIsNotifOpen(false)}
+                                onMarkAllRead={() => setUnreadCount(0)}
+                            />
+                        </div>
+
                         <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold border ${isDark
                             ? 'bg-indigo-900 text-indigo-300 border-indigo-700'
                             : 'bg-indigo-100 text-indigo-700 border-indigo-200'
                             }`}>
-                            {user?.name?.charAt(0) || 'A'}
+                            {user?.full_name?.charAt(0) || 'A'}
                         </div>
                     </div>
                 </header>

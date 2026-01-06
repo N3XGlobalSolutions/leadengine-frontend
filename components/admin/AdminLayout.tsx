@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, Settings, LogOut, Bell, Sun, Moon, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Users, User as UserIcon, Settings, LogOut, Bell, Sun, Moon, HelpCircle, Building2 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
@@ -61,8 +61,16 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                         <span>Dashboard</span>
                     </Link>
                     <Link to="/admin/clients" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/clients')}`}>
-                        <Users size={20} />
+                        <Building2 size={20} />
                         <span>Clients</span>
+                    </Link>
+                    <Link to="/admin/leads" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/leads')}`}>
+                        <Users size={20} />
+                        <span>Leads</span>
+                    </Link>
+                    <Link to="/admin/users" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/users')}`}>
+                        <UserIcon size={20} />
+                        <span>Users</span>
                     </Link>
                     <Link to="/admin/settings" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/settings')}`}>
                         <Settings size={20} />

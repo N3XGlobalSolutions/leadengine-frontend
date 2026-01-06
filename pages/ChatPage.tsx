@@ -64,6 +64,7 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
         isChatEnded,
         systemError,
         sessionId,
+        questionProgress,  // ⭐ NEW: Get progress tracking
         handleStart,
         handleSendMessage,
         handleScheduleCall,
@@ -135,6 +136,26 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                                 SESSION ID: <span className={`${themeClasses.accent} font-semibold`}>{sessionId?.slice(0, 8).toUpperCase()}</span>
                             </span>
                         </div>
+
+                        {/* ⭐ NEW: Progress Indicator */}
+                        {questionProgress.total > 0 && !isChatEnded && questionProgress.current > 0 && (
+                            <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-gray-700">
+                                        Question {questionProgress.current} of {questionProgress.total}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                        {Math.round((questionProgress.current / questionProgress.total) * 100)}% Complete
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                    <div
+                                        className={`bg-gradient-to-r from-${config.colors.primary}-500 to-${config.colors.secondary}-600 h-2 rounded-full transition-all duration-500 ease-out`}
+                                        style={{ width: `${(questionProgress.current / questionProgress.total) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         {/* Messages Container */}
                         <div className="flex-1 overflow-y-auto space-y-4 pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">

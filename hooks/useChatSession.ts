@@ -102,6 +102,17 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     const [systemError, setSystemError] = useState<string | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(persistedState?.conversationId || null);
 
+    // ⭐ NEW: Question progress tracking
+    const [questionProgress, setQuestionProgress] = useState<{
+        current: number;
+        total: number;
+        currentStepId: string | null;
+    }>({
+        current: 0,
+        total: 0,
+        currentStepId: null
+    });
+
     // Track when the session was created (for 24h expiry)
     const [sessionCreatedAt] = useState(() => persistedState?.createdAt || Date.now());
 
@@ -119,6 +130,16 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         }
     }, [messages, hasStarted, isChatEnded, leadData, sessionId, sessionCreatedAt, conversationId]);
 
+    // ⭐ NEW: Initialize total questions from config
+    useEffect(() => {
+        if (config?.leadQualification?.questions) {
+            setQuestionProgress(prev => ({
+                ...prev,
+                total: config.leadQualification.questions.length
+            }));
+        }
+    }, [config]);
+
     const addMessage = useCallback(
         (role: MessageRole, text: string, options?: Partial<Message>) => {
             const newMessage: Message = {
@@ -134,9 +155,23 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         []
     );
 
-    const determineQuickReplies = (text: string): string[] => {
+    const determineQuickReplies = (text: string, currentStepId: string | null): string[] => {
+        // ⭐ NEW: Try to match based on current step first (context-aware)
+        if (currentStepId && config.leadQualification?.questions) {
+            const currentStep = config.leadQualification.questions.find(
+                q => q.id === currentStepId
+            );
+
+            if (currentStep && currentStep.optionsKey) {
+                const options = config.leadQualification.options?.[currentStep.optionsKey as keyof typeof config.leadQualification.options];
+                if (options && options.length > 0) {
+                    return options;
+                }
+            }
+        }
+
+        // Fallback to keyword matching (existing logic)
         const lowerText = text.toLowerCase();
-        // Check if config options exist
         if (!config.leadQualification?.options) return [];
 
         if (lowerText.includes('location') || lowerText.includes('area') || lowerText.includes('where')) {
@@ -179,19 +214,42 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 setConversationId(response.conversation_id);
             }
 
-            // Check for lead capture
-            if (response.suggested_actions?.includes('lead_captured')) {
-                // If backend signaled lead capture, we can assume success
-                // We might want to construct summary data or just flag it
-                // For now, let's just log it or maybe trigger a thank you
-            }
+            // ⭐ Check for lead_captured action to auto-trigger action buttons
+            const isLeadCaptured = response.suggested_actions?.includes('lead_captured');
 
             addMessage(MessageRole.Bot, response.answer, {
+                showActions: isLeadCaptured,  // Auto-trigger action buttons when lead is captured
                 // sources: response.sources
             });
 
-            // Determine quick replies based on text keyword matching (fallback)
-            const replies = determineQuickReplies(response.answer);
+            // If lead captured, log for verification
+            if (isLeadCaptured) {
+                console.log('✅ Lead captured! Summary should be in the message above.');
+            }
+
+            // ⭐ Extract step ID and update progress
+            const extractStepInfo = (answer: string) => {
+                const stepMatch = answer.match(/\[STEP:(\w+)\]/);
+                if (stepMatch && stepMatch[1]) {
+                    const stepId = stepMatch[1];
+                    const stepIndex = config.leadQualification?.questions.findIndex(
+                        q => q.id === stepId
+                    );
+
+                    if (stepIndex !== undefined && stepIndex !== -1) {
+                        setQuestionProgress(prev => ({
+                            ...prev,
+                            current: stepIndex + 1,
+                            currentStepId: stepId
+                        }));
+                    }
+                }
+            };
+
+            extractStepInfo(response.answer);
+
+            // Determine quick replies based on active step (preferred) or keywords (fallback)
+            const replies = determineQuickReplies(response.answer, questionProgress.currentStepId);
             setQuickReplies(replies);
 
         } catch (error: any) {
@@ -217,7 +275,7 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                     }
 
                     addMessage(MessageRole.Bot, retryResponse.answer);
-                    const replies = determineQuickReplies(retryResponse.answer);
+                    const replies = determineQuickReplies(retryResponse.answer, questionProgress.currentStepId);
                     setQuickReplies(replies);
                     return;
 
@@ -314,6 +372,7 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         isChatEnded,
         systemError,
         sessionId,
+        questionProgress,  // ⭐ NEW: Export progress for display
         handleStart,
         handleSendMessage,
         handleScheduleCall,

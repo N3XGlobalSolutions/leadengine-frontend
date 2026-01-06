@@ -4,29 +4,14 @@ import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { AlertCircle, Sparkles, Lock, Mail, ArrowRight, Loader2, User as UserIcon, Building, ShieldCheck } from 'lucide-react';
 import { UserRole } from '../types/auth';
 
+
 export const AdminLoginPage = () => {
-    const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [fullName, setFullName] = useState('');
-    const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.CLIENT_ADMIN);
-    const [tenantId, setTenantId] = useState('');
-
-    const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const { login, register } = useAdminAuth();
+    const { login } = useAdminAuth();
     const navigate = useNavigate();
-    const location = useLocation();
-
-    const from = (location.state as any)?.from?.pathname || '/admin';
-
-    const toggleMode = () => {
-        setIsLogin(!isLogin);
-        setError('');
-        setPassword('');
-        // Keep email/name if useful, or clear them
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,18 +19,11 @@ export const AdminLoginPage = () => {
         setIsSubmitting(true);
 
         try {
-            if (isLogin) {
-                await login(email, password);
-
-                // Get the updated user state directly or decode token content to decide where to go
-                // Since login() updates context, we might need to rely on the return value or a fresh check
-                // For simplicity, let's assume login() throws if failed, and if success, we access current user info.
-                // However, state updates are async. A better approach is to check the response of login if we modified authService to return user.
-
-                // Alternative: Decode token locally to get immediate role/tenant info for redirection
-                const token = localStorage.getItem('access_token');
-                // We need to decode to get payload quickly
-                const base64Url = token!.split('.')[1];
+            await login(email, password);
+            // Alternative: Decode token locally to get immediate role/tenant info for redirection
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                const base64Url = token.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
                     return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -57,47 +35,16 @@ export const AdminLoginPage = () => {
                 } else if (payload.tenant_id) {
                     navigate(`/${payload.tenant_id}/dashboard`);
                 } else {
-                    // Fallback
                     navigate('/admin');
                 }
-
             } else {
-                // ... registration logic ... (keep as is)
-                // Validation: Tenant ID required for non-platform admins
-                if (selectedRole !== UserRole.PLATFORM_ADMIN && !tenantId.trim()) {
-                    throw { response: { status: 422, data: { detail: "Tenant ID is required for this role." } } };
-                }
-
-                await register({
-                    email,
-                    password,
-                    full_name: fullName,
-                    role: selectedRole,
-                    tenant_id: selectedRole === UserRole.PLATFORM_ADMIN ? null : tenantId
-                });
-
-                // After register, auto-login happens in context (check AdminAuthContext)
-                // We should also duplicate the redirect logic or rely on the user to click login?
-                // Actually AdminAuthContext.register() calls login().
-                // So we can assume successful login and redirect similarly.
-
-                if (selectedRole === UserRole.PLATFORM_ADMIN || selectedRole === UserRole.AOB_ADMIN) {
-                    navigate('/admin');
-                } else {
-                    // If we just registered with a tenantId, go there
-                    navigate(`/${tenantId}/dashboard`);
-                }
+                throw new Error("No token received");
             }
 
         } catch (err: any) {
             console.error(err);
             if (err.response?.status === 401) {
                 setError('Invalid email or password. Please try again.');
-            } else if (err.response?.status === 400) {
-                // Often used for "User already exists" in registration
-                setError(err.response.data.detail || 'Invalid request. User might already exist.');
-            } else if (err.response?.status === 422) {
-                setError(err.response.data?.detail || 'Please check your inputs (Password min 8 chars).');
             } else {
                 setError('Unable to connect to the server. Please try again later.');
             }
@@ -120,6 +67,7 @@ export const AdminLoginPage = () => {
                 {/* Card Container */}
                 <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl shadow-2xl p-8 transform transition-all hover:scale-[1.01] duration-500">
 
+
                     {/* Header */}
                     <div className="text-center mb-8">
                         <div className="flex items-center justify-center mb-4">
@@ -128,13 +76,10 @@ export const AdminLoginPage = () => {
                             </div>
                         </div>
                         <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">
-                            {isLogin ? 'Welcome Back' : 'Create Account'}
+                            Welcome Back
                         </h1>
                         <p className="text-slate-400 text-sm">
-                            {isLogin
-                                ? 'Sign in to access your Q-Bot dashboard'
-                                : 'Join Q-Bot to start managing your AI assistants'
-                            }
+                            Sign in to access your Q-Bot dashboard
                         </p>
                     </div>
 
@@ -147,75 +92,8 @@ export const AdminLoginPage = () => {
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
-
-                        {/* Registration Extra Fields */}
-                        {!isLogin && (
-                            <>
-                                {/* Full Name */}
-                                <div className="space-y-1.5 animate-fade-in-up">
-                                    <label className="text-xs font-medium text-slate-300 ml-1">Full Name</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                            <UserIcon size={18} className="text-slate-500 group-focus-within:text-blue-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={fullName}
-                                            onChange={(e) => setFullName(e.target.value)}
-                                            className="block w-full pl-10 pr-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all text-sm"
-                                            placeholder="John Doe"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Role Selection */}
-                                <div className="space-y-1.5 animate-fade-in-up" style={{ animationDelay: '50ms' }}>
-                                    <label className="text-xs font-medium text-slate-300 ml-1">Role</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                            <ShieldCheck size={18} className="text-slate-500 group-focus-within:text-blue-400 transition-colors" />
-                                        </div>
-                                        <select
-                                            value={selectedRole}
-                                            onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                                            className="block w-full pl-10 pr-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all text-sm appearance-none"
-                                        >
-                                            <option value={UserRole.CLIENT_ADMIN}>Client Admin</option>
-                                            <option value={UserRole.CLIENT_AGENT}>Client Agent</option>
-                                            <option value={UserRole.AOB_ADMIN}>AOB Admin</option>
-                                            <option value={UserRole.PLATFORM_ADMIN}>Platform Admin</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* Tenant ID (Conditional) */}
-                                {selectedRole !== UserRole.PLATFORM_ADMIN && (
-                                    <div className="space-y-1.5 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-                                        <label className="text-xs font-medium text-slate-300 ml-1">Tenant ID</label>
-                                        <div className="relative group">
-                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                                                <Building size={18} className="text-slate-500 group-focus-within:text-blue-400 transition-colors" />
-                                            </div>
-                                            <input
-                                                type="text"
-                                                required
-                                                value={tenantId}
-                                                onChange={(e) => setTenantId(e.target.value)}
-                                                className="block w-full pl-10 pr-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all text-sm"
-                                                placeholder="UUID or Tenant Identifier"
-                                            />
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 ml-1">
-                                            Required for non-platform admins.
-                                        </p>
-                                    </div>
-                                )}
-                            </>
-                        )}
-
                         {/* Email Input */}
-                        <div className={`space-y-1.5 ${!isLogin ? 'animate-fade-in-up' : ''}`} style={{ animationDelay: isLogin ? '0ms' : '150ms' }}>
+                        <div className="space-y-1.5 animate-fade-in-up">
                             <label className="text-xs font-medium text-slate-300 ml-1">Work Email</label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -233,12 +111,9 @@ export const AdminLoginPage = () => {
                         </div>
 
                         {/* Password Input */}
-                        <div className={`space-y-1.5 ${!isLogin ? 'animate-fade-in-up' : ''}`} style={{ animationDelay: isLogin ? '0ms' : '200ms' }}>
+                        <div className="space-y-1.5 animate-fade-in-up" style={{ animationDelay: '50ms' }}>
                             <div className="flex items-center justify-between ml-1">
                                 <label className="text-xs font-medium text-slate-300">Password</label>
-                                {isLogin && (
-                                    <a href="#" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Forgot password?</a>
-                                )}
                             </div>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -271,31 +146,25 @@ export const AdminLoginPage = () => {
                             {isSubmitting ? (
                                 <>
                                     <Loader2 size={18} className="animate-spin mr-2" />
-                                    {isLogin ? 'Authenticating...' : 'Creating Account...'}
+                                    Authenticating...
                                 </>
                             ) : (
                                 <>
-                                    {isLogin ? 'Sign In' : 'Sign Up'}
+                                    Sign In
                                     <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
                         </button>
                     </form>
 
-                    {/* Footer / Switch Mode */}
+                    {/* Footer - Private System Notice */}
                     <div className="mt-8 text-center pt-4 border-t border-slate-800/50">
-                        <p className="text-sm text-slate-400">
-                            {isLogin ? "Don't have an account? " : "Already have an account? "}
-                            <button
-                                onClick={toggleMode}
-                                className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline focus:outline-none"
-                            >
-                                {isLogin ? 'Sign up' : 'Sign in'}
-                            </button>
+                        <p className="text-xs text-slate-500">
+                            Private System. Access restricted to authorized personnel.
                         </p>
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

@@ -24,7 +24,62 @@ const MOCK_ONBOARDING_DATA_30_DAYS: OnboardingData[] = [
     { date: 'Week 1', count: 12 },
     { date: 'Week 2', count: 15 },
     { date: 'Week 3', count: 8 },
+    { date: 'Week 3', count: 8 },
     { date: 'Week 4', count: 20 },
+];
+
+const MOCK_LEADS: DashboardLead[] = [
+    {
+        id: 'mock-lead-1',
+        name: 'Sarah Johnson',
+        status: 'qualified',
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+        email: 'sarah.j@example.com',
+        phone: '+1 (555) 123-4567',
+        conversation_id: 'mock-conversation-1',
+        metadata: {
+            role: 'Marketing Manager',
+            company_size: '50-200',
+            budget: '$5k-10k'
+        }
+    },
+    {
+        id: 'mock-lead-2',
+        name: 'Michael Chen',
+        status: 'new',
+        created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 mins ago
+        email: 'm.chen@techstart.io',
+        phone: '+1 (555) 987-6543',
+        conversation_id: 'mock-conversation-2',
+        metadata: {
+            interest: 'Enterprise Plan',
+            timeline: 'Immediate'
+        }
+    },
+    {
+        id: 'mock-lead-3',
+        name: 'Emma Davis',
+        status: 'converted',
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(), // 2 days ago
+        email: 'emma.davis@designco.com',
+        phone: '+1 (555) 456-7890',
+        conversation_id: 'mock-conversation-3',
+        metadata: {
+            package: 'Pro',
+            onboarding_scheduled: 'true'
+        }
+    },
+    {
+        id: 'mock-lead-4',
+        name: 'James Wilson',
+        status: 'lost',
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), // 5 days ago
+        email: 'j.wilson@nomad.com',
+        conversation_id: 'mock-conversation-4',
+        metadata: {
+            reason: 'Budget constraints'
+        }
+    }
 ];
 
 // Helper to map Backend Tenant -> Frontend Client
@@ -63,9 +118,9 @@ const mapTenantToClient = (tenant: any): Client => {
             options: {},
             questions: backendConfig.qualification_questions?.map((q: any) => ({
                 id: q.id,
-                label: q.question,
-                instruction: q.question,
-                collects: [],
+                label: q.label || q.question, // Map from label, fallback to legacy question
+                instruction: q.instruction || q.question, // Map from instruction, fallback to legacy question
+                collects: q.collects || [],
                 options: q.quick_replies?.map((qr: any) => qr.text) || []
             })) || []
         },
@@ -73,7 +128,18 @@ const mapTenantToClient = (tenant: any): Client => {
         messages: {
             scheduleSuccess: 'Thank you! Our team will be in touch shortly.',
             maybeLater: 'No problem! Feel free to reach out whenever you are ready.'
-        }
+        },
+
+        // New Settings Mappings
+        welcome_message: backendConfig.welcome_message || "Hello! How can I help you today?",
+        language: backendConfig.language || "en",
+        tone: backendConfig.tone || "professional",
+        company_context: backendConfig.company_context || "",
+        guardrails: backendConfig.guardrails || [],
+        max_conversation_length: backendConfig.max_conversation_length || 50,
+        lead_trigger_count: backendConfig.lead_trigger_count || 5,
+        lead_form_enabled: backendConfig.lead_form_enabled ?? true,
+        lead_form_fields: backendConfig.lead_form_fields || ["name", "phone"]
     };
 
     return {
@@ -180,8 +246,11 @@ export const updateClient = async (client: Client): Promise<Client> => {
 
         // Qualifications
         qualification_questions: client.config?.leadQualification?.questions?.map(q => ({
+
             id: q.id,
-            question: q.label,
+            label: q.label,
+            instruction: q.instruction,
+            collects: q.collects || [],
             quick_replies: q.options?.map((opt, idx) => ({
                 id: String(idx + 1),
                 text: opt,
@@ -190,8 +259,15 @@ export const updateClient = async (client: Client): Promise<Client> => {
             required: true
         })),
 
-        language: "en", // default for now
-        tone: "professional"
+        language: client.config?.language || "en",
+        tone: client.config?.tone || "professional",
+        welcome_message: client.config?.welcome_message,
+        company_context: client.config?.company_context,
+        guardrails: client.config?.guardrails,
+        max_conversation_length: client.config?.max_conversation_length,
+        lead_trigger_count: client.config?.lead_trigger_count,
+        lead_form_enabled: client.config?.lead_form_enabled,
+        lead_form_fields: client.config?.lead_form_fields
     };
 
     const payload = {
@@ -242,7 +318,9 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
 
             qualification_questions: clientData.config.leadQualification.questions.map(q => ({
                 id: q.id,
-                question: q.label, // Backend expects 'question'
+                label: q.label,
+                instruction: q.instruction,
+                collects: q.collects || [],
                 quick_replies: q.options?.map((opt, idx) => ({
                     id: String(idx + 1),
                     text: opt,
@@ -268,9 +346,9 @@ export const ingestDocument = async (tenantId: string, file: File): Promise<void
     const formData = new FormData();
     formData.append('file', file);
 
+    // Don't manually set Content-Type - let axios set it with the correct boundary
     await api.post('/documents/ingest', formData, {
         headers: {
-            'Content-Type': 'multipart/form-data',
             'X-Tenant-ID': tenantId
         }
     });
@@ -278,7 +356,10 @@ export const ingestDocument = async (tenantId: string, file: File): Promise<void
 
 export const getTenantDocuments = async (tenantId: string): Promise<TenantDocument[]> => {
     try {
+        console.log('📄 Fetching documents for tenant:', tenantId);
         const res = await api.get(`/documents/tenants/${tenantId}`);
+        console.log('📄 Documents API response:', res.data);
+        console.log('📄 Number of documents:', Array.isArray(res.data) ? res.data.length : 'Not an array');
         return res.data;
     } catch (e) {
         console.error("Error fetching documents:", e);
@@ -367,4 +448,75 @@ export const getSystemHealth = async (): Promise<SystemHealth> => {
             version: 'unknown'
         };
     }
+};
+// --- User Management ---
+import { User, UserRole, UserRegister } from '@/types/auth';
+
+export const getUsers = async (): Promise<User[]> => {
+    try {
+        const res = await api.get('/users');
+        return res.data;
+    } catch (e) {
+        console.error("Error fetching users:", e);
+        return [];
+    }
+};
+
+export const updateUser = async (userId: string, data: Partial<User>): Promise<User> => {
+    const res = await api.put(`/users/${userId}`, data);
+    return res.data;
+};
+
+export const deleteUser = async (userId: string): Promise<void> => {
+    await api.delete(`/users/${userId}`);
+};
+
+export const createUser = async (userData: UserRegister): Promise<User> => {
+    const res = await api.post('/users', userData);
+    return res.data;
+};
+
+// --- Lead Management ---
+export const getTenantLeads = async (tenantId: string, status?: string): Promise<DashboardLead[]> => {
+    try {
+        const params: any = {};
+        if (status && status !== 'all') params.status = status;
+
+        const res = await api.get(`/leads/tenants/${tenantId}/all`, { params });
+
+        const realLeads = res.data.map((lead: any) => ({
+            id: lead.lead_id,
+            name: lead.name || 'Anonymous',
+            email: lead.email,
+            phone: lead.phone,
+            status: lead.status,
+            created_at: lead.created_at,
+            conversation_id: lead.conversation_id,
+            metadata: lead.metadata
+        }));
+
+        // Append mock leads to real leads for testing
+        return [...realLeads, ...MOCK_LEADS];
+    } catch (e) {
+        console.error("Error fetching tenant leads:", e);
+        // Fallback to mock data if API fails or returns empty (for dev purposes as requested)
+        return MOCK_LEADS;
+    }
+};
+
+export const getLeadById = async (leadId: string): Promise<any | null> => {
+    try {
+        const res = await api.get(`/leads/${leadId}`);
+        return res.data;
+    } catch (e) {
+        console.error(`Error fetching lead ${leadId}:`, e);
+        return null;
+    }
+};
+
+export const updateLeadStatus = async (leadId: string, status: string): Promise<any> => {
+    const res = await api.patch(`/leads/${leadId}/status`, null, {
+        params: { new_status: status }
+    });
+    return res.data;
 };

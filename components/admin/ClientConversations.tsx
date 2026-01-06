@@ -3,7 +3,7 @@ import { Conversation } from '../../types';
 import { chatService } from '../../services/chatService';
 import { MessageCircle, Clock, CheckCircle, XCircle } from 'lucide-react';
 // import { format } from 'date-fns';
-import ConversationViewer from './ConversationViewer';
+import ConversationViewer from './ConversationViewer.tsx';
 
 import { TenantConfig } from '../../types/config';
 

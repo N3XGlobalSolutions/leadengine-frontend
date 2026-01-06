@@ -38,6 +38,17 @@ export interface TenantConfig {
         scheduleSuccess: string;
         maybeLater: string;
     };
+
+    // Behavior & Settings
+    welcome_message?: string;
+    language?: string;
+    tone?: string;
+    company_context?: string;
+    guardrails?: string[]; // stored as string[] but edited as comma-separated string maybe?
+    max_conversation_length?: number;
+    lead_trigger_count?: number;
+    lead_form_enabled?: boolean;
+    lead_form_fields?: string[];
 }
 
 // Default template with placeholder questions

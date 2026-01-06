@@ -76,6 +76,10 @@ export interface DashboardLead {
     name: string;
     status: string;
     created_at: string;
+    email?: string;
+    phone?: string;
+    conversation_id?: string;
+    metadata?: Record<string, any>;
 }
 
 export interface SystemHealth {

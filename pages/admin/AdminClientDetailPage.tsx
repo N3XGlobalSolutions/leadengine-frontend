@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Save, Trash2, Pause, Play, Building2, Users, Calendar,
     Globe, Palette, MessageSquare, Bot, AlertTriangle, Check, X, LayoutDashboard,
-    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy
+    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield
 } from 'lucide-react';
 import { Client, TenantDocument } from '../../types/admin';
 import { TenantConfig, Question } from '../../types/config';
@@ -22,7 +22,7 @@ export const AdminClientDetailPage = () => {
 
     const [client, setClient] = useState<Client | null>(null);
     const [documents, setDocuments] = useState<TenantDocument[]>([]);
-    const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'qualifications' | 'knowledge' | 'integration' | 'conversations'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'settings' | 'qualifications' | 'knowledge' | 'integration' | 'conversations'>('general');
     const [generatedKey, setGeneratedKey] = useState<string>('');
 
     const [loading, setLoading] = useState(true);
@@ -93,13 +93,35 @@ export const AdminClientDetailPage = () => {
         setUploading(true);
         try {
             await ingestDocument(client.id, selectedFile);
-            setSuccessMessage('Document uploaded successfully!');
+            setSuccessMessage('Document uploaded and processing...');
             setSelectedFile(null);
 
-            // Refresh list
-            const docs = await getTenantDocuments(client.id);
-            setDocuments(docs);
+            // Backend returns 202 (async processing), so poll for the document
+            // Retry fetching documents with delays to allow backend processing
+            let retries = 0;
+            const maxRetries = 5;
+            const fetchWithRetry = async () => {
+                const docs = await getTenantDocuments(client.id);
 
+                // Check if our document appears (match by filename)
+                const uploadedDoc = docs.find(d => d.filename === selectedFile.name);
+
+                if (uploadedDoc || retries >= maxRetries) {
+                    setDocuments(docs);
+                    if (uploadedDoc) {
+                        setSuccessMessage('Document uploaded successfully!');
+                    } else {
+                        setSuccessMessage('Document queued for processing. Refresh to see updates.');
+                    }
+                } else {
+                    retries++;
+                    // Wait progressively longer: 1s, 2s, 3s, 4s, 5s
+                    await new Promise(resolve => setTimeout(resolve, retries * 1000));
+                    await fetchWithRetry();
+                }
+            };
+
+            await fetchWithRetry();
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (e) {
             setErrorMessage('Failed to upload document');
@@ -312,8 +334,8 @@ export const AdminClientDetailPage = () => {
             )}
 
             {/* Tabs */}
-            <div className={`flex border-b mb-6 ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
-                {['general', 'branding', 'qualifications', 'knowledge', 'integration', 'conversations'].map((tab) => (
+            <div className={`flex border-b mb-6 ${isDark ? 'border-slate-700' : 'border-gray-200'} overflow-x-auto`}>
+                {['general', 'branding', 'settings', 'qualifications', 'knowledge', 'integration', 'conversations'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -441,6 +463,137 @@ export const AdminClientDetailPage = () => {
                                 </div>
                             </div>
                         </>
+                    )}
+
+                    {/* SETTINGS TAB */}
+                    {activeTab === 'settings' && (
+                        <div className="space-y-6">
+                            {/* Behavior */}
+                            <div className={cardClass}>
+                                <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                    <Sliders size={20} /> Behavior & Personality
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className={labelClass}>Welcome Message (Initial Greeting)</label>
+                                        <textarea
+                                            rows={2}
+                                            value={client.config?.welcome_message || ''}
+                                            onChange={(e) => updateConfig('welcome_message', e.target.value)}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Language</label>
+                                        <select
+                                            value={client.config?.language || 'en'}
+                                            onChange={(e) => updateConfig('language', e.target.value)}
+                                            className={inputClass}
+                                        >
+                                            <option value="en">English (en)</option>
+                                            <option value="es">Spanish (es)</option>
+                                            <option value="fr">French (fr)</option>
+                                            <option value="de">German (de)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Tone</label>
+                                        <select
+                                            value={client.config?.tone || 'professional'}
+                                            onChange={(e) => updateConfig('tone', e.target.value)}
+                                            className={inputClass}
+                                        >
+                                            <option value="professional">Professional</option>
+                                            <option value="friendly">Friendly</option>
+                                            <option value="casual">Casual</option>
+                                            <option value="empathetic">Empathetic</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className={labelClass}>Company Context (for LLM)</label>
+                                        <textarea
+                                            rows={4}
+                                            value={client.config?.company_context || ''}
+                                            onChange={(e) => updateConfig('company_context', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="Provide background about the company, products, and services to help the AI answer better."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Constraints */}
+                            <div className={cardClass}>
+                                <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                    <Shield size={20} /> Constraints & Guardrails
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className={labelClass}>Max Conversation Length</label>
+                                        <input
+                                            type="number"
+                                            value={client.config?.max_conversation_length || 50}
+                                            onChange={(e) => updateConfig('max_conversation_length', parseInt(e.target.value))}
+                                            className={inputClass}
+                                        />
+                                        <p className="text-xs text-gray-400 mt-1">Messages per session</p>
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Lead Trigger Count</label>
+                                        <input
+                                            type="number"
+                                            value={client.config?.lead_trigger_count || 3}
+                                            onChange={(e) => updateConfig('lead_trigger_count', parseInt(e.target.value))}
+                                            className={inputClass}
+                                        />
+                                        <p className="text-xs text-gray-400 mt-1">Messages before looking for leads</p>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className={labelClass}>Guardrails (Topics to Avoid)</label>
+                                        <textarea
+                                            rows={3}
+                                            value={Array.isArray(client.config?.guardrails) ? client.config?.guardrails.join(', ') : ''}
+                                            onChange={(e) => updateConfig('guardrails', e.target.value.split(',').map(s => s.trim()))}
+                                            className={inputClass}
+                                            placeholder="Comma-separated list (e.g. competitors, politics, sensitive data)"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Lead Form Settings */}
+                            <div className={cardClass}>
+                                <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                    <FileText size={20} /> Lead Form Configuration
+                                </h2>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            id="leadFormEnabled"
+                                            checked={client.config?.lead_form_enabled ?? true}
+                                            onChange={(e) => updateConfig('lead_form_enabled', e.target.checked)}
+                                            className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <label htmlFor="leadFormEnabled" className={labelClass + " mb-0"}>Enable Standard Lead Form</label>
+                                    </div>
+
+                                    {(client.config?.lead_form_enabled ?? true) && (
+                                        <div>
+                                            <label className={labelClass}>Fields to Collect</label>
+                                            <input
+                                                type="text"
+                                                value={Array.isArray(client.config?.lead_form_fields) ? client.config?.lead_form_fields.join(', ') : 'name, email, phone'}
+                                                onChange={(e) => updateConfig('lead_form_fields', e.target.value.split(',').map(s => s.trim()))}
+                                                className={inputClass}
+                                                placeholder="name, email, phone"
+                                            />
+                                            <p className="text-xs text-gray-400 mt-1">Standard form fields (comma separated)</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {/* QUALIFICATIONS TAB */}

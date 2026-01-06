@@ -41,49 +41,75 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
           </span>
 
           {/* Message Content */}
-          <div
-            className={`
-              px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm break-words
-              ${isBot
-                ? 'bg-white text-gray-800 rounded-bl-none border border-gray-100'
-                : 'bg-white text-gray-800 rounded-br-none border border-gray-100'
-              }
-            `}
-          >
-            {isBot ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkBreaks]}
-                rehypePlugins={[rehypeRaw]}
-                components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                  li: ({ children }) => <li className="text-gray-700">{children}</li>,
-                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                  em: ({ children }) => <em className="italic">{children}</em>,
-                  code: ({ children }) => (
-                    <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">{children}</code>
-                  ),
-                  pre: ({ children }) => (
-                    <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto my-2 text-sm">{children}</pre>
-                  ),
-                  a: ({ href, children }) => (
-                    <a href={href} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>
-                  ),
-                  h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-lg font-bold mb-2">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-base font-bold mb-1">{children}</h3>,
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-gray-300 pl-3 italic text-gray-600 my-2">{children}</blockquote>
-                  ),
-                }}
-              >
-                {message.text}
-              </ReactMarkdown>
-            ) : (
-              <span className="whitespace-pre-wrap">{message.text}</span>
-            )}
-          </div>
+          {isBot && message.showActions ? (
+            // ⭐ Special rendering for summary message (when action buttons will show)
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 px-5 py-4 rounded-2xl rounded-bl-none shadow-md max-w-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-2xl">📋</span>
+                <h4 className="font-semibold text-blue-900">Your Information Summary</h4>
+              </div>
+              <div className="prose prose-sm max-w-none text-gray-800">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                  rehypePlugins={[rehypeRaw]}
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                    li: ({ children }) => <li className="text-gray-700">{children}</li>,
+                    strong: ({ children }) => <strong className="font-semibold text-blue-900">{children}</strong>,
+                  }}
+                >
+                  {message.text}
+                </ReactMarkdown>
+              </div>
+            </div>
+          ) : (
+            // Regular message rendering
+            <div
+              className={`
+                px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm break-words
+                ${isBot
+                  ? 'bg-white text-gray-800 rounded-bl-none border border-gray-100'
+                  : 'bg-white text-gray-800 rounded-br-none border border-gray-100'
+                }
+              `}
+            >
+              {isBot ? (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                  rehypePlugins={[rehypeRaw]}
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                    li: ({ children }) => <li className="text-gray-700">{children}</li>,
+                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                    em: ({ children }) => <em className="italic">{children}</em>,
+                    code: ({ children }) => (
+                      <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">{children}</code>
+                    ),
+                    pre: ({ children }) => (
+                      <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto my-2 text-sm">{children}</pre>
+                    ),
+                    a: ({ href, children }) => (
+                      <a href={href} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>
+                    ),
+                    h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-lg font-bold mb-2">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-base font-bold mb-1">{children}</h3>,
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-4 border-gray-300 pl-3 italic text-gray-600 my-2">{children}</blockquote>
+                    ),
+                  }}
+                >
+                  {message.text}
+                </ReactMarkdown>
+              ) : (
+                <span className="whitespace-pre-wrap">{message.text}</span>
+              )}
+            </div>
+          )}
 
           {/* Summary Card */}
           {message.isSummary && message.summaryData && (

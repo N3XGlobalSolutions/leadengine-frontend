@@ -4,6 +4,8 @@ import { ChatPage } from './pages/ChatPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AdminPage } from './pages/AdminPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminLeadsPage } from './pages/admin/AdminLeadsPage';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminClientsPage } from './pages/admin/AdminClientsPage';
 import { AddClientPage } from './pages/admin/AddClientPage';
 import { AdminClientDetailPage } from './pages/admin/AdminClientDetailPage';
@@ -25,6 +27,16 @@ export default function App() {
             <Route path="/admin" element={
               <ProtectedRoute>
                 <AdminPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/leads" element={
+              <ProtectedRoute>
+                <AdminLeadsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute>
+                <AdminUsersPage />
               </ProtectedRoute>
             } />
             <Route path="/admin/clients" element={

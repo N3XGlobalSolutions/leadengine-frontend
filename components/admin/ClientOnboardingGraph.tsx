@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getOnboardingData } from '../../services/adminService';
+import { getClients } from '../../services/adminService';
 import { OnboardingData } from '../../types/admin';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 
@@ -11,19 +11,67 @@ export const ClientOnboardingGraph = () => {
     const { isDark } = useAdminTheme();
 
     useEffect(() => {
-        const fetchData = async () => {
+        const calculateOnboardingStats = async () => {
             setLoading(true);
-            const result = await getOnboardingData(range);
-            setData(result);
-            setLoading(false);
+            try {
+                // Fetch all clients
+                const clients = await getClients();
+
+                // Initialize the dates array based on range
+                const days = range === '7d' ? 7 : 30;
+                const stats: Record<string, number> = {};
+                const chartData: OnboardingData[] = [];
+
+                // Create a map of the last N days with 0 counts
+                // If 30d, grouping by specific days might be too crowded, but for now let's do daily.
+                // Or for 30d maybe show every 3rd day or verify if Recharts handles it.
+                // Let's stick to daily granularity, it's fine for 30 points.
+
+                const today = new Date();
+                // Normalize today to start of day for comparison if needed, 
+                // but we rely on string comparison 'YYYY-MM-DD'
+
+                for (let i = days - 1; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(today.getDate() - i);
+                    const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
+
+                    // Format for display (e.g., 'Mon' or 'Jan 1')
+                    // For short graph, day name is nice. For 30d, date is better.
+                    const displayLabel = range === '7d'
+                        ? d.toLocaleDateString('en-US', { weekday: 'short' })
+                        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                    stats[dateStr] = 0;
+                    chartData.push({ date: displayLabel, count: 0, _fullDate: dateStr } as any);
+                }
+
+                // Aggregate client counts
+                clients.forEach(client => {
+                    const onboardingDate = client.onboardedDate; // YYYY-MM-DD
+                    if (stats.hasOwnProperty(onboardingDate)) {
+                        stats[onboardingDate]++;
+                        // Find the corresponding entry in chartData and increment
+                        const dataPoint = chartData.find((p: any) => p._fullDate === onboardingDate);
+                        if (dataPoint) dataPoint.count++;
+                    }
+                });
+
+                setData(chartData);
+            } catch (error) {
+                console.error("Failed to calculate onboarding stats:", error);
+            } finally {
+                setLoading(false);
+            }
         };
-        fetchData();
+
+        calculateOnboardingStats();
     }, [range]);
 
     return (
         <div className={`p-6 rounded-xl shadow-sm border transition-colors ${isDark
-                ? 'bg-slate-800 border-slate-700'
-                : 'bg-white border-gray-100'
+            ? 'bg-slate-800 border-slate-700'
+            : 'bg-white border-gray-100'
             }`}>
             <div className="flex items-center justify-between mb-6">
                 <div>
@@ -34,8 +82,8 @@ export const ClientOnboardingGraph = () => {
                     <button
                         onClick={() => setRange('7d')}
                         className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${range === '7d'
-                                ? (isDark ? 'bg-slate-600 shadow-sm text-white' : 'bg-white shadow-sm text-gray-900')
-                                : (isDark ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-700')
+                            ? (isDark ? 'bg-slate-600 shadow-sm text-white' : 'bg-white shadow-sm text-gray-900')
+                            : (isDark ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-700')
                             }`}
                     >
                         7 Days
@@ -43,8 +91,8 @@ export const ClientOnboardingGraph = () => {
                     <button
                         onClick={() => setRange('30d')}
                         className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${range === '30d'
-                                ? (isDark ? 'bg-slate-600 shadow-sm text-white' : 'bg-white shadow-sm text-gray-900')
-                                : (isDark ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-700')
+                            ? (isDark ? 'bg-slate-600 shadow-sm text-white' : 'bg-white shadow-sm text-gray-900')
+                            : (isDark ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-700')
                             }`}
                     >
                         30 Days
@@ -76,6 +124,7 @@ export const ClientOnboardingGraph = () => {
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fill: isDark ? '#94A3B8' : '#6B7280', fontSize: 12 }}
+                                allowDecimals={false}
                             />
                             <Tooltip
                                 contentStyle={{

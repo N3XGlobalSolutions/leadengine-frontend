@@ -39,6 +39,9 @@ export const AddClientPage = () => {
         config: JSON.parse(JSON.stringify(DEFAULT_TENANT_CONFIG)) // Deep copy
     });
 
+    // New state for "Initial Greeting" (Question #0)
+    const [greetingInstruction, setGreetingInstruction] = useState('Hello! I am [Bot Name], the virtual assistant for [Company Name]. Before we proceed, may I have your name and phone number so our team can reach you?');
+
     const generateSlug = (name: string) => {
         return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     };
@@ -156,22 +159,46 @@ export const AddClientPage = () => {
                 }
             };
 
+            // Prepend "Greeting" as the first question
+            const allQuestions = [
+                {
+                    id: 'q0',
+                    label: 'Introduction & Contact',
+                    instruction: greetingInstruction,
+                    collects: ['name', 'phone'],
+                    options: []
+                },
+                ...formData.config.leadQualification.questions
+            ];
+
             const createdClient = await createClient({
                 name: formData.name,
                 slug: formData.slug,
                 plan: formData.plan,
-                config: finalConfig
+                config: {
+                    ...finalConfig,
+                    leadQualification: {
+                        ...finalConfig.leadQualification,
+                        questions: allQuestions
+                    }
+                }
             });
 
             // If a file was selected, upload it now using the new tenant ID
             if (selectedFile) {
                 try {
                     await ingestDocument(createdClient.id, selectedFile);
-                    console.log('📄 Document uploaded successfully');
+                    console.log('📄 Document queued for processing');
+                    // Note: Document will be processed asynchronously, may take a few seconds to appear
                 } catch (docErr) {
                     console.error('Failed to upload document', docErr);
-                    // We don't block success here, but we could warn the user
-                    // For now, proceed to list
+                    // Show error but don't block navigation - user can upload later
+                    setError(`Client created successfully! However, document upload failed. You can upload it from the client detail page.`);
+                    setTimeout(() => {
+                        navigate('/admin/clients');
+                    }, 3000); // Give user time to read the message
+                    setSaving(false);
+                    return; // Don't navigate immediately
                 }
             }
 
@@ -463,6 +490,30 @@ export const AddClientPage = () => {
                                     These can be anything (e.g., industry-specific questions).
                                     Adding "Quick Reply Options" helps users answer faster.
                                 </p>
+                            </div>
+                        </div>
+
+                        {/* INITIAL GREETING (Question 0) */}
+                        <div className={cardClass}>
+                            <div className="flex items-center gap-3 mb-4 border-b pb-4 border-gray-100 dark:border-slate-700">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-green-500 text-white`}>
+                                    0
+                                </div>
+                                <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Initial Greeting & Contact</span>
+                                <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200">Required</span>
+                            </div>
+                            <div className="pl-11">
+                                <label className={labelClass}>Greeting Instruction & Data Collection *</label>
+                                <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                    This is the very first thing the bot will do. It must introduce itself and ask for contact details.
+                                </p>
+                                <textarea
+                                    value={greetingInstruction}
+                                    onChange={(e) => setGreetingInstruction(e.target.value)}
+                                    className={inputClass}
+                                    rows={3}
+                                    placeholder="Hello! I am..."
+                                />
                             </div>
                         </div>
 

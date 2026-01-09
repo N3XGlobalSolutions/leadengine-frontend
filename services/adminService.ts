@@ -484,7 +484,7 @@ export const getTenantLeads = async (tenantId: string, status?: string): Promise
 
         const res = await api.get(`/leads/tenants/${tenantId}/all`, { params });
 
-        const realLeads = res.data.map((lead: any) => ({
+        return res.data.map((lead: any) => ({
             id: lead.lead_id,
             name: lead.name || 'Anonymous',
             email: lead.email,
@@ -494,13 +494,9 @@ export const getTenantLeads = async (tenantId: string, status?: string): Promise
             conversation_id: lead.conversation_id,
             metadata: lead.metadata
         }));
-
-        // Append mock leads to real leads for testing
-        return [...realLeads, ...MOCK_LEADS];
     } catch (e) {
         console.error("Error fetching tenant leads:", e);
-        // Fallback to mock data if API fails or returns empty (for dev purposes as requested)
-        return MOCK_LEADS;
+        return [];
     }
 };
 

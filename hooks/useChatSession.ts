@@ -162,10 +162,16 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 q => q.id === currentStepId
             );
 
-            if (currentStep && currentStep.optionsKey) {
-                const options = config.leadQualification.options?.[currentStep.optionsKey as keyof typeof config.leadQualification.options];
-                if (options && options.length > 0) {
-                    return options;
+            // Support both direct options (new config) and optionsKey (legacy config)
+            if (currentStep) {
+                if (currentStep.options && currentStep.options.length > 0) {
+                    return currentStep.options;
+                }
+                if (currentStep.optionsKey) {
+                    const options = config.leadQualification.options?.[currentStep.optionsKey as keyof typeof config.leadQualification.options];
+                    if (options && options.length > 0) {
+                        return options;
+                    }
                 }
             }
         }
@@ -214,11 +220,102 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 setConversationId(response.conversation_id);
             }
 
-            // ⭐ Check for lead_captured action to auto-trigger action buttons
-            const isLeadCaptured = response.suggested_actions?.includes('lead_captured');
+            // Check for JSON summary in response - Multiple strategies
+            let botText = response.answer;
+            let summaryData: any = null;
+            let isSummary = false;
 
-            addMessage(MessageRole.Bot, response.answer, {
+            // Helper: Sanitize JSON by removing trailing commas (common LLM error)
+            const sanitizeJson = (jsonStr: string): string => {
+                // Remove trailing commas before closing braces/brackets
+                let sanitized = jsonStr.replace(/,\s*}/g, '}');
+                sanitized = sanitized.replace(/,\s*]/g, ']');
+                return sanitized;
+            };
+
+            // Strategy 1: Try markdown code block wrapped JSON (```json ... ```)
+            let jsonMatch = response.answer.match(/```json\n([\s\S]*?)\n```/);
+
+            // Strategy 2: Try bare JSON object (no markdown wrapper)
+            if (!jsonMatch) {
+                // Look for a JSON object that starts with { and has "summary" and "message" keys
+                const bareJsonMatch = response.answer.match(/\{\s*"summary"\s*:\s*\{[\s\S]*?\},\s*"message"\s*:\s*"[\s\S]*?"\s*\}/);
+                if (bareJsonMatch) {
+                    jsonMatch = [bareJsonMatch[0], bareJsonMatch[0]]; // Simulate match format
+                }
+            }
+
+            // Strategy 3: Try to extract JSON from text that might have prefix/suffix
+            if (!jsonMatch) {
+                // Find any valid JSON object in the response
+                const jsonObjectMatch = response.answer.match(/(\{[\s\S]*?\})\s*$/);
+                if (jsonObjectMatch) {
+                    try {
+                        const sanitized = sanitizeJson(jsonObjectMatch[1]);
+                        const testParse = JSON.parse(sanitized);
+                        if (testParse.summary && testParse.message) {
+                            jsonMatch = [jsonObjectMatch[0], jsonObjectMatch[1]];
+                        }
+                    } catch (e) {
+                        // Not valid JSON, continue
+                    }
+                }
+            }
+
+            if (jsonMatch) {
+                try {
+                    // Apply sanitization before parsing
+                    const jsonString = sanitizeJson(jsonMatch[1].trim());
+                    const parsed = JSON.parse(jsonString);
+                    if (parsed.summary && parsed.message) {
+                        botText = parsed.message;
+                        summaryData = parsed.summary;
+                        isSummary = true;
+                        console.log('✅ Successfully parsed summary JSON:', summaryData);
+                        // Trigger lead capture actions
+                        if (!response.suggested_actions) {
+                            response.suggested_actions = [];
+                        }
+                        response.suggested_actions.push('lead_captured');
+                    }
+                } catch (e) {
+                    console.error("Failed to parse summary JSON:", e);
+                    console.error("Failed JSON string:", jsonMatch[1]);
+                }
+            }
+
+            // ⭐ Extract step ID and update progress (Run this BEFORE modifying botText or adding message)
+            let currentStepId = questionProgress.currentStepId;
+            const stepMatch = response.answer.match(/\[STEP:(\w+)\]/);
+
+            if (stepMatch && stepMatch[1]) {
+                const stepId = stepMatch[1];
+                currentStepId = stepId; // Update local var for immediate use
+
+                const stepIndex = config.leadQualification?.questions.findIndex(
+                    q => q.id === stepId
+                );
+
+                if (stepIndex !== undefined && stepIndex !== -1) {
+                    // Update progress asynchronously
+                    setQuestionProgress(prev => ({
+                        ...prev,
+                        current: stepIndex + 1,
+                        currentStepId: stepId
+                    }));
+                }
+            }
+
+            // ⭐ Clean the bot text for display (Remove [STEP:...] tags)
+            botText = botText.replace(/\[STEP:\w+\]/g, '').trim();
+
+            // ⭐ Check for lead_captured action to auto-trigger action buttons
+            const isLeadCaptured = response.suggested_actions?.includes('lead_captured') || isSummary;
+
+            addMessage(MessageRole.Bot, botText, {
                 showActions: isLeadCaptured,  // Auto-trigger action buttons when lead is captured
+                isSummary: isSummary,
+                summaryData: summaryData
                 // sources: response.sources
             });
 
@@ -227,29 +324,10 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 console.log('✅ Lead captured! Summary should be in the message above.');
             }
 
-            // ⭐ Extract step ID and update progress
-            const extractStepInfo = (answer: string) => {
-                const stepMatch = answer.match(/\[STEP:(\w+)\]/);
-                if (stepMatch && stepMatch[1]) {
-                    const stepId = stepMatch[1];
-                    const stepIndex = config.leadQualification?.questions.findIndex(
-                        q => q.id === stepId
-                    );
 
-                    if (stepIndex !== undefined && stepIndex !== -1) {
-                        setQuestionProgress(prev => ({
-                            ...prev,
-                            current: stepIndex + 1,
-                            currentStepId: stepId
-                        }));
-                    }
-                }
-            };
-
-            extractStepInfo(response.answer);
 
             // Determine quick replies based on active step (preferred) or keywords (fallback)
-            const replies = determineQuickReplies(response.answer, questionProgress.currentStepId);
+            const replies = determineQuickReplies(response.answer, currentStepId);
             setQuickReplies(replies);
 
         } catch (error: any) {
@@ -333,16 +411,14 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     const handleScheduleCall = () => {
         setQuickReplies([]);
         addMessage(MessageRole.User, 'Yes, schedule a call.');
-        // Backend handles lead capture automatically via chat now.
-        // We just send the intent.
-        handleSendMessage("Yes, I'd like to schedule a call.");
+        addMessage(MessageRole.Bot, 'Thank you for confirming. Our team will contact you shortly to schedule the call.');
         setIsChatEnded(true);
     };
 
     const handleMaybeLater = () => {
         setQuickReplies([]);
         addMessage(MessageRole.User, 'Maybe later.');
-        handleSendMessage("Maybe later.");
+        addMessage(MessageRole.Bot, 'No problem at all. Feel free to reach out whenever you\'re ready.');
         setIsChatEnded(true);
     };
 

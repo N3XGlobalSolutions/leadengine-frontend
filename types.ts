@@ -6,14 +6,8 @@ export enum MessageRole {
 }
 
 export interface SummaryData {
-  sessionId?: string; // Unique ID for this specific conversation
-  name?: string;
-  phone?: string;
-  location?: string;
-  budget?: string;
-  type?: string;
-  moveIn?: string;
-  financing?: string;
+  sessionId?: string;
+  [key: string]: string | undefined;
 }
 
 export interface Message {

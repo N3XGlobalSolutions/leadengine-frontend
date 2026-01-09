@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import { Message, MessageRole } from '../../types';
-import { MapPin, DollarSign, Home, Calendar, CreditCard, User, Phone, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { MapPin, DollarSign, Home, Calendar, CreditCard, User, Phone, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
 
 
 interface ChatBubbleProps {
@@ -114,83 +114,91 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
           {/* Summary Card */}
           {message.isSummary && message.summaryData && (
             <div className="mt-3 w-full bg-white rounded-xl p-5 shadow-lg border border-gray-100 animate-fade-in-up">
-              {/* Summary content omitted for brevity but should remain if space allows, or can be kept as is if I don't touch inner summary content. 
-                  Actually I am replacing the whole return block, so I must include it. 
-              */}
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b pb-2 flex items-center justify-between">
                 <span>Lead Qualification Summary</span>
                 <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full">Completed</span>
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-sm text-gray-700">
-                {/* Contact Info */}
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 p-1 bg-gray-100 rounded text-gray-600">
-                    <User className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="overflow-hidden">
-                    <span className="block text-xs text-gray-500 font-medium">Name</span>
-                    <span className="font-semibold truncate block">{message.summaryData.name || 'Not provided'}</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 p-1 bg-gray-100 rounded text-gray-600">
-                    <Phone className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500 font-medium">Phone</span>
-                    <span className="font-semibold">{message.summaryData.phone || 'Not provided'}</span>
-                  </div>
-                </div>
 
-                <div className="col-span-1 sm:col-span-2 border-t border-dashed border-gray-200 my-1"></div>
+              {(() => {
+                // Helper to find key case-insensitively
+                const findKey = (search: string) => Object.keys(message.summaryData || {}).find(k => k.toLowerCase() === search);
 
-                {/* Requirements */}
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 p-1 bg-red-50 rounded text-red-500">
-                    <MapPin className="w-3.5 h-3.5" />
-                  </div>
+                const nameKey = findKey('name');
+                const phoneKey = findKey('phone');
+
+                const nameValue = nameKey ? message.summaryData![nameKey] : null;
+                const phoneValue = phoneKey ? message.summaryData![phoneKey] : null;
+
+                // Rest of data excluding name, phone, and internal fields
+                const remainingData = Object.entries(message.summaryData || {}).filter(([key]) => {
+                  const lower = key.toLowerCase();
+                  return lower !== 'name' && lower !== 'phone' && key !== 'sessionId' && !key.startsWith('q0'); // Also skip q0 if it was the legacy ID
+                });
+
+                return (
                   <div>
-                    <span className="block text-xs text-gray-500 font-medium">Location</span>
-                    <span className="font-semibold">{message.summaryData.location}</span>
+                    {/* Spotlight Section */}
+                    {(nameValue || phoneValue) && (
+                      <div className="flex items-center gap-4 mb-6 pb-6 border-b border-dashed border-gray-200">
+                        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                          <User size={24} />
+                        </div>
+                        <div>
+                          {nameValue && <h4 className="text-lg font-bold text-gray-900">{nameValue}</h4>}
+                          {phoneValue && (
+                            <div className="flex items-center gap-1.5 text-sm text-gray-500 mt-0.5">
+                              <Phone size={12} />
+                              <span>{phoneValue}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Remaining Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm text-gray-700">
+                      {remainingData.map(([key, value]) => {
+                        // Simple title case for label
+                        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+                        // Choose icon based on key (simple heuristic)
+                        let icon = <Check className="w-3.5 h-3.5" />; // Default icon
+                        let bgClass = "bg-gray-100 text-gray-600";
+
+                        const lowerKey = key.toLowerCase();
+                        if (lowerKey.includes('location') || lowerKey.includes('address')) {
+                          icon = <MapPin className="w-3.5 h-3.5" />;
+                          bgClass = "bg-red-50 text-red-500";
+                        } else if (lowerKey.includes('budget') || lowerKey.includes('price')) {
+                          icon = <DollarSign className="w-3.5 h-3.5" />;
+                          bgClass = "bg-green-50 text-green-600";
+                        } else if (lowerKey.includes('type') || lowerKey.includes('bhk')) {
+                          icon = <Home className="w-3.5 h-3.5" />;
+                          bgClass = "bg-blue-50 text-blue-500";
+                        } else if (lowerKey.includes('move') || lowerKey.includes('date')) {
+                          icon = <Calendar className="w-3.5 h-3.5" />;
+                          bgClass = "bg-purple-50 text-purple-500";
+                        } else if (lowerKey.includes('financ') || lowerKey.includes('loan')) {
+                          icon = <CreditCard className="w-3.5 h-3.5" />;
+                          bgClass = "bg-yellow-50 text-yellow-600";
+                        }
+
+                        return (
+                          <div key={key} className="flex items-start gap-2.5">
+                            <div className={`mt-0.5 p-1 rounded ${bgClass}`}>
+                              {icon}
+                            </div>
+                            <div className="overflow-hidden">
+                              <span className="block text-xs text-gray-500 font-medium lowercase first-letter:uppercase">{label}</span>
+                              <span className="font-semibold truncate block" title={value}>{value || 'Not provided'}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 p-1 bg-green-50 rounded text-green-600">
-                    <DollarSign className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500 font-medium">Budget</span>
-                    <span className="font-semibold">{message.summaryData.budget}</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 p-1 bg-blue-50 rounded text-blue-500">
-                    <Home className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500 font-medium">Type</span>
-                    <span className="font-semibold">{message.summaryData.type}</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <div className="mt-0.5 p-1 bg-purple-50 rounded text-purple-500">
-                    <Calendar className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500 font-medium">Move-in</span>
-                    <span className="font-semibold">{message.summaryData.moveIn}</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2.5 sm:col-span-2">
-                  <div className="mt-0.5 p-1 bg-yellow-50 rounded text-yellow-600">
-                    <CreditCard className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500 font-medium">Financing</span>
-                    <span className="font-semibold">{message.summaryData.financing}</span>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           )}
 

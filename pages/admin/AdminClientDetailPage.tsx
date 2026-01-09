@@ -604,7 +604,7 @@ export const AdminClientDetailPage = () => {
                                 <div>
                                     <h3 className={`font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-800'}`}>Dynamic Questions</h3>
                                     <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                        Define the 5 questions the bot asks.
+                                        Questions 0-1 are required greeting fields (name & phone). Questions 2-6 are your custom qualification questions.
                                     </p>
                                 </div>
                             </div>
@@ -612,8 +612,8 @@ export const AdminClientDetailPage = () => {
                             {client.config?.leadQualification?.questions?.map((question, qIndex) => (
                                 <div key={question.id || qIndex} className={cardClass}>
                                     <div className="flex items-center gap-3 mb-4 border-b pb-4 border-gray-100 dark:border-slate-700">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
-                                            {qIndex + 1}
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${qIndex < 2 ? 'bg-green-500 text-white' : isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
+                                            {qIndex}
                                         </div>
                                         <input
                                             type="text"
@@ -621,6 +621,7 @@ export const AdminClientDetailPage = () => {
                                             onChange={(e) => updateQuestion(qIndex, 'label', e.target.value)}
                                             className={`${inputClass} font-semibold`}
                                             placeholder="Question Label"
+                                            readOnly={qIndex < 2}
                                         />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-11">

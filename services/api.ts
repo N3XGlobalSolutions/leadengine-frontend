@@ -1,4 +1,5 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import { authService } from './authService';
 
 // Default to localhost:8000 if not specified
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -9,6 +10,27 @@ export const api = axios.create({
         'Content-Type': 'application/json',
     },
 });
+
+// --- Token Refresh State ---
+let isRefreshing = false;
+let failedQueue: Array<{
+    resolve: (token: string) => void;
+    reject: (error: any) => void;
+}> = [];
+
+/**
+ * Process the queue of failed requests after token refresh
+ */
+const processQueue = (error: any, token: string | null = null) => {
+    failedQueue.forEach((promise) => {
+        if (error) {
+            promise.reject(error);
+        } else {
+            promise.resolve(token!);
+        }
+    });
+    failedQueue = [];
+};
 
 // Request Interceptor: Attach Token and Handle FormData
 api.interceptors.request.use(
@@ -28,28 +50,72 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle 401 (Auto Logout)
+// Response Interceptor: Handle 401 with Token Refresh
 api.interceptors.response.use(
-    (response) => response,
+    (response: AxiosResponse) => response,
     async (error: AxiosError) => {
-        if (error.response?.status === 401) {
-            // Token expired or invalid
-            const originalRequest = error.config;
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-            // Prevent infinite loops if the refresh endpoint itself fails
-            if (originalRequest?.url?.includes('/auth/refresh')) {
-                localStorage.removeItem('access_token');
-                localStorage.removeItem('refresh_token');
-                window.location.href = '/admin/login'; // Force redirect
-                return Promise.reject(error);
-            }
-
-            // Optional: Implement Refresh Token Logic here if backend supports 'silent refresh'
-            // For MVP Phase 1, we just logout
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            // window.location.href = '/admin/login'; // Can be handled by Context instead of hard redirect
+        // Only handle 401 errors
+        if (error.response?.status !== 401) {
+            return Promise.reject(error);
         }
-        return Promise.reject(error);
+
+        // Prevent infinite loops - if the refresh endpoint itself fails, logout
+        if (originalRequest?.url?.includes('/auth/refresh') || originalRequest?.url?.includes('/auth/login')) {
+            authService.logout();
+            window.location.href = '/admin/login';
+            return Promise.reject(error);
+        }
+
+        // Prevent multiple retry attempts on the same request
+        if (originalRequest._retry) {
+            authService.logout();
+            window.location.href = '/admin/login';
+            return Promise.reject(error);
+        }
+
+        // Check if we have a refresh token
+        if (!authService.hasRefreshToken()) {
+            authService.logout();
+            window.location.href = '/admin/login';
+            return Promise.reject(error);
+        }
+
+        // If already refreshing, queue this request
+        if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+                failedQueue.push({ resolve, reject });
+            })
+                .then((token) => {
+                    originalRequest.headers.set('Authorization', `Bearer ${token}`);
+                    return api(originalRequest);
+                })
+                .catch((err) => Promise.reject(err));
+        }
+
+        // Start the refresh process
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+            // Attempt to refresh the token
+            const newToken = await authService.refreshToken();
+
+            // Process queued requests with new token
+            processQueue(null, newToken);
+
+            // Retry the original request with new token
+            originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
+            return api(originalRequest);
+        } catch (refreshError) {
+            // Refresh failed - logout and redirect
+            processQueue(refreshError, null);
+            authService.logout();
+            window.location.href = '/admin/login';
+            return Promise.reject(refreshError);
+        } finally {
+            isRefreshing = false;
+        }
     }
 );

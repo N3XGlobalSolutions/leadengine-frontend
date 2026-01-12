@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, Building2, Users, Calendar, ChevronRight, Pause, Play } from 'lucide-react';
+import { Search, Plus, Building2, Users, Calendar, ChevronRight, Pause, Play, RefreshCw } from 'lucide-react';
 import { Client } from '@/types/admin';
-import { getClients } from '../../services/adminService';
+import { getClients, getAllClientConversationCounts } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 
@@ -11,17 +11,52 @@ export const AdminClientsPage = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [conversationCounts, setConversationCounts] = useState<Record<string, number>>({});
+    const [countsLoading, setCountsLoading] = useState(false);
     const { isDark } = useAdminTheme();
 
+    // Function to fetch conversation counts
+    const fetchConversationCounts = useCallback(async (clientIds: string[]) => {
+        if (clientIds.length === 0) return;
+        setCountsLoading(true);
+        try {
+            const counts = await getAllClientConversationCounts(clientIds);
+            setConversationCounts(counts);
+        } catch (e) {
+            console.error('Error fetching conversation counts:', e);
+        } finally {
+            setCountsLoading(false);
+        }
+    }, []);
+
+    // Initial load of clients
     useEffect(() => {
         const fetchClients = async () => {
             setLoading(true);
             const data = await getClients();
             setClients(data);
             setLoading(false);
+
+            // Fetch conversation counts for all clients after loading clients
+            if (data.length > 0) {
+                const clientIds = data.map(c => c.id);
+                await fetchConversationCounts(clientIds);
+            }
         };
         fetchClients();
-    }, []);
+    }, [fetchConversationCounts]);
+
+    // Real-time update: refresh conversation counts every 30 seconds
+    useEffect(() => {
+        if (clients.length === 0) return;
+
+        const clientIds = clients.map(c => c.id);
+        const intervalId = setInterval(() => {
+            fetchConversationCounts(clientIds);
+        }, 30000); // 30 seconds
+
+        return () => clearInterval(intervalId);
+    }, [clients, fetchConversationCounts]);
 
     const filteredClients = clients.filter(client => {
         const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -151,8 +186,12 @@ export const AdminClientsPage = () => {
 
                             <div className={`flex items-center gap-4 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                                 <div className="flex items-center gap-1">
-                                    <Users size={14} />
-                                    <span>{client.totalUsers} users</span>
+                                    {countsLoading ? (
+                                        <RefreshCw size={14} className="animate-spin" />
+                                    ) : (
+                                        <Users size={14} />
+                                    )}
+                                    <span>{conversationCounts[client.id] ?? 0} users</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Calendar size={14} />

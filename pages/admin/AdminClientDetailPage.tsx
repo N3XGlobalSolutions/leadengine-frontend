@@ -3,13 +3,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Save, Trash2, Pause, Play, Building2, Users, Calendar,
     Globe, Palette, MessageSquare, Bot, AlertTriangle, Check, X, LayoutDashboard,
-    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield
+    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw
 } from 'lucide-react';
 import { Client, TenantDocument } from '../../types/admin';
 import { TenantConfig, Question } from '../../types/config';
 import {
     getClientById, updateClient, deleteClient, toggleClientPause,
-    getTenantDocuments, ingestDocument, deleteDocument, generateApiKey
+    getTenantDocuments, ingestDocument, deleteDocument, generateApiKey,
+    getClientConversationCount
 } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -24,6 +25,8 @@ export const AdminClientDetailPage = () => {
     const [documents, setDocuments] = useState<TenantDocument[]>([]);
     const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'settings' | 'qualifications' | 'knowledge' | 'integration' | 'conversations'>('general');
     const [generatedKey, setGeneratedKey] = useState<string>('');
+    const [conversationCount, setConversationCount] = useState<number>(0);
+    const [countLoading, setCountLoading] = useState(false);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -46,9 +49,29 @@ export const AdminClientDetailPage = () => {
             const docs = await getTenantDocuments(clientId);
             setDocuments(docs);
 
+            // Fetch conversation count
+            setCountLoading(true);
+            const count = await getClientConversationCount(clientId);
+            setConversationCount(count);
+            setCountLoading(false);
+
             setLoading(false);
         };
         fetchClient();
+    }, [clientId]);
+
+    // Real-time update: refresh conversation count every 30 seconds
+    useEffect(() => {
+        if (!clientId) return;
+
+        const intervalId = setInterval(async () => {
+            setCountLoading(true);
+            const count = await getClientConversationCount(clientId);
+            setConversationCount(count);
+            setCountLoading(false);
+        }, 30000); // 30 seconds
+
+        return () => clearInterval(intervalId);
     }, [clientId]);
 
     const handleSave = async () => {
@@ -841,9 +864,12 @@ export const AdminClientDetailPage = () => {
                             Statistics
                         </h3>
                         <div className="space-y-4">
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-center">
                                 <span className={isDark ? 'text-slate-400' : 'text-gray-500'}>Total Users</span>
-                                <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{client.totalUsers}</span>
+                                <span className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                    {countLoading && <RefreshCw size={14} className="animate-spin text-indigo-500" />}
+                                    {conversationCount}
+                                </span>
                             </div>
                             <div className="flex justify-between">
                                 <span className={isDark ? 'text-slate-400' : 'text-gray-500'}>Onboarded</span>

@@ -1,6 +1,7 @@
-import React from 'react';
-import { X, ExternalLink, Zap, Users, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, ExternalLink, Zap, Users, Calendar, RefreshCw } from 'lucide-react';
 import { Client } from '../../types/admin';
+import { getClientConversationCount } from '../../services/adminService';
 
 interface ClientSpotlightProps {
     client: Client | null;
@@ -8,6 +9,25 @@ interface ClientSpotlightProps {
 }
 
 export const ClientSpotlight: React.FC<ClientSpotlightProps> = ({ client, onClose }) => {
+    const [conversationCount, setConversationCount] = useState<number>(0);
+    const [countLoading, setCountLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchCount = async () => {
+            if (!client) return;
+            setCountLoading(true);
+            try {
+                const count = await getClientConversationCount(client.id);
+                setConversationCount(count);
+            } catch (e) {
+                console.error('Error fetching conversation count:', e);
+            } finally {
+                setCountLoading(false);
+            }
+        };
+        fetchCount();
+    }, [client]);
+
     if (!client) return null;
 
     return (
@@ -50,7 +70,10 @@ export const ClientSpotlight: React.FC<ClientSpotlightProps> = ({ client, onClos
                                 <Users size={16} className="mr-2" />
                                 <span className="text-xs font-semibold uppercase tracking-wider">Total Users</span>
                             </div>
-                            <span className="text-2xl font-bold text-gray-900">{client.totalUsers}</span>
+                            <span className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                                {countLoading && <RefreshCw size={18} className="animate-spin text-indigo-500" />}
+                                {conversationCount}
+                            </span>
                         </div>
                         <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                             <div className="flex items-center text-gray-500 mb-2">

@@ -126,8 +126,16 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                 const nameKey = findKey('name');
                 const phoneKey = findKey('phone');
 
-                const nameValue = nameKey ? message.summaryData![nameKey] : null;
-                const phoneValue = phoneKey ? message.summaryData![phoneKey] : null;
+                // Handle both old format (string) and new format ({label, answer} object)
+                const getValue = (val: any): string => {
+                  if (val === null || val === undefined) return '';
+                  if (typeof val === 'string') return val;
+                  if (typeof val === 'object' && val.answer) return val.answer;
+                  return String(val);
+                };
+
+                const nameValue = nameKey ? getValue(message.summaryData![nameKey]) : null;
+                const phoneValue = phoneKey ? getValue(message.summaryData![phoneKey]) : null;
 
                 // Rest of data excluding name, phone, and internal fields
                 const remainingData = Object.entries(message.summaryData || {}).filter(([key]) => {
@@ -158,27 +166,41 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                     {/* Remaining Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm text-gray-700">
                       {remainingData.map(([key, value]) => {
-                        // Simple title case for label
-                        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        // Handle new format: {label, answer} object
+                        let label: string;
+                        let displayValue: string;
+
+                        const valueObj = value as { label?: string; answer?: string } | null;
+
+                        if (typeof value === 'object' && value !== null && valueObj?.label && valueObj?.answer !== undefined) {
+                          // New format from backend state machine
+                          label = valueObj.label;
+                          displayValue = valueObj.answer || 'Not provided';
+                        } else {
+                          // Old format: key-value pairs
+                          label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                          displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
+                        }
 
                         // Choose icon based on key (simple heuristic)
                         let icon = <Check className="w-3.5 h-3.5" />; // Default icon
                         let bgClass = "bg-gray-100 text-gray-600";
 
                         const lowerKey = key.toLowerCase();
-                        if (lowerKey.includes('location') || lowerKey.includes('address')) {
+                        const lowerLabel = label.toLowerCase();
+                        if (lowerKey.includes('location') || lowerLabel.includes('location') || lowerLabel.includes('address') || lowerLabel.includes('area')) {
                           icon = <MapPin className="w-3.5 h-3.5" />;
                           bgClass = "bg-red-50 text-red-500";
-                        } else if (lowerKey.includes('budget') || lowerKey.includes('price')) {
+                        } else if (lowerKey.includes('budget') || lowerLabel.includes('budget') || lowerLabel.includes('price')) {
                           icon = <DollarSign className="w-3.5 h-3.5" />;
                           bgClass = "bg-green-50 text-green-600";
-                        } else if (lowerKey.includes('type') || lowerKey.includes('bhk')) {
+                        } else if (lowerKey.includes('type') || lowerLabel.includes('type') || lowerLabel.includes('bhk') || lowerLabel.includes('property')) {
                           icon = <Home className="w-3.5 h-3.5" />;
                           bgClass = "bg-blue-50 text-blue-500";
-                        } else if (lowerKey.includes('move') || lowerKey.includes('date')) {
+                        } else if (lowerKey.includes('move') || lowerLabel.includes('move') || lowerLabel.includes('timeline') || lowerLabel.includes('date')) {
                           icon = <Calendar className="w-3.5 h-3.5" />;
                           bgClass = "bg-purple-50 text-purple-500";
-                        } else if (lowerKey.includes('financ') || lowerKey.includes('loan')) {
+                        } else if (lowerKey.includes('financ') || lowerLabel.includes('financ') || lowerLabel.includes('loan')) {
                           icon = <CreditCard className="w-3.5 h-3.5" />;
                           bgClass = "bg-yellow-50 text-yellow-600";
                         }
@@ -190,7 +212,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                             </div>
                             <div className="overflow-hidden">
                               <span className="block text-xs text-gray-500 font-medium lowercase first-letter:uppercase">{label}</span>
-                              <span className="font-semibold truncate block" title={value}>{value || 'Not provided'}</span>
+                              <span className="font-semibold truncate block" title={displayValue}>{displayValue}</span>
                             </div>
                           </div>
                         );

@@ -116,8 +116,8 @@ export const AdminLeadsPage = () => {
                                 key={client.id}
                                 onClick={() => setSelectedClient(client)}
                                 className={`w-full text-left p-3 flex items-center gap-3 transition-colors border-l-2 ${selectedClient?.id === client.id
-                                        ? `bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500`
-                                        : `border-transparent ${hoverClass}`
+                                    ? `bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500`
+                                    : `border-transparent ${hoverClass}`
                                     }`}
                             >
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${isDark ? 'bg-slate-700 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
@@ -299,12 +299,27 @@ export const AdminLeadsPage = () => {
                                     <div>
                                         <h4 className={`text-sm font-semibold mb-3 ${textMain}`}>Collected Data</h4>
                                         <div className={`rounded-xl border overflow-hidden ${borderClass}`}>
-                                            {Object.entries((selectedLead as any).metadata).map(([key, value], i) => (
-                                                <div key={key} className={`flex text-sm p-3 ${i % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-900/30' : 'bg-gray-50')}`}>
-                                                    <span className={`w-1/3 font-medium capitalize ${textSub}`}>{key.replace(/_/g, ' ')}</span>
-                                                    <span className={`w-2/3 ${textMain}`}>{String(value)}</span>
-                                                </div>
-                                            ))}
+                                            {Object.entries((selectedLead as any).metadata).map(([key, value], i) => {
+                                                // Handle both old format (string) and new format ({label, answer})
+                                                let displayKey = key.replace(/_/g, ' ');
+                                                let displayValue = '';
+
+                                                if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
+                                                    // New format from state machine
+                                                    displayKey = (value as any).label;
+                                                    displayValue = (value as any).answer || 'Not provided';
+                                                } else {
+                                                    // Old format or simple value
+                                                    displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
+                                                }
+
+                                                return (
+                                                    <div key={key} className={`flex text-sm p-3 ${i % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-900/30' : 'bg-gray-50')}`}>
+                                                        <span className={`w-1/3 font-medium capitalize ${textSub}`}>{displayKey}</span>
+                                                        <span className={`w-2/3 ${textMain}`}>{displayValue}</span>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}

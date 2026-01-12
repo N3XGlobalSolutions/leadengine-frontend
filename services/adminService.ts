@@ -1,6 +1,7 @@
 import { Client, DashboardStats, OnboardingData, CreateClientInput, TenantDocument, DashboardMetrics, DailyMetric, DashboardLead, SystemHealth, PlatformStats } from '@/types/admin';
 import { api } from './api';
 import { TenantConfig } from '@/types/config';
+import { chatService } from './chatService';
 
 // --- MOCK STATS (Backend doesn't have stats yet) ---
 const MOCK_STATS: DashboardStats = {
@@ -219,7 +220,37 @@ export const getClientById = async (id: string): Promise<Client | null> => {
     }
 };
 
+// --- Conversation Count Functions ---
+/**
+ * Get the number of conversations (users) for a specific client.
+ * Each conversation represents one user interaction.
+ */
+export const getClientConversationCount = async (clientId: string): Promise<number> => {
+    try {
+        const conversations = await chatService.getTenantConversations(clientId);
+        return conversations.length;
+    } catch (e) {
+        console.error(`Error fetching conversation count for client ${clientId}:`, e);
+        return 0;
+    }
+};
 
+/**
+ * Get conversation counts for all provided clients.
+ * Returns a map of clientId -> conversation count.
+ */
+export const getAllClientConversationCounts = async (clientIds: string[]): Promise<Record<string, number>> => {
+    const counts: Record<string, number> = {};
+
+    // Fetch counts in parallel for better performance
+    const promises = clientIds.map(async (id) => {
+        const count = await getClientConversationCount(id);
+        counts[id] = count;
+    });
+
+    await Promise.all(promises);
+    return counts;
+};
 
 // ... (existing imports/code up to updateClient)
 

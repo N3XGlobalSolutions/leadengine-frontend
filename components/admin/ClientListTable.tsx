@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { MoreHorizontal, Search, Star, LayoutDashboard } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { MoreHorizontal, Search, Star, LayoutDashboard, RefreshCw } from 'lucide-react';
 import { Client } from '@/types/admin';
-import { getClients } from '../../services/adminService';
+import { getClients, getAllClientConversationCounts } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 
 interface ClientListTableProps {
@@ -12,7 +12,23 @@ export const ClientListTable: React.FC<ClientListTableProps> = ({ onSpotlight })
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [conversationCounts, setConversationCounts] = useState<Record<string, number>>({});
+    const [countsLoading, setCountsLoading] = useState(false);
     const { isDark } = useAdminTheme();
+
+    // Function to fetch conversation counts
+    const fetchConversationCounts = useCallback(async (clientIds: string[]) => {
+        if (clientIds.length === 0) return;
+        setCountsLoading(true);
+        try {
+            const counts = await getAllClientConversationCounts(clientIds);
+            setConversationCounts(counts);
+        } catch (e) {
+            console.error('Error fetching conversation counts:', e);
+        } finally {
+            setCountsLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
         const fetchClients = async () => {
@@ -20,9 +36,27 @@ export const ClientListTable: React.FC<ClientListTableProps> = ({ onSpotlight })
             const data = await getClients();
             setClients(data);
             setLoading(false);
+
+            // Fetch conversation counts after loading clients
+            if (data.length > 0) {
+                const clientIds = data.map(c => c.id);
+                await fetchConversationCounts(clientIds);
+            }
         };
         fetchClients();
-    }, []);
+    }, [fetchConversationCounts]);
+
+    // Real-time update: refresh conversation counts every 30 seconds
+    useEffect(() => {
+        if (clients.length === 0) return;
+
+        const clientIds = clients.map(c => c.id);
+        const intervalId = setInterval(() => {
+            fetchConversationCounts(clientIds);
+        }, 30000); // 30 seconds
+
+        return () => clearInterval(intervalId);
+    }, [clients, fetchConversationCounts]);
 
     const filteredClients = clients.filter(client =>
         client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,7 +130,12 @@ export const ClientListTable: React.FC<ClientListTableProps> = ({ onSpotlight })
                                         </span>
                                     </td>
                                     <td className={`px-6 py-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{client.plan}</td>
-                                    <td className={`px-6 py-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{client.totalUsers}</td>
+                                    <td className={`px-6 py-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                        <span className="inline-flex items-center gap-1.5">
+                                            {countsLoading && <RefreshCw size={12} className="animate-spin text-indigo-500" />}
+                                            {conversationCounts[client.id] ?? 0}
+                                        </span>
+                                    </td>
                                     <td className={`px-6 py-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{client.onboardedDate}</td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end space-x-2">

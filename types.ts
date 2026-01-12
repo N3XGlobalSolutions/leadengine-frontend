@@ -35,6 +35,14 @@ export interface ChatResponse {
   message_id: string;
   sources?: string[];
   suggested_actions?: string[];
+
+  // NEW: Explicit state info from backend - no more parsing from text!
+  current_state?: string;           // "greeting", "contact", "qualifying", "completed"
+  current_step_index?: number;      // 0-based index for progress
+  total_steps?: number;             // Total qualification questions
+  summary_data?: Record<string, any>;  // Backend-created summary
+  show_actions?: boolean;           // Explicit flag for action buttons
+  quick_replies?: string[];         // Quick reply options for current question
 }
 
 export interface Conversation {

@@ -508,16 +508,16 @@ export const AdminClientDetailPage = () => {
                                     </div>
                                     <div>
                                         <label className={labelClass}>Language</label>
-                                        <select
-                                            value={client.config?.language || 'en'}
-                                            onChange={(e) => updateConfig('language', e.target.value)}
-                                            className={inputClass}
-                                        >
-                                            <option value="en">English (en)</option>
-                                            <option value="es">Spanish (es)</option>
-                                            <option value="fr">French (fr)</option>
-                                            <option value="de">German (de)</option>
-                                        </select>
+                                        <input
+                                            type="text"
+                                            value="English"
+                                            readOnly
+                                            disabled
+                                            className={`${inputClass} cursor-not-allowed opacity-75`}
+                                        />
+                                        <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                            Language is fixed to English
+                                        </p>
                                     </div>
                                     <div>
                                         <label className={labelClass}>Tone</label>

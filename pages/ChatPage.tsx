@@ -11,42 +11,86 @@ import QuickReplies from '../components/chat/QuickReplies';
 import CookieConsent from '../components/chat/CookieConsent';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
-const SafeColorMap: Record<string, {
-    bgGradient: string;
-    iconBg: string;
-    loadingDot: string;
-    accent: string;
-}> = {
-    blue: {
-        bgGradient: 'from-blue-50/80 via-slate-50 to-gray-50',
-        iconBg: 'bg-blue-600',
-        loadingDot: 'bg-blue-500',
-        accent: 'text-blue-600'
-    },
-    indigo: {
-        bgGradient: 'from-indigo-50/80 via-slate-50 to-gray-50',
-        iconBg: 'bg-indigo-600',
-        loadingDot: 'bg-indigo-500',
-        accent: 'text-indigo-600'
-    },
-    green: {
-        bgGradient: 'from-green-50/80 via-slate-50 to-gray-50',
-        iconBg: 'bg-green-600',
-        loadingDot: 'bg-green-500',
-        accent: 'text-green-600'
-    },
-    purple: {
-        bgGradient: 'from-purple-50/80 via-slate-50 to-gray-50',
-        iconBg: 'bg-purple-600',
-        loadingDot: 'bg-purple-500',
-        accent: 'text-purple-600'
-    },
-    default: {
-        bgGradient: 'from-gray-50 via-slate-50 to-gray-50',
-        iconBg: 'bg-gray-700',
-        loadingDot: 'bg-gray-500',
-        accent: 'text-gray-700'
+// Utility to check if a color is a hex code
+const isHexColor = (color: string) => /^#([0-9A-F]{3}){1,2}$/i.test(color);
+
+// Utility to darken a hex color (for gradients/hover states)
+const adjustColor = (hex: string, percent: number): string => {
+    if (!isHexColor(hex)) return hex;
+    const num = parseInt(hex.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+    const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
+    const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+    return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
+};
+
+// Create a lighter version of a color for backgrounds
+const lightenColor = (hex: string): string => adjustColor(hex, 80);
+
+// Generate theme styles from primary color (either hex or named)
+const getThemeStyles = (primaryColor: string, secondaryColor: string) => {
+    const isHex = isHexColor(primaryColor);
+
+    if (isHex) {
+        // Return inline style objects for custom hex colors
+        return {
+            bgGradientStyle: {
+                background: `linear-gradient(to bottom right, ${lightenColor(primaryColor)}, #f8fafc, #f9fafb)`
+            },
+            iconBgStyle: { backgroundColor: primaryColor },
+            loadingDotStyle: { backgroundColor: primaryColor },
+            accentStyle: { color: primaryColor },
+            progressBarStyle: {
+                background: `linear-gradient(to right, ${primaryColor}, ${secondaryColor || adjustColor(primaryColor, -20)})`
+            },
+            // Fallback classes (won't be used when isHex is true)
+            bgGradient: '',
+            iconBg: '',
+            loadingDot: '',
+            accent: '',
+            isCustom: true
+        };
     }
+
+    // Fallback to named color classes
+    const colorMap: Record<string, { bgGradient: string; iconBg: string; loadingDot: string; accent: string }> = {
+        blue: {
+            bgGradient: 'from-blue-50/80 via-slate-50 to-gray-50',
+            iconBg: 'bg-blue-600',
+            loadingDot: 'bg-blue-500',
+            accent: 'text-blue-600'
+        },
+        indigo: {
+            bgGradient: 'from-indigo-50/80 via-slate-50 to-gray-50',
+            iconBg: 'bg-indigo-600',
+            loadingDot: 'bg-indigo-500',
+            accent: 'text-indigo-600'
+        },
+        green: {
+            bgGradient: 'from-green-50/80 via-slate-50 to-gray-50',
+            iconBg: 'bg-green-600',
+            loadingDot: 'bg-green-500',
+            accent: 'text-green-600'
+        },
+        purple: {
+            bgGradient: 'from-purple-50/80 via-slate-50 to-gray-50',
+            iconBg: 'bg-purple-600',
+            loadingDot: 'bg-purple-500',
+            accent: 'text-purple-600'
+        }
+    };
+
+    const theme = colorMap[primaryColor] || colorMap['indigo'];
+    return {
+        ...theme,
+        bgGradientStyle: {},
+        iconBgStyle: {},
+        loadingDotStyle: {},
+        accentStyle: {},
+        progressBarStyle: {},
+        isCustom: false
+    };
 };
 
 const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) => {
@@ -72,8 +116,10 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
         handleFeedback,
     } = useChatSession(config, tenantId);
 
-    const themeKey = config.colors.primary in SafeColorMap ? config.colors.primary : 'default';
-    const themeClasses = SafeColorMap[themeKey];
+    const themeStyles = useMemo(() => getThemeStyles(
+        config.colors?.primary || '#4F46E5',
+        config.colors?.secondary || '#6366F1'
+    ), [config.colors?.primary, config.colors?.secondary]);
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
@@ -81,13 +127,19 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
     }, [messages, isLoading]);
 
     return (
-        <div className={`min-h-screen bg-gradient-to-br ${themeClasses.bgGradient} font-sans flex flex-col`}>
+        <div
+            className={`min-h-screen font-sans flex flex-col ${!themeStyles.isCustom ? `bg-gradient-to-br ${themeStyles.bgGradient}` : ''}`}
+            style={themeStyles.isCustom ? themeStyles.bgGradientStyle : undefined}
+        >
             {/* Header */}
             <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
                     {/* Left: Company Branding */}
                     <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg ${themeClasses.iconBg} flex items-center justify-center text-white shadow-md`}>
+                        <div
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-md ${!themeStyles.isCustom ? themeStyles.iconBg : ''}`}
+                            style={themeStyles.isCustom ? themeStyles.iconBgStyle : undefined}
+                        >
                             <MessageCircle size={20} />
                         </div>
                         <span className="font-semibold text-gray-900 text-lg tracking-tight">
@@ -99,7 +151,10 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                     <div className="flex items-center gap-3">
                         <div className="text-right hidden sm:block">
                             <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">AI Assistant</p>
-                            <p className={`text-sm font-bold ${themeClasses.accent}`}>{config.botDisplayName}</p>
+                            <p
+                                className={`text-sm font-bold ${!themeStyles.isCustom ? themeStyles.accent : ''}`}
+                                style={themeStyles.isCustom ? themeStyles.accentStyle : undefined}
+                            >{config.botDisplayName}</p>
                         </div>
                         <div className="w-9 h-9 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center overflow-hidden">
                             <img
@@ -133,7 +188,10 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                         {/* Session ID Badge */}
                         <div className="text-center mb-6">
                             <span className="text-xs text-gray-400 font-medium tracking-wide">
-                                SESSION ID: <span className={`${themeClasses.accent} font-semibold`}>{sessionId?.slice(0, 8).toUpperCase()}</span>
+                                SESSION ID: {' '}
+                                <span className={`font-semibold ${!themeStyles.isCustom ? themeStyles.accent : ''}`} style={themeStyles.isCustom ? themeStyles.accentStyle : undefined}>
+                                    {sessionId?.slice(0, 8).toUpperCase()}
+                                </span>
                             </span>
                         </div>
 
@@ -150,8 +208,11 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                                     <div
-                                        className={`bg-gradient-to-r from-${config.colors.primary}-500 to-${config.colors.secondary}-600 h-2 rounded-full transition-all duration-500 ease-out`}
-                                        style={{ width: `${(questionProgress.current / questionProgress.total) * 100}%` }}
+                                        className="h-2 rounded-full transition-all duration-500 ease-out"
+                                        style={{
+                                            width: `${(questionProgress.current / questionProgress.total) * 100}%`,
+                                            ...themeStyles.progressBarStyle
+                                        }}
                                     />
                                 </div>
                             </div>
@@ -191,9 +252,18 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                                         />
                                     </div>
                                     <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-100 flex items-center gap-1.5">
-                                        <span className={`w-2 h-2 rounded-full animate-bounce ${themeClasses.loadingDot}`} style={{ animationDelay: '0ms' }} />
-                                        <span className={`w-2 h-2 rounded-full animate-bounce ${themeClasses.loadingDot}`} style={{ animationDelay: '150ms' }} />
-                                        <span className={`w-2 h-2 rounded-full animate-bounce ${themeClasses.loadingDot}`} style={{ animationDelay: '300ms' }} />
+                                        <span
+                                            className={`w-2 h-2 rounded-full animate-bounce ${!themeStyles.isCustom ? themeStyles.loadingDot : ''}`}
+                                            style={{ animationDelay: '0ms', ...(themeStyles.isCustom ? themeStyles.loadingDotStyle : {}) }}
+                                        />
+                                        <span
+                                            className={`w-2 h-2 rounded-full animate-bounce ${!themeStyles.isCustom ? themeStyles.loadingDot : ''}`}
+                                            style={{ animationDelay: '150ms', ...(themeStyles.isCustom ? themeStyles.loadingDotStyle : {}) }}
+                                        />
+                                        <span
+                                            className={`w-2 h-2 rounded-full animate-bounce ${!themeStyles.isCustom ? themeStyles.loadingDot : ''}`}
+                                            style={{ animationDelay: '300ms', ...(themeStyles.isCustom ? themeStyles.loadingDotStyle : {}) }}
+                                        />
                                     </div>
                                 </div>
                             )}
@@ -201,38 +271,41 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                             <div ref={messagesEndRef} className="h-1" />
                         </div>
                     </div>
-                )}
-            </main>
+                )
+                }
+            </main >
 
             {/* Fixed Bottom Input Area */}
-            {hasStarted && !isChatEnded && (
-                <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/95 border-t border-gray-100 z-50">
-                    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-                        {/* Quick Replies */}
-                        {quickReplies.length > 0 && !isLoading && (
-                            <div className="mb-3">
-                                <QuickReplies
-                                    options={quickReplies}
-                                    onSelect={handleSendMessage}
+            {
+                hasStarted && !isChatEnded && (
+                    <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/95 border-t border-gray-100 z-50">
+                        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+                            {/* Quick Replies */}
+                            {quickReplies.length > 0 && !isLoading && (
+                                <div className="mb-3">
+                                    <QuickReplies
+                                        options={quickReplies}
+                                        onSelect={handleSendMessage}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Input Field */}
+                            <div className="relative">
+                                <ChatInput
+                                    onSend={handleSendMessage}
+                                    disabled={isLoading}
+                                    placeholder="Type your message here..."
                                 />
                             </div>
-                        )}
-
-                        {/* Input Field */}
-                        <div className="relative">
-                            <ChatInput
-                                onSend={handleSendMessage}
-                                disabled={isLoading}
-                                placeholder="Type your message here..."
-                            />
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Cookie Consent */}
             <CookieConsent />
-        </div>
+        </div >
     );
 };
 

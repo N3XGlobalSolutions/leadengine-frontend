@@ -36,8 +36,8 @@ export const useTenantConfig = (tenantId?: string) => {
                     botAvatar: branding.avatar_url,
 
                     colors: {
-                        primary: branding.primary_color?.replace('text-', '').replace('bg-', '') || 'indigo',
-                        secondary: branding.secondary_color || 'purple'
+                        primary: branding.primary_color || '#4F46E5',
+                        secondary: branding.secondary_color || '#6366F1'
                     },
 
                     welcome: {

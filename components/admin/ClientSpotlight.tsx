@@ -8,7 +8,10 @@ interface ClientSpotlightProps {
     onClose: () => void;
 }
 
+import { useNavigate } from 'react-router-dom';
+
 export const ClientSpotlight: React.FC<ClientSpotlightProps> = ({ client, onClose }) => {
+    const navigate = useNavigate();
     const [conversationCount, setConversationCount] = useState<number>(0);
     const [countLoading, setCountLoading] = useState(false);
 
@@ -90,10 +93,16 @@ export const ClientSpotlight: React.FC<ClientSpotlightProps> = ({ client, onClos
                     </div>
 
                     <div className="mt-8 flex space-x-3">
-                        <button className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
+                        <button
+                            onClick={() => navigate(`/admin/clients/${client.id}`)}
+                            className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                        >
                             Manage Client
                         </button>
-                        <button className="flex-1 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+                        <button
+                            onClick={() => navigate(`/${client.id}/dashboard`)}
+                            className="flex-1 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                        >
                             View Reports
                         </button>
                     </div>

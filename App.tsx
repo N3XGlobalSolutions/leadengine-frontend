@@ -16,6 +16,7 @@ import { AdminSupportPage } from './pages/admin/AdminSupportPage';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { AdminThemeProvider } from './contexts/AdminThemeContext';
 import { ProtectedRoute } from './components/admin/ProtectedRoute';
+import { ClientLeadsPage } from './pages/ClientLeadsPage';
 export default function App() {
   return (
     <Router>
@@ -76,6 +77,7 @@ export default function App() {
 
             {/* Client Routes */}
             <Route path="/:tenantId/dashboard" element={<DashboardPage />} />
+            <Route path="/:tenantId/leads" element={<ClientLeadsPage />} />
             <Route path="/:tenantId" element={<ChatPage />} />
 
             {/* 404 Route */}

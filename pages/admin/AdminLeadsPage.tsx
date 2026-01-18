@@ -78,7 +78,7 @@ export const AdminLeadsPage = () => {
         total: leads.length,
         new: leads.filter(l => l.status === 'new').length,
         qualified: leads.filter(l => l.status === 'qualified').length,
-        converted: leads.filter(l => l.status === 'converted').length
+        disqualified: leads.filter(l => l.status === 'disqualified').length
     };
 
     // Styles
@@ -153,9 +153,9 @@ export const AdminLeadsPage = () => {
                                         <p className={textSub}>Manage leads captured by the AI agent.</p>
                                     </div>
                                     <div className="flex gap-2">
-                                        {['new', 'qualified', 'converted'].map(s => (
+                                        {['new', 'qualified', 'disqualified'].map(s => (
                                             <div key={s} className={`px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-2 ${borderClass}`}>
-                                                <span className={`w-2 h-2 rounded-full ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-purple-500'
+                                                <span className={`w-2 h-2 rounded-full ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-red-500'
                                                     }`} />
                                                 <span className="capitalize">{s}</span>
                                                 <span className={textMain}>{(stats as any)[s]}</span>
@@ -182,10 +182,8 @@ export const AdminLeadsPage = () => {
                                     >
                                         <option value="all">All Statuses</option>
                                         <option value="new">New</option>
-                                        <option value="contacted">Contacted</option>
                                         <option value="qualified">Qualified</option>
-                                        <option value="converted">Converted</option>
-                                        <option value="lost">Lost</option>
+                                        <option value="disqualified">Disqualified</option>
                                     </select>
                                 </div>
                             </div>
@@ -216,7 +214,7 @@ export const AdminLeadsPage = () => {
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
                                                         ${lead.status === 'new' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
                                                             lead.status === 'qualified' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                                                                lead.status === 'converted' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                                                lead.status === 'disqualified' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
                                                                     'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}`}>
                                                         {lead.status}
                                                     </span>
@@ -261,10 +259,8 @@ export const AdminLeadsPage = () => {
                                         className={`text-xs font-medium bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-indigo-500 font-bold`}
                                     >
                                         <option value="new">New</option>
-                                        <option value="contacted">Contacted</option>
                                         <option value="qualified">Qualified</option>
-                                        <option value="converted">Converted</option>
-                                        <option value="lost">Lost</option>
+                                        <option value="disqualified">Disqualified</option>
                                     </select>
                                 </div>
                             </div>

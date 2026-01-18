@@ -140,7 +140,8 @@ const mapTenantToClient = (tenant: any): Client => {
         max_conversation_length: backendConfig.max_conversation_length || 50,
         lead_trigger_count: backendConfig.lead_trigger_count || 5,
         lead_form_enabled: backendConfig.lead_form_enabled ?? true,
-        lead_form_fields: backendConfig.lead_form_fields || ["name", "phone"]
+        lead_form_fields: backendConfig.lead_form_fields || ["name", "phone"],
+        lead_qualification_criteria: backendConfig.lead_qualification_criteria
     };
 
     return {
@@ -298,7 +299,8 @@ export const updateClient = async (client: Client): Promise<Client> => {
         max_conversation_length: client.config?.max_conversation_length,
         lead_trigger_count: client.config?.lead_trigger_count,
         lead_form_enabled: client.config?.lead_form_enabled,
-        lead_form_fields: client.config?.lead_form_fields
+        lead_form_fields: client.config?.lead_form_fields,
+        lead_qualification_criteria: client.config?.lead_qualification_criteria
     };
 
     const payload = {
@@ -362,7 +364,8 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
 
             welcome_message: `${clientData.config.welcome.headline} ${clientData.config.welcome.highlightedHeadline}`,
             language: "en",
-            tone: "professional"
+            tone: "professional",
+            lead_qualification_criteria: clientData.config.lead_qualification_criteria
         }
     };
 

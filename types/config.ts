@@ -49,6 +49,9 @@ export interface TenantConfig {
     lead_trigger_count?: number;
     lead_form_enabled?: boolean;
     lead_form_fields?: string[];
+
+    // Lead Qualification Criteria
+    lead_qualification_criteria?: string; // Natural language criteria for qualifying leads
 }
 
 // Default template with placeholder questions

@@ -755,6 +755,28 @@ export const AdminClientDetailPage = () => {
                                     </>
                                 )}
                             </div>
+
+                            {/* LQC - Lead Qualification Criteria */}
+                            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-slate-700">
+                                <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                    <Wand2 size={20} /> LQC - Lead Qualification Criteria
+                                </h2>
+                                <div className="space-y-3">
+                                    <label className={labelClass}>
+                                        Qualification Criteria Prompt
+                                    </label>
+                                    <textarea
+                                        rows={12}
+                                        value={client.config?.lead_qualification_criteria || ''}
+                                        onChange={(e) => updateConfig('lead_qualification_criteria', e.target.value)}
+                                        className={inputClass}
+                                        placeholder="Enter or paste your lead qualification criteria prompt here. This can include specific questions, scoring criteria, or guidelines for qualifying leads as warm or cold..."
+                                    />
+                                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                        Define the criteria and prompts used to validate and qualify leads. This will help identify warm leads vs cold leads.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     )}
                     {/* GENERATE KEY TAB */}

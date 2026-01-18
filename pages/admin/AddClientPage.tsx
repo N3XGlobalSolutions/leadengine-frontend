@@ -43,6 +43,9 @@ export const AddClientPage = () => {
     const [greetNameInstruction, setGreetNameInstruction] = useState('Hello! I am [Bot Name], the virtual assistant for [Company Name]. Before we proceed, may I have your name?');
     const [collectPhoneInstruction, setCollectPhoneInstruction] = useState('Great! And what\'s the best phone number to reach you?');
 
+    // Lead Qualification Criteria state
+    const [leadQualificationCriteria, setLeadQualificationCriteria] = useState('');
+
     const generateSlug = (name: string) => {
         return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     };
@@ -118,8 +121,8 @@ export const AddClientPage = () => {
             case 3:
                 return formData.config.welcome.highlightedHeadline.length >= 1;
             case 4:
-                // Knowledge Base - Optional for now
-                return true;
+                // Knowledge Base - LQC is required
+                return leadQualificationCriteria.trim().length > 0;
             case 5:
                 // Ensure all 5 questions have at least a label and instruction
                 return formData.config.leadQualification.questions.every(q =>
@@ -188,7 +191,8 @@ export const AddClientPage = () => {
                     leadQualification: {
                         ...finalConfig.leadQualification,
                         questions: allQuestions
-                    }
+                    },
+                    lead_qualification_criteria: leadQualificationCriteria || undefined
                 }
             });
 
@@ -481,6 +485,28 @@ export const AddClientPage = () => {
                                         Remove file
                                     </button>
                                 )}
+                            </div>
+
+                            {/* LQC - Lead Qualification Criteria */}
+                            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-slate-700">
+                                <h3 className={`text-md font-semibold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                    <Wand2 size={18} /> LQC - Lead Qualification Criteria
+                                </h3>
+                                <div className="space-y-3">
+                                    <label className={labelClass}>
+                                        Qualification Criteria Prompt *
+                                    </label>
+                                    <textarea
+                                        rows={12}
+                                        value={leadQualificationCriteria}
+                                        onChange={(e) => setLeadQualificationCriteria(e.target.value)}
+                                        className={inputClass}
+                                        placeholder="Enter or paste your lead qualification criteria prompt here. This can include specific questions, scoring criteria, or guidelines for qualifying leads as warm or cold..."
+                                    />
+                                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                        Define the criteria and prompts used to validate and qualify leads. This will help identify warm leads vs cold leads.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>

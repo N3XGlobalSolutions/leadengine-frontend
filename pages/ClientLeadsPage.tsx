@@ -100,7 +100,7 @@ export const ClientLeadsPage = () => {
         total: leads.length,
         new: leads.filter(l => l.status === 'new').length,
         qualified: leads.filter(l => l.status === 'qualified').length,
-        converted: leads.filter(l => l.status === 'converted').length
+        disqualified: leads.filter(l => l.status === 'disqualified').length
     };
 
     return (
@@ -146,17 +146,15 @@ export const ClientLeadsPage = () => {
                                 >
                                     <option value="all">All Statuses</option>
                                     <option value="new">New</option>
-                                    <option value="contacted">Contacted</option>
                                     <option value="qualified">Qualified</option>
-                                    <option value="converted">Converted</option>
-                                    <option value="lost">Lost</option>
+                                    <option value="disqualified">Disqualified</option>
                                 </select>
                             </div>
 
                             <div className="flex gap-2">
-                                {['new', 'qualified', 'converted'].map(s => (
+                                {['new', 'qualified', 'disqualified'].map(s => (
                                     <div key={s} className="px-3 py-1 rounded-lg border border-gray-100 text-xs font-medium flex items-center gap-2 bg-gray-50">
-                                        <span className={`w-2 h-2 rounded-full ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-purple-500'}`} />
+                                        <span className={`w-2 h-2 rounded-full ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-red-500'}`} />
                                         <span className="capitalize text-gray-600">{s}: {(stats as any)[s]}</span>
                                     </div>
                                 ))}
@@ -191,7 +189,7 @@ export const ClientLeadsPage = () => {
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
                                                     ${lead.status === 'new' ? 'bg-blue-100 text-blue-800' :
                                                         lead.status === 'qualified' ? 'bg-green-100 text-green-800' :
-                                                            lead.status === 'converted' ? 'bg-purple-100 text-purple-800' :
+                                                            lead.status === 'disqualified' ? 'bg-red-100 text-red-800' :
                                                                 'bg-gray-100 text-gray-800'}`}>
                                                     {lead.status}
                                                 </span>
@@ -229,10 +227,8 @@ export const ClientLeadsPage = () => {
                                             className="text-xs font-bold bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-indigo-600 uppercase tracking-wide hover:text-indigo-800 transition-colors"
                                         >
                                             <option value="new">New</option>
-                                            <option value="contacted">Contacted</option>
                                             <option value="qualified">Qualified</option>
-                                            <option value="converted">Converted</option>
-                                            <option value="lost">Lost</option>
+                                            <option value="disqualified">Disqualified</option>
                                         </select>
                                     </div>
                                 </div>

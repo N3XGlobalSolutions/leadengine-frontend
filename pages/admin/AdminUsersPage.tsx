@@ -82,10 +82,10 @@ export const AdminUsersPage = () => {
     );
 
     // Styles
-    const inputClass = `w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200 text-gray-900'}`;
-    const labelClass = `block text-sm font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`;
-    const modalClass = `fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm`;
-    const modalContentClass = `w-full max-w-md p-6 rounded-xl shadow-2xl ${isDark ? 'bg-slate-800' : 'bg-white'}`;
+    const inputClass = `w-full px-3 sm:px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200 text-gray-900'}`;
+    const labelClass = `block text-xs sm:text-sm font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`;
+    const modalClass = `fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm`;
+    const modalContentClass = `w-full max-w-md p-4 sm:p-6 rounded-xl shadow-2xl ${isDark ? 'bg-slate-800' : 'bg-white'}`;
 
     const handleCreateUser = async () => {
         if (!createData.email || !createData.password || !createData.full_name) {
@@ -120,7 +120,7 @@ export const AdminUsersPage = () => {
                         setCreateData({ role: UserRole.CLIENT_ADMIN });
                         setIsCreating(true);
                     }}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-indigo-600/20"
+                    className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-indigo-600/20 w-full sm:w-auto"
                 >
                     <UserIcon size={18} />
                     <span>Add User</span>
@@ -147,14 +147,14 @@ export const AdminUsersPage = () => {
             {/* Users Table */}
             <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
                         <thead>
                             <tr className={`border-b ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-gray-50'}`}>
-                                <th className={`p-4 text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>User</th>
-                                <th className={`p-4 text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Role</th>
-                                <th className={`p-4 text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Tenant ID</th>
-                                <th className={`p-4 text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Status</th>
-                                <th className={`p-4 text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Actions</th>
+                                <th className={`p-3 sm:p-4 text-xs sm:text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>User</th>
+                                <th className={`p-3 sm:p-4 text-xs sm:text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Role</th>
+                                <th className={`p-3 sm:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Tenant ID</th>
+                                <th className={`p-3 sm:p-4 text-xs sm:text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Status</th>
+                                <th className={`p-3 sm:p-4 text-xs sm:text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -188,7 +188,7 @@ export const AdminUsersPage = () => {
                                                 {user.role}
                                             </span>
                                         </td>
-                                        <td className={`p-4 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                        <td className={`p-3 sm:p-4 text-xs sm:text-sm hidden md:table-cell ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                                             {user.tenant_id || '-'}
                                         </td>
                                         <td className="p-4">

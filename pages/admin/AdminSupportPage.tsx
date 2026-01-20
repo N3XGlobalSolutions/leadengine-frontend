@@ -47,15 +47,15 @@ export const AdminSupportPage = () => {
 
     return (
         <AdminLayout>
-            <div className="max-w-4xl mx-auto">
-                <div className="mb-8">
-                    <h1 className={`text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Support Center</h1>
-                    <p className={`${isDark ? 'text-slate-400' : 'text-gray-600'}`}>Find answers, troubleshoot issues, or get in touch with our team.</p>
+            <div className="max-w-4xl mx-auto px-3 sm:px-4">
+                <div className="mb-6 sm:mb-8">
+                    <h1 className={`text-2xl sm:text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Support Center</h1>
+                    <p className={`text-sm sm:text-base ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>Find answers, troubleshoot issues, or get in touch with our team.</p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-8">
+                <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
                     {/* FAQ Section */}
-                    <section className={`p-6 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                    <section className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
                         <div className="flex items-center mb-6">
                             <div className={`p-2 rounded-lg mr-4 ${isDark ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
                                 <HelpCircle size={24} />
@@ -68,10 +68,10 @@ export const AdminSupportPage = () => {
                                 <div key={index} className={`border rounded-xl overflow-hidden ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
                                     <button
                                         onClick={() => toggleFaq(index)}
-                                        className={`w-full flex items-center justify-between p-4 text-left transition-colors ${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-gray-50'
+                                        className={`w-full flex items-center justify-between p-3 sm:p-4 text-left transition-colors ${isDark ? 'hover:bg-slate-700/50' : 'hover:bg-gray-50'
                                             }`}
                                     >
-                                        <span className={`font-medium ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>{faq.question}</span>
+                                        <span className={`font-medium text-sm sm:text-base ${isDark ? 'text-slate-200' : 'text-gray-900'}`}>{faq.question}</span>
                                         {openFaq === index ?
                                             <ChevronUp size={20} className={isDark ? 'text-slate-400' : 'text-gray-500'} /> :
                                             <ChevronDown size={20} className={isDark ? 'text-slate-400' : 'text-gray-500'} />
@@ -79,8 +79,8 @@ export const AdminSupportPage = () => {
                                     </button>
 
                                     {openFaq === index && (
-                                        <div className={`p-4 pt-0 border-t ${isDark ? 'border-slate-700 text-slate-400' : 'border-gray-100 text-gray-600'}`}>
-                                            <p className="mt-4 leading-relaxed">{faq.answer}</p>
+                                        <div className={`p-3 sm:p-4 pt-0 border-t ${isDark ? 'border-slate-700 text-slate-400' : 'border-gray-100 text-gray-600'}`}>
+                                            <p className="mt-3 sm:mt-4 leading-relaxed text-sm sm:text-base">{faq.answer}</p>
                                         </div>
                                     )}
                                 </div>
@@ -89,7 +89,7 @@ export const AdminSupportPage = () => {
                     </section>
 
                     {/* Troubleshooting Section */}
-                    <section className={`p-6 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                    <section className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
                         <div className="flex items-center mb-6">
                             <div className={`p-2 rounded-lg mr-4 ${isDark ? 'bg-orange-900/50 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>
                                 <AlertTriangle size={24} />
@@ -99,9 +99,9 @@ export const AdminSupportPage = () => {
 
                         <div className="grid md:grid-cols-2 gap-4">
                             {troubleshootItems.map((item, index) => (
-                                <div key={index} className={`p-4 rounded-xl border ${isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
-                                    <h3 className={`font-semibold mb-2 ${isDark ? 'text-orange-300' : 'text-orange-700'}`}>{item.problem}</h3>
-                                    <div className={`text-sm whitespace-pre-line ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
+                                <div key={index} className={`p-3 sm:p-4 rounded-lg sm:rounded-xl border ${isDark ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
+                                    <h3 className={`font-semibold mb-2 text-sm sm:text-base ${isDark ? 'text-orange-300' : 'text-orange-700'}`}>{item.problem}</h3>
+                                    <div className={`text-xs sm:text-sm whitespace-pre-line ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
                                         {item.solution}
                                     </div>
                                 </div>
@@ -110,7 +110,7 @@ export const AdminSupportPage = () => {
                     </section>
 
                     {/* Contact Support Section */}
-                    <section className={`p-6 rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                    <section className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
                         <div className="flex items-center mb-6">
                             <div className={`p-2 rounded-lg mr-4 ${isDark ? 'bg-green-900/50 text-green-400' : 'bg-green-50 text-green-600'}`}>
                                 <MessageCircle size={24} />
@@ -119,28 +119,28 @@ export const AdminSupportPage = () => {
                         </div>
 
                         <div className="grid md:grid-cols-3 gap-6">
-                            <div className={`flex flex-col items-center p-6 rounded-xl border text-center transition-colors ${isDark ? 'bg-slate-900/50 border-slate-700 hover:border-green-500/50' : 'bg-gray-50 border-gray-100 hover:border-green-200'
+                            <div className={`flex flex-col items-center p-4 sm:p-6 rounded-lg sm:rounded-xl border text-center transition-colors ${isDark ? 'bg-slate-900/50 border-slate-700 hover:border-green-500/50' : 'bg-gray-50 border-gray-100 hover:border-green-200'
                                 }`}>
-                                <Mail size={32} className={`mb-4 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
-                                <h3 className={`font-semibold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Email Us</h3>
-                                <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Get a response within 24 hours</p>
-                                <a href="mailto:admin@n3xglobalsolutions.com" className="text-green-500 hover:text-green-600 font-medium">admin@n3xglobalsolutions.com</a>
+                                <Mail size={28} className={`mb-3 sm:mb-4 sm:w-8 sm:h-8 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
+                                <h3 className={`font-semibold mb-1 text-sm sm:text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>Email Us</h3>
+                                <p className={`text-xs sm:text-sm mb-3 sm:mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Get a response within 24 hours</p>
+                                <a href="mailto:admin@n3xglobalsolutions.com" className="text-green-500 hover:text-green-600 font-medium text-xs sm:text-sm break-all">admin@n3xglobalsolutions.com</a>
                             </div>
 
-                            <div className={`flex flex-col items-center p-6 rounded-xl border text-center transition-colors ${isDark ? 'bg-slate-900/50 border-slate-700 hover:border-green-500/50' : 'bg-gray-50 border-gray-100 hover:border-green-200'
+                            <div className={`flex flex-col items-center p-4 sm:p-6 rounded-lg sm:rounded-xl border text-center transition-colors ${isDark ? 'bg-slate-900/50 border-slate-700 hover:border-green-500/50' : 'bg-gray-50 border-gray-100 hover:border-green-200'
                                 }`}>
-                                <Phone size={32} className={`mb-4 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
-                                <h3 className={`font-semibold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Call Us</h3>
-                                <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Mon-Fri 9am-6pm IST</p>
-                                <a href="tel:+919876543210" className="text-green-500 hover:text-green-600 font-medium">+91 9876543210</a>
+                                <Phone size={28} className={`mb-3 sm:mb-4 sm:w-8 sm:h-8 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
+                                <h3 className={`font-semibold mb-1 text-sm sm:text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>Call Us</h3>
+                                <p className={`text-xs sm:text-sm mb-3 sm:mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Mon-Fri 9am-6pm IST</p>
+                                <a href="tel:+919876543210" className="text-green-500 hover:text-green-600 font-medium text-xs sm:text-sm">+91 93607 38170</a>
                             </div>
 
-                            <div className={`flex flex-col items-center p-6 rounded-xl border text-center transition-colors ${isDark ? 'bg-slate-900/50 border-slate-700 hover:border-green-500/50' : 'bg-gray-50 border-gray-100 hover:border-green-200'
+                            <div className={`flex flex-col items-center p-4 sm:p-6 rounded-lg sm:rounded-xl border text-center transition-colors ${isDark ? 'bg-slate-900/50 border-slate-700 hover:border-green-500/50' : 'bg-gray-50 border-gray-100 hover:border-green-200'
                                 }`}>
-                                <FileText size={32} className={`mb-4 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
-                                <h3 className={`font-semibold mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>Documentation</h3>
-                                <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Browse our detailed guides</p>
-                                <a href="/admin/guide" className="text-green-500 hover:text-green-600 font-medium">View Guide</a>
+                                <FileText size={28} className={`mb-3 sm:mb-4 sm:w-8 sm:h-8 ${isDark ? 'text-slate-300' : 'text-gray-600'}`} />
+                                <h3 className={`font-semibold mb-1 text-sm sm:text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>Documentation</h3>
+                                <p className={`text-xs sm:text-sm mb-3 sm:mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Browse our detailed guides</p>
+                                <a href="/admin/guide" className="text-green-500 hover:text-green-600 font-medium text-xs sm:text-sm">View Guide</a>
                             </div>
                         </div>
                     </section>

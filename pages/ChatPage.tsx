@@ -286,6 +286,8 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                                     <QuickReplies
                                         options={quickReplies}
                                         onSelect={handleSendMessage}
+                                        primaryColor={config.colors?.primary}
+                                        secondaryColor={config.colors?.secondary}
                                     />
                                 </div>
                             )}
@@ -296,6 +298,8 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                                     onSend={handleSendMessage}
                                     disabled={isLoading}
                                     placeholder="Type your message here..."
+                                    primaryColor={config.colors?.primary}
+                                    secondaryColor={config.colors?.secondary}
                                 />
                             </div>
                         </div>

@@ -32,21 +32,21 @@ export const AdminGuidePage = () => {
 
     return (
         <AdminLayout>
-            <div className="max-w-5xl mx-auto pb-12">
+            <div className="max-w-5xl mx-auto pb-8 sm:pb-12 px-3 sm:px-4">
                 {/* Header */}
-                <div className={`mb-10 text-center p-12 rounded-3xl ${isDark
+                <div className={`mb-6 sm:mb-10 text-center p-6 sm:p-8 lg:p-12 rounded-2xl sm:rounded-3xl ${isDark
                     ? 'bg-gradient-to-r from-indigo-900 to-purple-900'
                     : 'bg-gradient-to-r from-indigo-600 to-purple-700'
                     } text-white shadow-xl`}>
-                    <BookOpen size={48} className="mx-auto mb-4 opacity-80" />
-                    <h1 className="text-4xl font-extrabold mb-4 tracking-tight">Platform Admin Documentation</h1>
-                    <p className="text-xl text-indigo-100 max-w-2xl mx-auto">
+                    <BookOpen size={36} className="mx-auto mb-3 sm:mb-4 opacity-80 sm:w-12 sm:h-12" />
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 sm:mb-4 tracking-tight">Platform Admin Documentation</h1>
+                    <p className="text-base sm:text-lg lg:text-xl text-indigo-100 max-w-2xl mx-auto px-2">
                         Your comprehensive guide to mastering the Q-Bot Administration Platform.
                         Learn how to onboard clients, manage AI configurations, and drive platform growth.
                     </p>
                 </div>
 
-                <div className={`p-8 rounded-2xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100 shadow-sm'}`}>
+                <div className={`p-4 sm:p-6 lg:p-8 rounded-xl sm:rounded-2xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100 shadow-sm'}`}>
 
                     {/* Introduction */}
                     <SectionTitle icon={Zap} title="Getting Started" />

@@ -74,6 +74,33 @@ export const AdminClientDetailPage = () => {
         return () => clearInterval(intervalId);
     }, [clientId]);
 
+    // Real-time update: poll for processing documents status
+    useEffect(() => {
+        if (!clientId) return;
+
+        // Check if any documents are still processing
+        const hasProcessingDocs = documents.some(d => d.status === 'processing');
+        if (!hasProcessingDocs) return;
+
+        const pollInterval = setInterval(async () => {
+            try {
+                const docs = await getTenantDocuments(clientId);
+                setDocuments(docs);
+
+                // Check if all done - if so, this effect will re-run and not set interval
+                const stillProcessing = docs.some(d => d.status === 'processing');
+                if (!stillProcessing) {
+                    setSuccessMessage('Document processing completed!');
+                    setTimeout(() => setSuccessMessage(''), 3000);
+                }
+            } catch (e) {
+                console.error('Failed to poll document status:', e);
+            }
+        }, 5000); // Poll every 5 seconds
+
+        return () => clearInterval(pollInterval);
+    }, [clientId, documents.some(d => d.status === 'processing')]);
+
     const handleSave = async () => {
         if (!client) return;
         setSaving(true);
@@ -289,9 +316,9 @@ export const AdminClientDetailPage = () => {
     }
 
     // Styles
-    const inputClass = `w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`;
-    const labelClass = `block text-sm font-medium mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`;
-    const cardClass = `p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`;
+    const inputClass = `w-full px-3 sm:px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`;
+    const labelClass = `block text-xs sm:text-sm font-medium mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`;
+    const cardClass = `p-4 sm:p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`;
 
     return (
         <AdminLayout>
@@ -314,32 +341,32 @@ export const AdminClientDetailPage = () => {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <button
                         onClick={handleTogglePause}
-                        className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-all ${client.status === 'Paused'
+                        className={`inline-flex items-center px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-all ${client.status === 'Paused'
                             ? 'bg-green-600 hover:bg-green-700 text-white'
                             : (isDark ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-yellow-500 hover:bg-yellow-600') + ' text-white'
                             }`}
                     >
                         {client.status === 'Paused' ? (
-                            <><Play size={18} className="mr-2" /> Resume</>
+                            <><Play size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Resume</>
                         ) : (
-                            <><Pause size={18} className="mr-2" /> Pause</>
+                            <><Pause size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Pause</>
                         )}
                     </button>
                     <button
                         onClick={() => setShowDeleteModal(true)}
-                        className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all"
+                        className="inline-flex items-center px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm sm:text-base font-medium transition-all"
                     >
-                        <Trash2 size={18} className="mr-2" /> Delete
+                        <Trash2 size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Delete
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all disabled:opacity-50"
+                        className="inline-flex items-center px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm sm:text-base font-medium transition-all disabled:opacity-50"
                     >
-                        <Save size={18} className="mr-2" /> {saving ? 'Saving...' : 'Save Changes'}
+                        <Save size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> {saving ? 'Saving...' : 'Save'}
                     </button>
                 </div>
             </div>
@@ -647,7 +674,7 @@ export const AdminClientDetailPage = () => {
                                             readOnly={qIndex < 2}
                                         />
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-11">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pl-0 sm:pl-11">
                                         <div>
                                             <label className={labelClass}>AI Instruction</label>
                                             <textarea

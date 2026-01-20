@@ -6,9 +6,17 @@ interface ChatInputProps {
   onSend: (text: string) => void;
   disabled: boolean;
   placeholder?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, placeholder }) => {
+const ChatInput: React.FC<ChatInputProps> = ({
+  onSend,
+  disabled,
+  placeholder,
+  primaryColor = '#4F46E5',
+  secondaryColor = '#6366F1'
+}) => {
   const [input, setInput] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -18,6 +26,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, placeholder }) 
       setInput('');
     }
   };
+
+  // Determine if we should use inline styles (for hex colors) or class names
+  const isHexColor = (color: string) => /^#([0-9A-F]{3}){1,2}$/i.test(color);
+  const useCustomColors = isHexColor(primaryColor);
 
   return (
     <div className="w-full">
@@ -38,11 +50,28 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, placeholder }) 
           disabled={!input.trim() || disabled}
           className={`
             absolute right-3 p-2.5 rounded-lg flex items-center justify-center transition-all duration-200
-            ${input.trim() && !disabled
-              ? 'bg-brand-purple text-white hover:bg-indigo-600 shadow-md'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            ${!input.trim() || disabled
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : useCustomColors
+                ? 'text-white shadow-md hover:shadow-lg'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md'
             }
           `}
+          style={
+            input.trim() && !disabled && useCustomColors
+              ? { backgroundColor: primaryColor }
+              : undefined
+          }
+          onMouseEnter={(e) => {
+            if (input.trim() && !disabled && useCustomColors) {
+              e.currentTarget.style.backgroundColor = secondaryColor;
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (input.trim() && !disabled && useCustomColors) {
+              e.currentTarget.style.backgroundColor = primaryColor;
+            }
+          }}
         >
           <Send size={18} fill={input.trim() ? "currentColor" : "none"} />
         </button>
@@ -52,3 +81,4 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSend, disabled, placeholder }) 
 };
 
 export default ChatInput;
+

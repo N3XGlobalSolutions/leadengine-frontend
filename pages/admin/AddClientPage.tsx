@@ -222,27 +222,27 @@ export const AddClientPage = () => {
     };
 
     // Styling
-    const inputClass = `w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
+    const inputClass = `w-full px-3 sm:px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
         }`;
-    const labelClass = `block text-sm font-medium mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`;
-    const cardClass = `p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`;
+    const labelClass = `block text-xs sm:text-sm font-medium mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`;
+    const cardClass = `p-4 sm:p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`;
 
     return (
         <AdminLayout>
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
+            <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
                 <button
                     onClick={() => navigate('/admin/clients')}
-                    className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'
+                    className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'
                         }`}
                 >
                     <ArrowLeft size={20} />
                 </button>
-                <div>
-                    <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                <div className="flex-1 min-w-0">
+                    <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         Add New Client
                     </h1>
-                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                    <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'} truncate`}>
                         Configure a new tenant with 2 greeting fields and 5 dynamic qualification questions
                     </p>
                 </div>
@@ -254,15 +254,15 @@ export const AddClientPage = () => {
                     {STEPS.map((step, index) => (
                         <React.Fragment key={step.id}>
                             <div className="flex flex-col items-center z-10">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-colors ${currentStep > step.id
+                                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold transition-colors ${currentStep > step.id
                                     ? 'bg-green-500 text-white'
                                     : currentStep === step.id
                                         ? 'bg-indigo-600 text-white'
                                         : isDark ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-gray-500'
                                     }`}>
-                                    {currentStep > step.id ? <Check size={18} /> : <step.icon size={18} />}
+                                    {currentStep > step.id ? <Check size={16} className="sm:w-[18px] sm:h-[18px]" /> : <step.icon size={16} className="sm:w-[18px] sm:h-[18px]" />}
                                 </div>
-                                <span className={`text-xs mt-2 font-medium ${currentStep >= step.id
+                                <span className={`text-xs mt-1 sm:mt-2 font-medium whitespace-nowrap ${currentStep >= step.id
                                     ? (isDark ? 'text-white' : 'text-gray-900')
                                     : (isDark ? 'text-slate-500' : 'text-gray-400')
                                     }`}>
@@ -364,18 +364,18 @@ export const AddClientPage = () => {
                                 <label className={labelClass}>Avatar URL</label>
                                 <input type="url" value={formData.config.botAvatar} onChange={(e) => updateConfig('botAvatar', e.target.value)} className={inputClass} />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div>
                                     <label className={labelClass}>Primary Color</label>
                                     <div className="flex gap-2">
-                                        <input type="color" value={formData.config.colors.primary} onChange={(e) => updateConfig('colors.primary', e.target.value)} className="h-10 w-10 rounded cursor-pointer" />
+                                        <input type="color" value={formData.config.colors.primary} onChange={(e) => updateConfig('colors.primary', e.target.value)} className="h-10 w-10 sm:w-12 rounded cursor-pointer flex-shrink-0" />
                                         <input type="text" value={formData.config.colors.primary} onChange={(e) => updateConfig('colors.primary', e.target.value)} className={inputClass} />
                                     </div>
                                 </div>
                                 <div>
                                     <label className={labelClass}>Secondary Color</label>
                                     <div className="flex gap-2">
-                                        <input type="color" value={formData.config.colors.secondary} onChange={(e) => updateConfig('colors.secondary', e.target.value)} className="h-10 w-10 rounded cursor-pointer" />
+                                        <input type="color" value={formData.config.colors.secondary} onChange={(e) => updateConfig('colors.secondary', e.target.value)} className="h-10 w-10 sm:w-12 rounded cursor-pointer flex-shrink-0" />
                                         <input type="text" value={formData.config.colors.secondary} onChange={(e) => updateConfig('colors.secondary', e.target.value)} className={inputClass} />
                                     </div>
                                 </div>
@@ -447,16 +447,16 @@ export const AddClientPage = () => {
                                 </div>
                             </div>
 
-                            <div className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-colors ${isDark ? 'border-slate-700 hover:border-indigo-500 bg-slate-800/50' : 'border-gray-300 hover:border-indigo-500 bg-gray-50'
+                            <div className={`border-2 border-dashed rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center transition-colors ${isDark ? 'border-slate-700 hover:border-indigo-500 bg-slate-800/50' : 'border-gray-300 hover:border-indigo-500 bg-gray-50'
                                 }`}>
-                                <div className={`p-4 rounded-full mb-4 ${isDark ? 'bg-slate-700' : 'bg-white shadow-sm'}`}>
-                                    <Upload size={32} className={isDark ? 'text-slate-400' : 'text-gray-400'} />
+                                <div className={`p-3 sm:p-4 rounded-full mb-3 sm:mb-4 ${isDark ? 'bg-slate-700' : 'bg-white shadow-sm'}`}>
+                                    <Upload size={24} className={`${isDark ? 'text-slate-400' : 'text-gray-400'} sm:w-8 sm:h-8`} />
                                 </div>
-                                <div className="text-center">
-                                    <p className={`font-medium mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                <div className="text-center px-2">
+                                    <p className={`font-medium mb-1 text-sm sm:text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                         {selectedFile ? selectedFile.name : 'Click to upload or drag and drop'}
                                     </p>
-                                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                    <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                                         {selectedFile ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB` : 'PDF, DOCX, TXT up to 10MB'}
                                     </p>
                                 </div>
@@ -473,7 +473,7 @@ export const AddClientPage = () => {
                                 />
                                 <label
                                     htmlFor="file-upload"
-                                    className="mt-6 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg cursor-pointer transition-colors"
+                                    className="mt-4 sm:mt-6 px-4 sm:px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm sm:text-base font-medium rounded-lg cursor-pointer transition-colors"
                                 >
                                     {selectedFile ? 'Change File' : 'Select File'}
                                 </label>
@@ -536,7 +536,7 @@ export const AddClientPage = () => {
                                 <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Greet & Collect Name</span>
                                 <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200">Required</span>
                             </div>
-                            <div className="pl-11">
+                            <div className="pl-0 sm:pl-11">
                                 <label className={labelClass}>Greeting Instruction & Name Collection *</label>
                                 <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                                     This is the very first thing the bot will do. It should introduce itself and ask for the user's name.
@@ -560,7 +560,7 @@ export const AddClientPage = () => {
                                 <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Collect Phone Number</span>
                                 <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200">Required</span>
                             </div>
-                            <div className="pl-11">
+                            <div className="pl-0 sm:pl-11">
                                 <label className={labelClass}>Phone Number Collection *</label>
                                 <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                                     After collecting the name, ask for their phone number.
@@ -591,7 +591,7 @@ export const AddClientPage = () => {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-11">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pl-0 sm:pl-11">
                                     <div>
                                         <label className={labelClass}>AI Instruction (What to ask) *</label>
                                         <textarea
@@ -687,11 +687,11 @@ export const AddClientPage = () => {
             </div>
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between pt-4 border-t border-gray-100 dark:border-slate-800">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
                 <button
                     onClick={handleBack}
                     disabled={currentStep === 1}
-                    className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 order-2 sm:order-1 ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                 >
                     <ArrowLeft size={18} /> Back
@@ -700,7 +700,7 @@ export const AddClientPage = () => {
                 {currentStep < 6 ? (
                     <button
                         onClick={handleNext}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-lg shadow-indigo-200 dark:shadow-indigo-900/20 order-1 sm:order-2"
                     >
                         Next <ArrowRight size={18} />
                     </button>
@@ -708,7 +708,7 @@ export const AddClientPage = () => {
                     <button
                         onClick={handleSubmit}
                         disabled={saving}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-lg shadow-green-200 dark:shadow-green-900/20"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-lg shadow-green-200 dark:shadow-green-900/20 order-1 sm:order-2"
                     >
                         {saving ? <Sparkles className="animate-spin" size={18} /> : <Check size={18} />}
                         {saving ? 'Creating...' : 'Create Client'}

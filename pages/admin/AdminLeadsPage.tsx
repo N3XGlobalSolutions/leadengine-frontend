@@ -90,12 +90,12 @@ export const AdminLeadsPage = () => {
 
     return (
         <AdminLayout>
-            <div className={`flex h-[calc(100vh-8rem)] rounded-xl border overflow-hidden ${borderClass} ${bgClass}`}>
+            <div className={`flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-8rem)] rounded-xl border overflow-hidden ${borderClass} ${bgClass}`}>
 
                 {/* --- LEFT SIDEBAR: CLIENTS --- */}
-                <div className={`w-80 border-r flex flex-col ${borderClass} ${isDark ? 'bg-slate-900/50' : 'bg-gray-50/50'}`}>
-                    <div className={`p-4 border-b ${borderClass}`}>
-                        <h2 className={`font-semibold mb-3 ${textMain}`}>Select Client</h2>
+                <div className={`w-full lg:w-80 border-b lg:border-b-0 lg:border-r flex flex-col ${borderClass} ${isDark ? 'bg-slate-900/50' : 'bg-gray-50/50'}`}>
+                    <div className={`p-3 sm:p-4 border-b ${borderClass}`}>
+                        <h2 className={`font-semibold text-sm sm:text-base mb-2 sm:mb-3 ${textMain}`}>Select Client</h2>
                         <div className="relative">
                             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${textSub}`} size={16} />
                             <input
@@ -108,26 +108,26 @@ export const AdminLeadsPage = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto max-h-48 lg:max-h-none">
                         {loading ? (
-                            <div className={`p-8 text-center text-sm ${textSub}`}>Loading...</div>
+                            <div className={`p-6 sm:p-8 text-center text-xs sm:text-sm ${textSub}`}>Loading...</div>
                         ) : filteredClients.map(client => (
                             <button
                                 key={client.id}
                                 onClick={() => setSelectedClient(client)}
-                                className={`w-full text-left p-3 flex items-center gap-3 transition-colors border-l-2 ${selectedClient?.id === client.id
+                                className={`w-full text-left p-2 sm:p-3 flex items-center gap-2 sm:gap-3 transition-colors border-l-2 ${selectedClient?.id === client.id
                                     ? `bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500`
                                     : `border-transparent ${hoverClass}`
                                     }`}
                             >
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${isDark ? 'bg-slate-700 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
+                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-bold text-xs ${isDark ? 'bg-slate-700 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
                                     {client.name.charAt(0)}
                                 </div>
-                                <div>
-                                    <div className={`font-medium text-sm ${textMain}`}>{client.name}</div>
-                                    <div className={`text-xs ${textSub}`}>/{client.slug}</div>
+                                <div className="flex-1 min-w-0">
+                                    <div className={`font-medium text-xs sm:text-sm truncate ${textMain}`}>{client.name}</div>
+                                    <div className={`text-xs ${textSub} truncate`}>/{client.slug}</div>
                                 </div>
-                                {selectedClient?.id === client.id && <ChevronRight size={16} className="ml-auto text-indigo-500" />}
+                                {selectedClient?.id === client.id && <ChevronRight size={16} className="ml-auto text-indigo-500 flex-shrink-0" />}
                             </button>
                         ))}
                     </div>
@@ -136,36 +136,36 @@ export const AdminLeadsPage = () => {
                 {/* --- MAIN CONTENT: LEADS --- */}
                 <div className="flex-1 flex flex-col min-w-0">
                     {!selectedClient ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-slate-800 text-slate-600' : 'bg-gray-100 text-gray-400'}`}>
-                                <Layout size={32} />
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8">
+                            <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-3 sm:mb-4 ${isDark ? 'bg-slate-800 text-slate-600' : 'bg-gray-100 text-gray-400'}`}>
+                                <Layout size={24} className="sm:w-8 sm:h-8" />
                             </div>
-                            <h3 className={`text-lg font-medium ${textMain}`}>No Client Selected</h3>
-                            <p className={textSub}>Select a client from the sidebar to view and manage their leads.</p>
+                            <h3 className={`text-base sm:text-lg font-medium ${textMain}`}>No Client Selected</h3>
+                            <p className={`text-sm ${textSub}`}>Select a client from above to view and manage their leads.</p>
                         </div>
                     ) : (
                         <>
                             {/* Header & Stats */}
-                            <div className={`p-6 border-b ${borderClass}`}>
-                                <div className="flex justify-between items-start mb-6">
+                            <div className={`p-3 sm:p-4 lg:p-6 border-b ${borderClass}`}>
+                                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
                                     <div>
-                                        <h2 className={`text-2xl font-bold ${textMain}`}>{selectedClient.name} Leads</h2>
-                                        <p className={textSub}>Manage leads captured by the AI agent.</p>
+                                        <h2 className={`text-xl sm:text-2xl font-bold ${textMain}`}>{selectedClient.name} Leads</h2>
+                                        <p className={`text-xs sm:text-sm ${textSub}`}>Manage leads captured by the AI agent.</p>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                                         {['new', 'qualified', 'disqualified'].map(s => (
-                                            <div key={s} className={`px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-2 ${borderClass}`}>
-                                                <span className={`w-2 h-2 rounded-full ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-red-500'
+                                            <div key={s} className={`px-2 sm:px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1 sm:gap-2 ${borderClass}`}>
+                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-red-500'
                                                     }`} />
-                                                <span className="capitalize">{s}</span>
+                                                <span className="capitalize whitespace-nowrap">{s}</span>
                                                 <span className={textMain}>{(stats as any)[s]}</span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                <div className="flex gap-4">
-                                    <div className="relative flex-1 max-w-md">
+                                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                                    <div className="relative flex-1">
                                         <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${textSub}`} size={16} />
                                         <input
                                             type="text"
@@ -189,29 +189,29 @@ export const AdminLeadsPage = () => {
                             </div>
 
                             {/* Leads List */}
-                            <div className="flex-1 overflow-y-auto">
-                                <table className="w-full text-left text-sm">
+                            <div className={`flex-1 overflow-y-auto overflow-x-auto ${selectedLead ? 'hidden lg:block' : ''}`}>
+                                <table className="w-full text-left text-sm min-w-[600px]">
                                     <thead className={`sticky top-0 z-10 font-medium ${isDark ? 'bg-slate-900 text-slate-400' : 'bg-gray-50 text-gray-500'} ${borderClass} border-b`}>
                                         <tr>
-                                            <th className="px-6 py-3">Lead Name</th>
-                                            <th className="px-6 py-3">Status</th>
-                                            <th className="px-6 py-3">Contact</th>
-                                            <th className="px-6 py-3">Captured</th>
-                                            <th className="px-6 py-3 text-right">Action</th>
+                                            <th className="px-3 sm:px-6 py-3">Lead Name</th>
+                                            <th className="px-3 sm:px-6 py-3">Status</th>
+                                            <th className="px-3 sm:px-6 py-3 hidden sm:table-cell">Contact</th>
+                                            <th className="px-3 sm:px-6 py-3 hidden md:table-cell">Captured</th>
+                                            <th className="px-3 sm:px-6 py-3 text-right">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-gray-100'}`}>
                                         {leadsLoading ? (
-                                            <tr><td colSpan={5} className="p-8 text-center text-gray-500">Loading leads...</td></tr>
+                                            <tr><td colSpan={5} className="p-6 sm:p-8 text-center text-gray-500 text-xs sm:text-sm">Loading leads...</td></tr>
                                         ) : filteredLeads.length === 0 ? (
-                                            <tr><td colSpan={5} className="p-8 text-center text-gray-500">No leads found.</td></tr>
+                                            <tr><td colSpan={5} className="p-6 sm:p-8 text-center text-gray-500 text-xs sm:text-sm">No leads found.</td></tr>
                                         ) : filteredLeads.map(lead => (
                                             <tr key={lead.id} className={`group transition-colors ${hoverClass} ${selectedLead?.id === lead.id ? (isDark ? 'bg-indigo-900/20' : 'bg-indigo-50') : ''}`}>
-                                                <td className="px-6 py-4 font-medium">
-                                                    <div className={`text-base ${textMain}`}>{lead.name}</div>
+                                                <td className="px-3 sm:px-6 py-4 font-medium">
+                                                    <div className={`text-sm sm:text-base ${textMain}`}>{lead.name}</div>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
+                                                <td className="px-3 sm:px-6 py-4">
+                                                    <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
                                                         ${lead.status === 'new' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
                                                             lead.status === 'qualified' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
                                                                 lead.status === 'disqualified' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
@@ -219,21 +219,21 @@ export const AdminLeadsPage = () => {
                                                         {lead.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-3 sm:px-6 py-4 hidden sm:table-cell">
                                                     <div className="space-y-1">
-                                                        {(lead as any).email && <div className="flex items-center gap-2 text-xs text-gray-500"><Mail size={12} /> {(lead as any).email}</div>}
+                                                        {(lead as any).email && <div className="flex items-center gap-2 text-xs text-gray-500"><Mail size={12} /> <span className="truncate max-w-[200px]">{(lead as any).email}</span></div>}
                                                         {(lead as any).phone && <div className="flex items-center gap-2 text-xs text-gray-500"><Phone size={12} /> {(lead as any).phone}</div>}
                                                     </div>
                                                 </td>
-                                                <td className={`px-6 py-4 text-xs ${textSub}`}>
+                                                <td className={`px-3 sm:px-6 py-4 text-xs hidden md:table-cell ${textSub}`}>
                                                     {new Date(lead.created_at).toLocaleDateString()}
                                                 </td>
-                                                <td className="px-6 py-4 text-right">
+                                                <td className="px-3 sm:px-6 py-4 text-right">
                                                     <button
                                                         onClick={() => setSelectedLead(lead)}
-                                                        className="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-3 py-1.5 border border-indigo-200 rounded hover:bg-indigo-50 dark:border-indigo-800 dark:hover:bg-indigo-900/30"
+                                                        className="text-indigo-600 hover:text-indigo-800 font-medium text-xs px-2 sm:px-3 py-1.5 border border-indigo-200 rounded hover:bg-indigo-50 dark:border-indigo-800 dark:hover:bg-indigo-900/30 whitespace-nowrap"
                                                     >
-                                                        View Details
+                                                        View
                                                     </button>
                                                 </td>
                                             </tr>
@@ -247,10 +247,10 @@ export const AdminLeadsPage = () => {
 
                 {/* --- RIGHT DRAWER: LEAD DETAILS --- */}
                 {selectedLead && (
-                    <div className={`w-[450px] border-l flex flex-col shadow-xl absolute right-0 top-0 h-full z-20 ${bgClass} ${borderClass} transition-transform duration-300 transform translate-x-0`}>
-                        <div className={`p-6 border-b flex justify-between items-start ${borderClass}`}>
-                            <div>
-                                <h3 className={`text-xl font-bold ${textMain}`}>{selectedLead.name}</h3>
+                    <div className={`fixed inset-0 lg:relative lg:inset-auto lg:w-[450px] xl:w-[500px] border-l flex flex-col shadow-xl z-50 lg:z-20 ${bgClass} ${borderClass} transition-transform duration-300`}>
+                        <div className={`p-4 sm:p-6 border-b flex justify-between items-start ${borderClass}`}>
+                            <div className="flex-1 min-w-0">
+                                <h3 className={`text-lg sm:text-xl font-bold ${textMain} truncate`}>{selectedLead.name}</h3>
                                 <div className="flex items-center gap-2 mt-2">
                                     <span className={`text-xs ${textSub}`}>Status:</span>
                                     <select
@@ -264,27 +264,27 @@ export const AdminLeadsPage = () => {
                                     </select>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedLead(null)} className={`${textSub} hover:text-gray-700`}>
+                            <button onClick={() => setSelectedLead(null)} className={`${textSub} hover:text-gray-700 flex-shrink-0 ml-2`}>
                                 <X size={24} />
                             </button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto">
-                            <div className="p-6 space-y-6">
+                            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                                 {/* Contact Info */}
-                                <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-gray-50'}`}>
+                                <div className={`p-3 sm:p-4 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-gray-50'}`}>
                                     <h4 className={`text-sm font-semibold mb-3 ${textMain}`}>Contact Information</h4>
                                     <div className="space-y-3">
                                         <div className="flex items-center gap-3">
-                                            <Mail size={16} className="text-gray-400" />
-                                            <span className={`text-sm ${textMain}`}>{(selectedLead as any).email || 'No email'}</span>
+                                            <Mail size={16} className="text-gray-400 flex-shrink-0" />
+                                            <span className={`text-sm ${textMain} break-all`}>{(selectedLead as any).email || 'No email'}</span>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <Phone size={16} className="text-gray-400" />
+                                            <Phone size={16} className="text-gray-400 flex-shrink-0" />
                                             <span className={`text-sm ${textMain}`}>{(selectedLead as any).phone || 'No phone'}</span>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <Calendar size={16} className="text-gray-400" />
+                                        <div className="flex items-start gap-3">
+                                            <Calendar size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
                                             <span className={`text-sm ${textMain}`}>Captured: {new Date(selectedLead.created_at).toLocaleString()}</span>
                                         </div>
                                     </div>
@@ -310,9 +310,9 @@ export const AdminLeadsPage = () => {
                                                 }
 
                                                 return (
-                                                    <div key={key} className={`flex text-sm p-3 ${i % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-900/30' : 'bg-gray-50')}`}>
-                                                        <span className={`w-1/3 font-medium capitalize ${textSub}`}>{displayKey}</span>
-                                                        <span className={`w-2/3 ${textMain}`}>{displayValue}</span>
+                                                    <div key={key} className={`flex flex-col sm:flex-row text-sm p-3 ${i % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-900/30' : 'bg-gray-50')}`}>
+                                                        <span className={`sm:w-1/3 font-medium capitalize ${textSub} mb-1 sm:mb-0`}>{displayKey}</span>
+                                                        <span className={`sm:w-2/3 ${textMain} break-words`}>{displayValue}</span>
                                                     </div>
                                                 );
                                             })}
@@ -323,7 +323,7 @@ export const AdminLeadsPage = () => {
                                 {/* Conversation History */}
                                 <div>
                                     <h4 className={`text-sm font-semibold mb-3 ${textMain}`}>Conversation History</h4>
-                                    <div className={`rounded-xl border overflow-hidden h-96 ${borderClass}`}>
+                                    <div className={`rounded-xl border overflow-hidden h-80 sm:h-96 ${borderClass}`}>
                                         {(selectedLead as any).conversation_id ? (
                                             <ConversationViewer conversationId={(selectedLead as any).conversation_id} />
                                         ) : (

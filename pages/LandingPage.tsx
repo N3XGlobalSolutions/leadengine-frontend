@@ -77,7 +77,7 @@ export const LandingPage = () => {
                                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </button>
                             <button
-                                onClick={() => window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank')} // Placeholder demo link
+                                onClick={() => window.open('#', '_blank')} // Placeholder demo link
                                 className="px-8 py-4 rounded-full bg-white text-gray-700 font-semibold text-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-md hover:shadow-lg hover:-translate-y-1"
                             >
                                 Watch Demo

@@ -56,10 +56,8 @@ export interface DashboardMetrics {
     documents: number;
     leads_by_status: {
         new: number;
-        contacted: number;
         qualified: number;
-        converted: number;
-        lost: number;
+        disqualified: number;
     };
     conversion_rate: number;
 }

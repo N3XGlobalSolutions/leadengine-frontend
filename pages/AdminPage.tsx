@@ -34,11 +34,11 @@ export const AdminPage = () => {
     return (
         <AdminLayout>
             {/* Stats Grid & Add Client Action */}
-            <div className={`mb-8 p-4 rounded-2xl border transition-colors ${isDark
+            <div className={`mb-6 sm:mb-8 p-4 sm:p-6 rounded-2xl border transition-colors ${isDark
                 ? 'bg-slate-800/50 border-slate-700'
                 : 'bg-gray-50/50 border-gray-100/50'
                 }`}>
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                     <StatsCard
                         title="Total Clients"
                         value={platformStats?.total_tenants.toString() || "..."}
@@ -81,14 +81,14 @@ export const AdminPage = () => {
 
                 <button
                     onClick={() => navigate('/admin/clients/new')}
-                    className={`w-full p-4 rounded-xl shadow-lg border flex items-center justify-center transition-all hover:scale-[1.01] hover:shadow-xl group ${isDark
+                    className={`w-full p-3 sm:p-4 rounded-xl shadow-lg border flex items-center justify-center transition-all hover:scale-[1.01] hover:shadow-xl group ${isDark
                         ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 shadow-indigo-900/30'
                         : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-indigo-200'
                         }`}>
                     <div className="bg-white/20 p-2 rounded-full mr-3 group-hover:bg-white/30 transition-colors">
                         <Users size={20} className="text-white" />
                     </div>
-                    <span className="text-lg font-bold tracking-wide">Add New Client</span>
+                    <span className="text-base sm:text-lg font-bold tracking-wide">Add New Client</span>
                 </button>
             </div>
 
@@ -101,16 +101,16 @@ export const AdminPage = () => {
                 {/* Recent Activity / Spotlight / Ads - Spans 1 column */}
                 <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-6 text-white shadow-lg flex flex-col justify-between">
                     <div>
-                        <h3 className="text-white text-2xl font-bold mb-2">Pro Tips</h3>
-                        <p className="text-indigo-100 mb-6">Learn how to maximize your client retention with our new guide.</p>
+                        <h3 className="text-white text-xl sm:text-2xl font-bold mb-2">Pro Tips</h3>
+                        <p className="text-indigo-100 mb-6 text-sm sm:text-base">Learn how to maximize your client retention with our new guide.</p>
                         <button
                             onClick={() => navigate('/admin/guide')}
-                            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium hover:bg-indigo-50 transition-colors shadow-sm">
+                            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-medium hover:bg-indigo-50 transition-colors shadow-sm text-sm sm:text-base">
                             Read Guide
                         </button>
                     </div>
                     <div className="mt-8 pt-8 border-t border-indigo-500/30">
-                        <p className="text-xl text-indigo-100 font-bold mb-3">System Status</p>
+                        <p className="text-lg sm:text-xl text-indigo-100 font-bold mb-3">System Status</p>
 
                         {systemHealth ? (
                             <div className="space-y-2">
@@ -119,7 +119,7 @@ export const AdminPage = () => {
                                         <div className={`h-3 w-3 rounded-full animate-pulse mr-2 ${systemHealth.status === 'healthy' ? 'bg-green-400' :
                                             systemHealth.status === 'degraded' ? 'bg-yellow-400' : 'bg-red-500'
                                             }`} />
-                                        <span className={`font-medium ${systemHealth.status === 'healthy' ? 'text-green-300' :
+                                        <span className={`font-medium text-sm sm:text-base ${systemHealth.status === 'healthy' ? 'text-green-300' :
                                             systemHealth.status === 'degraded' ? 'text-yellow-300' : 'text-red-300'
                                             }`}>
                                             {systemHealth.status === 'healthy' ? 'All systems operational' :

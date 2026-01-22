@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Trash2, Edit2, Check, X, User as UserIcon, Shield, Mail, Building2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Search, Trash2, Edit2, Check, X, User as UserIcon, Shield, Mail, Building2, Eye, EyeOff, Key, Copy } from 'lucide-react';
 import { User, UserRole, UserRegister } from '../../types/auth'; // Ensure this path is correct based on your project structure
-import { getUsers, updateUser, deleteUser, createUser } from '../../services/adminService';
+import { getUsers, updateUser, deleteUser, createUser, resetUserPassword } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 
@@ -10,6 +11,11 @@ export const AdminUsersPage = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const { isDark } = useAdminTheme();
+    const location = useLocation();
+    const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
+
+    // Refs for scrolling to highlighted user
+    const userRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
     // Modal States
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -22,16 +28,43 @@ export const AdminUsersPage = () => {
     const [createData, setCreateData] = useState<Partial<UserRegister>>({
         role: UserRole.CLIENT_ADMIN
     });
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // Password Reset State
+    const [resettingUser, setResettingUser] = useState<User | null>(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmResetPassword, setConfirmResetPassword] = useState('');
+    const [showResetPassword, setShowResetPassword] = useState(false);
+    const [showConfirmResetPassword, setShowConfirmResetPassword] = useState(false);
+    const [resetSuccess, setResetSuccess] = useState(false);
+    const [resetPasswordResult, setResetPasswordResult] = useState('');
 
     useEffect(() => {
         fetchUsers();
     }, []);
 
     const fetchUsers = async () => {
-        setLoading(true);
         const data = await getUsers();
         setUsers(data);
         setLoading(false);
+
+        // Check for highlight param
+        const params = new URLSearchParams(location.search);
+        const highlightId = params.get('highlight');
+        if (highlightId) {
+            setHighlightedUserId(highlightId);
+            // Scroll to element after a slight delay to ensure rendering
+            setTimeout(() => {
+                const element = userRowRefs.current[highlightId];
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Remove highlight after 5 seconds
+                    setTimeout(() => setHighlightedUserId(null), 5000);
+                }
+            }, 500);
+        }
     };
 
     const handleEditClick = (user: User) => {
@@ -56,6 +89,45 @@ export const AdminUsersPage = () => {
             alert("Failed to update user");
         }
         setSaveLoading(false);
+    };
+
+    // Password Reset Handlers
+    const handleResetClick = (user: User) => {
+        setResettingUser(user);
+        setNewPassword('');
+        setConfirmResetPassword('');
+        setResetSuccess(false);
+        setResetPasswordResult('');
+    };
+
+    const handleConfirmResetPassword = async () => {
+        if (!resettingUser) return;
+
+        if (newPassword !== confirmResetPassword) {
+            alert("Passwords do not match");
+            return;
+        }
+
+        if (newPassword.length < 8) {
+            alert("Password must be at least 8 characters long");
+            return;
+        }
+
+        setSaveLoading(true);
+        try {
+            await resetUserPassword(resettingUser.user_id, newPassword);
+            setResetPasswordResult(newPassword);
+            setResetSuccess(true);
+        } catch (e) {
+            console.error("Failed to reset password", e);
+            alert("Failed to reset password");
+        }
+        setSaveLoading(false);
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        alert("Password copied to clipboard");
     };
 
     const handleDeleteClick = (user: User) => {
@@ -93,12 +165,25 @@ export const AdminUsersPage = () => {
             return;
         }
 
+        if (createData.password !== confirmPassword) {
+            alert("Passwords do not match");
+            return;
+        }
+
+        if (createData.password.length < 8) {
+            alert("Password must be at least 8 characters long");
+            return;
+        }
+
         setSaveLoading(true);
         try {
             const newUser = await createUser(createData as UserRegister);
             setUsers([...users, newUser]);
             setIsCreating(false);
             setCreateData({ role: UserRole.CLIENT_ADMIN });
+            setConfirmPassword('');
+            setShowPassword(false);
+            setShowConfirmPassword(false);
         } catch (e: any) {
             console.error("Failed to create user", e);
             alert(e.response?.data?.detail || "Failed to create user");
@@ -118,6 +203,9 @@ export const AdminUsersPage = () => {
                 <button
                     onClick={() => {
                         setCreateData({ role: UserRole.CLIENT_ADMIN });
+                        setConfirmPassword('');
+                        setShowPassword(false);
+                        setShowConfirmPassword(false);
                         setIsCreating(true);
                     }}
                     className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-indigo-600/20 w-full sm:w-auto"
@@ -168,7 +256,18 @@ export const AdminUsersPage = () => {
                                 </tr>
                             ) : (
                                 filteredUsers.map((user) => (
-                                    <tr key={user.user_id} className={`border-b last:border-0 hover:bg-opacity-50 transition-colors ${isDark ? 'border-slate-700 hover:bg-slate-700' : 'border-gray-100 hover:bg-gray-50'}`}>
+                                    <tr
+                                        key={user.user_id}
+                                        ref={el => { userRowRefs.current[user.user_id] = el; }}
+                                        className={`border-b last:border-0 hover:bg-opacity-50 transition-all duration-500 ${isDark
+                                            ? highlightedUserId === user.user_id
+                                                ? 'bg-indigo-900/40 border-indigo-500/50'
+                                                : 'border-slate-700 hover:bg-slate-700'
+                                            : highlightedUserId === user.user_id
+                                                ? 'bg-indigo-50 border-indigo-200'
+                                                : 'border-gray-100 hover:bg-gray-50'
+                                            }`}
+                                    >
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
                                                 <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold ${isDark ? 'bg-indigo-900 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>
@@ -200,6 +299,9 @@ export const AdminUsersPage = () => {
                                             <div className="flex gap-2">
                                                 <button onClick={() => handleEditClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-indigo-400' : 'hover:bg-gray-200 text-indigo-600'}`}>
                                                     <Edit2 size={16} />
+                                                </button>
+                                                <button onClick={() => handleResetClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-amber-400' : 'hover:bg-gray-200 text-amber-600'}`} title="Reset Password">
+                                                    <Key size={16} />
                                                 </button>
                                                 <button onClick={() => handleDeleteClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-red-400' : 'hover:bg-gray-200 text-red-600'}`}>
                                                     <Trash2 size={16} />
@@ -249,15 +351,49 @@ export const AdminUsersPage = () => {
                             </div>
                             <div>
                                 <label className={labelClass}>Password</label>
-                                <input
-                                    type="password"
-                                    required
-                                    minLength={8}
-                                    value={createData.password || ''}
-                                    onChange={(e) => setCreateData({ ...createData, password: e.target.value })}
-                                    className={inputClass}
-                                    placeholder="••••••••"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        required
+                                        minLength={8}
+                                        value={createData.password || ''}
+                                        onChange={(e) => setCreateData({ ...createData, password: e.target.value })}
+                                        className={inputClass}
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-slate-400 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">Minimum 8 characters</p>
+                            </div>
+                            <div>
+                                <label className={labelClass}>Confirm Password</label>
+                                <div className="relative">
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        required
+                                        minLength={8}
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        className={inputClass}
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-slate-400 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                                {confirmPassword && createData.password !== confirmPassword && (
+                                    <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                                )}
                             </div>
                             <div>
                                 <label className={labelClass}>Role</label>
@@ -394,6 +530,120 @@ export const AdminUsersPage = () => {
                                 {saveLoading ? 'Deleting...' : 'Delete User'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Password Reset Modal */}
+            {resettingUser && (
+                <div className={modalClass}>
+                    <div className={modalContentClass}>
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-3">
+                                <Key className="text-amber-500" size={24} />
+                                <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Reset Password</h3>
+                            </div>
+                            <button onClick={() => setResettingUser(null)} className="text-gray-500 hover:text-gray-700">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {!resetSuccess ? (
+                            <div className="space-y-4">
+                                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
+                                    Set a new password for <strong>{resettingUser.full_name}</strong>.
+                                </p>
+                                <div>
+                                    <label className={labelClass}>New Password</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showResetPassword ? "text" : "password"}
+                                            required
+                                            minLength={8}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            className={inputClass}
+                                            placeholder="••••••••"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowResetPassword(!showResetPassword)}
+                                            className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-slate-400 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
+                                        >
+                                            {showResetPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">Minimum 8 characters</p>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Confirm Password</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showConfirmResetPassword ? "text" : "password"}
+                                            required
+                                            minLength={8}
+                                            value={confirmResetPassword}
+                                            onChange={(e) => setConfirmResetPassword(e.target.value)}
+                                            className={inputClass}
+                                            placeholder="••••••••"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmResetPassword(!showConfirmResetPassword)}
+                                            className={`absolute right-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-slate-400 hover:text-slate-300' : 'text-gray-500 hover:text-gray-700'}`}
+                                        >
+                                            {showConfirmResetPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                    {confirmResetPassword && newPassword !== confirmResetPassword && (
+                                        <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                                    )}
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button
+                                        onClick={() => setResettingUser(null)}
+                                        className={`px-4 py-2 rounded-lg font-medium ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmResetPassword}
+                                        disabled={saveLoading || !newPassword || newPassword !== confirmResetPassword}
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50"
+                                    >
+                                        {saveLoading ? 'Resetting...' : 'Reset Password'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-6 text-center">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600">
+                                    <Check size={32} />
+                                </div>
+                                <div>
+                                    <h4 className={`text-lg font-medium mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Password Reset Successful</h4>
+                                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
+                                        The password for <strong>{resettingUser.full_name}</strong> has been updated.
+                                    </p>
+                                </div>
+                                <div className={`p-4 rounded-lg border flex items-center justify-between gap-3 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
+                                    <code className={`font-mono text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>{resetPasswordResult}</code>
+                                    <button
+                                        onClick={() => copyToClipboard(resetPasswordResult)}
+                                        className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-gray-200 text-gray-500 hover:text-gray-900'}`}
+                                        title="Copy Password"
+                                    >
+                                        <Copy size={20} />
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => setResettingUser(null)}
+                                    className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"
+                                >
+                                    Done
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

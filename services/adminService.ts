@@ -501,6 +501,12 @@ export const updateUser = async (userId: string, data: Partial<User>): Promise<U
     return res.data;
 };
 
+export const resetUserPassword = async (userId: string, newPassword: string): Promise<void> => {
+    await api.post(`/users/${userId}/reset-password`, newPassword, {
+        headers: { 'Content-Type': 'text/plain' }
+    });
+};
+
 export const deleteUser = async (userId: string): Promise<void> => {
     await api.delete(`/users/${userId}`);
 };

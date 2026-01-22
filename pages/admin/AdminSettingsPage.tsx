@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { User, Lock, Bell, Moon, Sun, Save, Shield, Mail } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
@@ -7,6 +8,7 @@ import { useAdminTheme } from '../../contexts/AdminThemeContext';
 export const AdminSettingsPage = () => {
     const { user } = useAdminAuth();
     const { isDark, toggleTheme } = useAdminTheme();
+    const navigate = useNavigate();
 
     // Mock States for form inputs
     const [fullName, setFullName] = useState(user?.full_name || 'Admin User');
@@ -155,10 +157,13 @@ export const AdminSettingsPage = () => {
                                 <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Password</p>
                                 <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Last changed 3 months ago</p>
                             </div>
-                            <button className={`px-4 py-2 rounded-lg border font-medium transition-colors w-full sm:w-auto text-sm ${isDark
-                                ? 'border-slate-600 text-slate-300 hover:bg-slate-700'
-                                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                                }`}>
+                            <button
+                                onClick={() => navigate(`/admin/users?highlight=${user?.user_id}`)}
+                                className={`px-4 py-2 rounded-lg border font-medium transition-colors w-full sm:w-auto text-sm ${isDark
+                                    ? 'border-slate-600 text-slate-300 hover:bg-slate-700'
+                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                                    }`}
+                            >
                                 Change Password
                             </button>
                         </div>

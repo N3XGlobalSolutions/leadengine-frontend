@@ -96,7 +96,7 @@ const mapTenantToClient = (tenant: any): Client => {
 
     // Transform to Frontend TenantConfig (nested, camelCase)
     const frontendConfig: TenantConfig = {
-        companyName: backendConfig.bot_name || tenant.name,
+        companyName: backendConfig.company_name || tenant.name,
         shortName: backendConfig.bot_name || tenant.name,
         botName: backendConfig.bot_name || 'QBot',
         botDisplayName: backendConfig.bot_displayName || backendConfig.bot_name || 'Assistant',
@@ -265,6 +265,7 @@ export const updateClient = async (client: Client): Promise<Client> => {
         url_slug: client.slug,
 
         // Bot Branding
+        company_name: client.config?.companyName,
         bot_name: client.config?.botName,
         avatar_url: client.config?.botAvatar,
         primary_color: client.config?.colors?.primary,
@@ -339,6 +340,7 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
         config: {
             plan: clientData.plan === 'Starter' ? 'S1' : clientData.plan === 'Pro' ? 'S2' : 'S3',
             url_slug: clientData.slug,
+            company_name: clientData.config.companyName,
             bot_name: clientData.config.botName,
             avatar_url: clientData.config.botAvatar,
             primary_color: clientData.config.colors.primary,

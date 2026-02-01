@@ -16,6 +16,27 @@ import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { ClientConversations } from '../../components/admin/ClientConversations';
 
+// System questions that are auto-handled by the state machine
+// These are displayed as visual placeholders but never saved to the backend
+const SYSTEM_QUESTIONS: Question[] = [
+    {
+        id: 'system_greeting_name',
+        label: 'Greet & Collect Name',
+        instruction: 'Automatically handled by the state machine. The bot will greet the user and extract their name from the conversation.',
+        collects: ['name'],
+        options: [],
+        isSystemGenerated: true
+    },
+    {
+        id: 'system_collect_phone',
+        label: 'Collect Phone Number',
+        instruction: 'Automatically handled by the state machine. Phone number is MANDATORY and will be collected before proceeding to qualification questions.',
+        collects: ['phone'],
+        options: [],
+        isSystemGenerated: true
+    }
+];
+
 export const AdminClientDetailPage = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
@@ -106,7 +127,19 @@ export const AdminClientDetailPage = () => {
         setSaving(true);
         setErrorMessage('');
         try {
-            await updateClient(client);
+            // Filter out system questions before saving
+            const clientToSave = {
+                ...client,
+                config: {
+                    ...client.config,
+                    leadQualification: {
+                        ...client.config.leadQualification,
+                        questions: getActualQuestions()
+                    }
+                }
+            };
+
+            await updateClient(clientToSave);
             setSuccessMessage('Changes saved successfully!');
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (e) {
@@ -270,6 +303,43 @@ export const AdminClientDetailPage = () => {
     const updateField = (field: keyof Client, value: any) => {
         if (!client) return;
         setClient({ ...client, [field]: value });
+    };
+
+    // --- System Questions Helpers ---
+
+    /**
+     * Get display questions with system questions injected at the front.
+     * This shows admins the complete flow including auto-handled name/phone collection.
+     */
+    const getDisplayQuestions = (): Question[] => {
+        if (!client?.config?.leadQualification?.questions) return SYSTEM_QUESTIONS;
+
+        // Filter out any existing questions that collect name/phone (legacy configs)
+        const userQuestions = client.config.leadQualification.questions.filter(q => {
+            const collects = (q.collects || []).map(c => c.toLowerCase());
+            const isContactQuestion = collects.includes('name') || collects.includes('phone');
+            if (isContactQuestion) {
+                console.log(`Filtering out legacy contact question: ${q.label}`);
+            }
+            return !isContactQuestion;
+        });
+
+        return [...SYSTEM_QUESTIONS, ...userQuestions];
+    };
+
+    /**
+     * Get actual questions (without system placeholders) for saving to backend.
+     * This ensures we never persist the auto-injected system questions.
+     */
+    const getActualQuestions = (): Question[] => {
+        if (!client?.config?.leadQualification?.questions) return [];
+
+        // Filter out system questions and legacy name/phone questions
+        return client.config.leadQualification.questions.filter(q => {
+            if (q.isSystemGenerated) return false;
+            const collects = (q.collects || []).map(c => c.toLowerCase());
+            return !collects.includes('name') && !collects.includes('phone');
+        });
     };
 
     // --- Feature Handlers ---
@@ -654,56 +724,92 @@ export const AdminClientDetailPage = () => {
                                 <div>
                                     <h3 className={`font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-800'}`}>Dynamic Questions</h3>
                                     <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                        Questions 0-1 are required greeting fields (name & phone). Questions 2-6 are your custom qualification questions.
+                                        Name & phone are <strong>auto-handled by the state machine</strong>. Questions 1-5 below are your custom qualification questions.
                                     </p>
                                 </div>
                             </div>
 
-                            {client.config?.leadQualification?.questions?.map((question, qIndex) => (
-                                <div key={question.id || qIndex} className={cardClass}>
-                                    <div className="flex items-center gap-3 mb-4 border-b pb-4 border-gray-100 dark:border-slate-700">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${qIndex < 2 ? 'bg-green-500 text-white' : isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
-                                            {qIndex}
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={question.label}
-                                            onChange={(e) => updateQuestion(qIndex, 'label', e.target.value)}
-                                            className={`${inputClass} font-semibold`}
-                                            placeholder="Question Label"
-                                            readOnly={qIndex < 2}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pl-0 sm:pl-11">
-                                        <div>
-                                            <label className={labelClass}>AI Instruction</label>
-                                            <textarea
-                                                value={question.instruction}
-                                                onChange={(e) => updateQuestion(qIndex, 'instruction', e.target.value)}
-                                                className={inputClass}
-                                                rows={3}
+                            {getDisplayQuestions().map((question, displayIndex) => {
+                                const isSystem = question.isSystemGenerated || false;
+                                // Calculate actual index in the backend questions array (skip system questions)
+                                const actualIndex = isSystem ? -1 : displayIndex - SYSTEM_QUESTIONS.length;
+                                // User-facing number (1-5 for qualification questions)
+                                const userFacingNumber = isSystem ? null : actualIndex + 1;
+
+                                const cardStyle = isSystem
+                                    ? `${cardClass} opacity-75 ${isDark ? 'bg-slate-800/30 border-slate-700 border-dashed' : 'bg-gray-100/50 border-gray-300 border-dashed'}`
+                                    : cardClass;
+
+                                return (
+                                    <div key={question.id || displayIndex} className={cardStyle}>
+                                        <div className="flex items-center gap-3 mb-4 border-b pb-4 border-gray-100 dark:border-slate-700">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${isSystem
+                                                ? 'bg-gray-400 text-white'
+                                                : isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'
+                                                }`}>
+                                                {isSystem ? <Shield size={14} /> : userFacingNumber}
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={question.label}
+                                                onChange={(e) => !isSystem && actualIndex >= 0 && updateQuestion(actualIndex, 'label', e.target.value)}
+                                                className={`${inputClass} font-semibold ${isSystem ? 'cursor-not-allowed' : ''}`}
+                                                placeholder="Question Label"
+                                                readOnly={isSystem}
+                                                disabled={isSystem}
                                             />
+                                            {isSystem && (
+                                                <span className="ml-auto px-2 py-1 text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 rounded whitespace-nowrap">
+                                                    Auto-handled
+                                                </span>
+                                            )}
                                         </div>
-                                        <div>
-                                            <label className={labelClass}>Quick Replies</label>
-                                            <div className="space-y-2">
-                                                {(question.options || []).map((opt, oIdx) => (
-                                                    <div key={oIdx} className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={opt}
-                                                            onChange={(e) => updateOption(qIndex, oIdx, e.target.value)}
-                                                            className={inputClass}
-                                                        />
-                                                        <button onClick={() => removeOption(qIndex, oIdx)} className="text-red-500"><X size={18} /></button>
-                                                    </div>
-                                                ))}
-                                                <button onClick={() => addOption(qIndex)} className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-slate-700">+ Options</button>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pl-0 sm:pl-11">
+                                            <div>
+                                                <label className={labelClass}>AI Instruction</label>
+                                                <textarea
+                                                    value={question.instruction}
+                                                    onChange={(e) => !isSystem && actualIndex >= 0 && updateQuestion(actualIndex, 'instruction', e.target.value)}
+                                                    className={`${inputClass} ${isSystem ? 'cursor-not-allowed' : ''}`}
+                                                    rows={3}
+                                                    readOnly={isSystem}
+                                                    disabled={isSystem}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Quick Replies</label>
+                                                <div className="space-y-2">
+                                                    {(question.options || []).map((opt, oIdx) => (
+                                                        <div key={oIdx} className="flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={opt}
+                                                                onChange={(e) => !isSystem && actualIndex >= 0 && updateOption(actualIndex, oIdx, e.target.value)}
+                                                                className={`${inputClass} ${isSystem ? 'cursor-not-allowed' : ''}`}
+                                                                readOnly={isSystem}
+                                                                disabled={isSystem}
+                                                            />
+                                                            {!isSystem && (
+                                                                <button onClick={() => actualIndex >= 0 && removeOption(actualIndex, oIdx)} className="text-red-500">
+                                                                    <X size={18} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {!isSystem && (
+                                                        <button
+                                                            onClick={() => actualIndex >= 0 && addOption(actualIndex)}
+                                                            className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-slate-700"
+                                                        >
+                                                            + Options
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 

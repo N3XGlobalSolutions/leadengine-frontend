@@ -39,9 +39,7 @@ export const AddClientPage = () => {
         config: JSON.parse(JSON.stringify(DEFAULT_TENANT_CONFIG)) // Deep copy
     });
 
-    // New state for two separate greeting fields (Questions #0 and #1)
-    const [greetNameInstruction, setGreetNameInstruction] = useState('Hello! I am [Bot Name], the virtual assistant for [Company Name]. Before we proceed, may I have your name?');
-    const [collectPhoneInstruction, setCollectPhoneInstruction] = useState('Great! And what\'s the best phone number to reach you?');
+    // Note: Questions 0-1 (name/phone) are handled by the state machine and should NOT be stored in config
 
     // Lead Qualification Criteria state
     const [leadQualificationCriteria, setLeadQualificationCriteria] = useState('');
@@ -163,24 +161,9 @@ export const AddClientPage = () => {
                 }
             };
 
-            // Prepend two greeting questions: name collection and phone collection
-            const allQuestions = [
-                {
-                    id: 'q0',
-                    label: 'Greet & Collect Name',
-                    instruction: greetNameInstruction,
-                    collects: ['name'],
-                    options: []
-                },
-                {
-                    id: 'q1',
-                    label: 'Collect Phone Number',
-                    instruction: collectPhoneInstruction,
-                    collects: ['phone'],
-                    options: []
-                },
-                ...formData.config.leadQualification.questions
-            ];
+            // DON'T prepend questions 0-1 - they're handled by the state machine!
+            // Only save the actual user-defined qualification questions
+            const allQuestions = formData.config.leadQualification.questions;
 
             const createdClient = await createClient({
                 name: formData.name,
@@ -243,7 +226,7 @@ export const AddClientPage = () => {
                         Add New Client
                     </h1>
                     <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'} truncate`}>
-                        Configure a new tenant with 2 greeting fields and 5 dynamic qualification questions
+                        Configure a new tenant with 5 qualification questions (name & phone auto-collected)
                     </p>
                 </div>
             </div>
@@ -520,74 +503,27 @@ export const AddClientPage = () => {
                             <div>
                                 <h3 className={`font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-800'}`}>Dynamic Lead Qualification</h3>
                                 <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                    The bot will first collect the user's name and phone number (2 required fields),
-                                    then ask exactly 5 custom qualification questions for this client.
-                                    Adding "Quick Reply Options" helps users answer faster.
+                                    The bot will <strong>automatically collect name and phone</strong> before asking these qualification questions.
+                                    Define exactly 5 custom questions below. Adding "Quick Reply Options" helps users answer faster.
                                 </p>
                             </div>
                         </div>
 
-                        {/* GREETING FIELD 1: Greet & Collect Name (Question 0) */}
-                        <div className={cardClass}>
-                            <div className="flex items-center gap-3 mb-4 border-b pb-4 border-gray-100 dark:border-slate-700">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-green-500 text-white`}>
-                                    0
-                                </div>
-                                <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Greet & Collect Name</span>
-                                <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200">Required</span>
-                            </div>
-                            <div className="pl-0 sm:pl-11">
-                                <label className={labelClass}>Greeting Instruction & Name Collection *</label>
-                                <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                    This is the very first thing the bot will do. It should introduce itself and ask for the user's name.
-                                </p>
-                                <textarea
-                                    value={greetNameInstruction}
-                                    onChange={(e) => setGreetNameInstruction(e.target.value)}
-                                    className={inputClass}
-                                    rows={3}
-                                    placeholder="Hello! I am [Bot Name], the virtual assistant for [Company Name]. May I have your name?"
-                                />
-                            </div>
-                        </div>
 
-                        {/* GREETING FIELD 2: Collect Phone Number (Question 1) */}
-                        <div className={cardClass}>
-                            <div className="flex items-center gap-3 mb-4 border-b pb-4 border-gray-100 dark:border-slate-700">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-green-500 text-white`}>
-                                    1
-                                </div>
-                                <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Collect Phone Number</span>
-                                <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200">Required</span>
-                            </div>
-                            <div className="pl-0 sm:pl-11">
-                                <label className={labelClass}>Phone Number Collection *</label>
-                                <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                    After collecting the name, ask for their phone number.
-                                </p>
-                                <textarea
-                                    value={collectPhoneInstruction}
-                                    onChange={(e) => setCollectPhoneInstruction(e.target.value)}
-                                    className={inputClass}
-                                    rows={3}
-                                    placeholder="Great! And what's the best phone number to reach you?"
-                                />
-                            </div>
-                        </div>
 
                         {formData.config.leadQualification.questions.map((question, qIndex) => (
                             <div key={question.id} className={cardClass}>
                                 <div className="flex items-center gap-3 mb-4 border-b pb-4 border-gray-100 dark:border-slate-700">
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'
                                         }`}>
-                                        {qIndex + 2}
+                                        {qIndex + 1}
                                     </div>
                                     <input
                                         type="text"
                                         value={question.label}
                                         onChange={(e) => updateQuestion(qIndex, 'label', e.target.value)}
                                         className={`${inputClass} font-semibold`}
-                                        placeholder={`Question ${qIndex + 2} Category (e.g. Budget)`}
+                                        placeholder={`Question ${qIndex + 1} Category (e.g. Budget)`}
                                     />
                                 </div>
 
@@ -646,26 +582,14 @@ export const AddClientPage = () => {
 
                             <div className="pt-4">
                                 <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">Lead Qualification Flow</h3>
+                                <p className={`text-xs mb-3 italic ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                    Note: Name and phone are auto-collected by the state machine before these questions.
+                                </p>
                                 <div className="space-y-3">
-                                    {/* Show the two greeting questions first */}
-                                    <div className="flex gap-3">
-                                        <span className="font-mono text-gray-400">0.</span>
-                                        <div>
-                                            <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Greet & Collect Name</p>
-                                            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>"{greetNameInstruction}"</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <span className="font-mono text-gray-400">1.</span>
-                                        <div>
-                                            <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Collect Phone Number</p>
-                                            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>"{collectPhoneInstruction}"</p>
-                                        </div>
-                                    </div>
-                                    {/* Show the 5 qualification questions */}
+                                    {/* Show only the 5 qualification questions */}
                                     {formData.config.leadQualification.questions.map((q, i) => (
                                         <div key={i} className="flex gap-3">
-                                            <span className="font-mono text-gray-400">{i + 2}.</span>
+                                            <span className="font-mono text-gray-400">{i + 1}.</span>
                                             <div>
                                                 <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{q.label}</p>
                                                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>"{q.instruction}"</p>

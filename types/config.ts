@@ -5,6 +5,7 @@ export interface Question {
     collects: string[];      // Fields to extract for the summary (e.g. ["name", "phone"])
     optionsKey?: string;     // Reference to the options list in leadQualification.options
     options?: string[];      // Optional quick reply options
+    isSystemGenerated?: boolean; // True if this is a system question (auto-handled by state machine)
 }
 
 export interface TenantConfig {

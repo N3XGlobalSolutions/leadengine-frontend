@@ -43,6 +43,15 @@ export interface ChatResponse {
   summary_data?: Record<string, any>;  // Backend-created summary
   show_actions?: boolean;           // Explicit flag for action buttons
   quick_replies?: string[];         // Quick reply options for current question
+
+  // S2-specific fields
+  s2_lead_output?: {
+    lead_priority: string;          // "High" | "Medium" | "Low"
+    reasoning_summary: string;      // 2-3 line explanation
+    key_objections: string[];       // Detected hesitations
+    recommended_next_step: string;  // What sales should do next
+  };
+  conversational_transition?: string; // S2 acknowledgment before question
 }
 
 export interface Conversation {

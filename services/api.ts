@@ -63,8 +63,11 @@ api.interceptors.response.use(
 
         // Prevent infinite loops - if the refresh endpoint itself fails, logout
         if (originalRequest?.url?.includes('/auth/refresh') || originalRequest?.url?.includes('/auth/login')) {
-            authService.logout();
-            window.location.href = '/admin/login';
+            // For login failures, DO NOT redirect - let the UI handle the error
+            if (!originalRequest.url.includes('/auth/login')) {
+                authService.logout();
+                window.location.href = '/admin/login';
+            }
             return Promise.reject(error);
         }
 

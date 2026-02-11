@@ -7,6 +7,8 @@ import {
 import { getTenantLeads, getClientById, updateLeadStatus } from '../services/adminService';
 import { DashboardLead, Client } from '../types/admin';
 import ConversationViewer from '../components/admin/ConversationViewer';
+import { PriorityBadge } from '../components/admin/PriorityBadge';
+import { S2LeadInsights } from '../components/admin/S2LeadInsights';
 
 export const ClientLeadsPage = () => {
     const { tenantId } = useParams<{ tenantId: string }>();
@@ -168,6 +170,7 @@ export const ClientLeadsPage = () => {
                                     <tr>
                                         <th className="px-3 sm:px-6 py-3">Lead Name</th>
                                         <th className="px-3 sm:px-6 py-3">Status</th>
+                                        <th className="px-3 sm:px-6 py-3 hidden lg:table-cell">Priority</th>
                                         <th className="px-3 sm:px-6 py-3 hidden sm:table-cell">Contact</th>
                                         <th className="px-3 sm:px-6 py-3 hidden md:table-cell">Captured</th>
                                         <th className="px-3 sm:px-6 py-3 text-right"></th>
@@ -175,7 +178,7 @@ export const ClientLeadsPage = () => {
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {filteredLeads.length === 0 ? (
-                                        <tr><td colSpan={5} className="p-8 text-center text-gray-500">No leads found.</td></tr>
+                                        <tr><td colSpan={6} className="p-8 text-center text-gray-500">No leads found.</td></tr>
                                     ) : filteredLeads.map(lead => (
                                         <tr
                                             key={lead.id}
@@ -193,6 +196,13 @@ export const ClientLeadsPage = () => {
                                                                 'bg-gray-100 text-gray-800'}`}>
                                                     {lead.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
+                                                {(lead as any).metadata?.s2_lead_output?.lead_priority ? (
+                                                    <PriorityBadge priority={(lead as any).metadata.s2_lead_output.lead_priority} />
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                )}
                                             </td>
                                             <td className="px-3 sm:px-6 py-4 hidden sm:table-cell">
                                                 <div className="space-y-1">
@@ -262,25 +272,32 @@ export const ClientLeadsPage = () => {
                                     <div>
                                         <h4 className="text-sm font-semibold text-gray-900 mb-3">Collected Data</h4>
                                         <div className="rounded-xl border border-gray-100 overflow-hidden">
-                                            {Object.entries((selectedLead as any).metadata).map(([key, value], i) => {
-                                                let displayKey = key.replace(/_/g, ' ');
-                                                let displayValue = '';
-                                                if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
-                                                    displayKey = (value as any).label;
-                                                    displayValue = (value as any).answer || 'Not provided';
-                                                } else {
-                                                    displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
-                                                }
+                                            {Object.entries((selectedLead as any).metadata)
+                                                .filter(([key]) => key !== 's2_lead_output')
+                                                .map(([key, value], i) => {
+                                                    let displayKey = key.replace(/_/g, ' ');
+                                                    let displayValue = '';
+                                                    if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
+                                                        displayKey = (value as any).label;
+                                                        displayValue = (value as any).answer || 'Not provided';
+                                                    } else {
+                                                        displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
+                                                    }
 
-                                                return (
-                                                    <div key={key} className={`flex flex-col sm:flex-row text-sm p-3 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                                                        <span className="sm:w-1/3 font-medium text-gray-500 capitalize mb-1 sm:mb-0">{displayKey}</span>
-                                                        <span className="sm:w-2/3 text-gray-900 break-words">{displayValue}</span>
-                                                    </div>
-                                                );
-                                            })}
+                                                    return (
+                                                        <div key={key} className={`flex flex-col sm:flex-row text-sm p-3 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                                            <span className="sm:w-1/3 font-medium text-gray-500 capitalize mb-1 sm:mb-0">{displayKey}</span>
+                                                            <span className="sm:w-2/3 text-gray-900 break-words">{displayValue}</span>
+                                                        </div>
+                                                    );
+                                                })}
                                         </div>
                                     </div>
+                                )}
+
+                                {/* S2 Lead Intelligence */}
+                                {(selectedLead as any).metadata?.s2_lead_output && (
+                                    <S2LeadInsights data={(selectedLead as any).metadata.s2_lead_output} />
                                 )}
 
                                 {/* Conversation History */}

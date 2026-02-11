@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import { Message, MessageRole } from '../../types';
-import { MapPin, DollarSign, Home, Calendar, CreditCard, User, Phone, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
+import { MapPin, DollarSign, Home, Calendar, CreditCard, User, Phone, ThumbsUp, ThumbsDown, Check, Info } from 'lucide-react';
 
 
 interface ChatBubbleProps {
@@ -70,7 +70,9 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
               className={`
                 px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm break-words
                 ${isBot
-                  ? 'bg-white text-gray-800 rounded-bl-none border border-gray-100'
+                  ? message.isSoftDQ
+                    ? 'bg-amber-50 text-gray-800 rounded-bl-none border-2 border-amber-300'
+                    : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'
                   : 'bg-white text-gray-800 rounded-br-none border border-gray-100'
                 }
               `}
@@ -108,6 +110,14 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
               ) : (
                 <span className="whitespace-pre-wrap">{message.text}</span>
               )}
+            </div>
+          )}
+
+          {/* Soft-DQ Info Banner */}
+          {isBot && message.isSoftDQ && (
+            <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 max-w-md">
+              <Info size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+              <span className="text-xs text-amber-700">Based on your needs, we'll follow up when the timing is right.</span>
             </div>
           )}
 

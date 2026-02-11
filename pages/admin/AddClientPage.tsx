@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, ArrowRight, Check, Building2, Bot, MessageSquare,
-    HelpCircle, ClipboardCheck, Plus, X, Sparkles, Wand2, FileText, Upload, AlertCircle
+    HelpCircle, ClipboardCheck, Plus, X, Sparkles, Wand2, FileText, Upload, AlertCircle, Trash2, AlertTriangle
 } from 'lucide-react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -25,17 +25,19 @@ export const AddClientPage = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [showDowngradeModal, setShowDowngradeModal] = useState(false);
+    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | null>(null);
 
     // Form state initialized with default 5 questions
     const [formData, setFormData] = useState<{
         name: string;
         slug: string;
-        plan: 'Starter' | 'Pro' | 'Enterprise';
+        plan: 'S1' | 'S2' | 'S3';
         config: TenantConfig;
     }>({
         name: '',
         slug: '',
-        plan: 'Pro',
+        plan: 'S1',
         config: JSON.parse(JSON.stringify(DEFAULT_TENANT_CONFIG)) // Deep copy
     });
 
@@ -107,6 +109,61 @@ export const AddClientPage = () => {
         options[optionIndex] = value;
         newQuestions[questionIndex].options = options;
         updateConfig('leadQualification.questions', newQuestions);
+    };
+
+    // --- Plan Change Handler ---
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3';
+    const MIN_QUESTIONS = 5;
+    const MAX_QUESTIONS = 15;
+
+    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3') => {
+        const currentQuestionCount = formData.config.leadQualification.questions.length;
+        const isDowngrade = isS2OrHigher(formData.plan) && newPlan === 'S1' && currentQuestionCount > 5;
+
+        if (isDowngrade) {
+            setPendingPlan(newPlan);
+            setShowDowngradeModal(true);
+        } else {
+            setFormData(prev => ({ ...prev, plan: newPlan }));
+        }
+    };
+
+    const confirmDowngrade = () => {
+        if (!pendingPlan) return;
+        const trimmedQuestions = formData.config.leadQualification.questions.slice(0, 5);
+        setFormData(prev => ({
+            ...prev,
+            plan: pendingPlan,
+            config: {
+                ...prev.config,
+                leadQualification: {
+                    ...prev.config.leadQualification,
+                    questions: trimmedQuestions
+                }
+            }
+        }));
+        setShowDowngradeModal(false);
+        setPendingPlan(null);
+    };
+
+    // --- Add/Remove Question Handlers (S2/S3 only) ---
+    const addQuestion = () => {
+        const questions = formData.config.leadQualification.questions;
+        if (questions.length >= MAX_QUESTIONS) return;
+        const newQ: Question = {
+            id: `q${questions.length + 1}`,
+            label: '',
+            instruction: '',
+            collects: [],
+            options: []
+        };
+        updateConfig('leadQualification.questions', [...questions, newQ]);
+    };
+
+    const removeQuestion = (index: number) => {
+        const questions = formData.config.leadQualification.questions;
+        if (questions.length <= MIN_QUESTIONS) return;
+        updateConfig('leadQualification.questions', questions.filter((_, i) => i !== index));
     };
 
     // --- Validation ---
@@ -318,12 +375,12 @@ export const AddClientPage = () => {
                                 <label className={labelClass}>Plan</label>
                                 <select
                                     value={formData.plan}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, plan: e.target.value as any }))}
+                                    onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3')}
                                     className={inputClass}
                                 >
-                                    <option value="Starter">Starter</option>
-                                    <option value="Pro">Pro</option>
-                                    <option value="Enterprise">Enterprise</option>
+                                    <option value="S1">S1 (Starter)</option>
+                                    <option value="S2">S2 (Professional)</option>
+                                    <option value="S3">S3 (Enterprise)</option>
                                 </select>
                             </div>
                         </div>
@@ -504,7 +561,10 @@ export const AddClientPage = () => {
                                 <h3 className={`font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-800'}`}>Dynamic Lead Qualification</h3>
                                 <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
                                     The bot will <strong>automatically collect name and phone</strong> before asking these qualification questions.
-                                    Define exactly 5 custom questions below. Adding "Quick Reply Options" helps users answer faster.
+                                    {isS2OrHigher(formData.plan)
+                                        ? <> You have <strong>{formData.config.leadQualification.questions.length}</strong> of {MAX_QUESTIONS} possible questions. Minimum 5 required.</>
+                                        : <> Define exactly 5 custom questions below. Adding "Quick Reply Options" helps users answer faster.</>
+                                    }
                                 </p>
                             </div>
                         </div>
@@ -522,9 +582,19 @@ export const AddClientPage = () => {
                                         type="text"
                                         value={question.label}
                                         onChange={(e) => updateQuestion(qIndex, 'label', e.target.value)}
-                                        className={`${inputClass} font-semibold`}
+                                        className={`${inputClass} font-semibold flex-1`}
                                         placeholder={`Question ${qIndex + 1} Category (e.g. Budget)`}
                                     />
+                                    {/* Remove button: only for S2/S3 and only if > 5 questions */}
+                                    {isS2OrHigher(formData.plan) && formData.config.leadQualification.questions.length > MIN_QUESTIONS && (
+                                        <button
+                                            onClick={() => removeQuestion(qIndex)}
+                                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                            title="Remove question"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pl-0 sm:pl-11">
@@ -559,6 +629,20 @@ export const AddClientPage = () => {
                                 </div>
                             </div>
                         ))}
+
+                        {/* Add Question Button (S2/S3 only, max 15) */}
+                        {isS2OrHigher(formData.plan) && formData.config.leadQualification.questions.length < MAX_QUESTIONS && (
+                            <button
+                                onClick={addQuestion}
+                                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors ${isDark
+                                    ? 'border-indigo-700 text-indigo-400 hover:bg-indigo-900/20'
+                                    : 'border-indigo-300 text-indigo-600 hover:bg-indigo-50'
+                                    }`}
+                            >
+                                <Plus size={18} />
+                                Add Question ({formData.config.leadQualification.questions.length}/{MAX_QUESTIONS})
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -639,6 +723,38 @@ export const AddClientPage = () => {
                     </button>
                 )}
             </div>
+
+            {/* Plan Downgrade Confirmation Modal */}
+            {showDowngradeModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className={`max-w-md w-full mx-4 rounded-2xl shadow-2xl p-6 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <AlertTriangle size={20} className="text-amber-600" />
+                            </div>
+                            <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Downgrade Plan?</h3>
+                        </div>
+                        <p className={`text-sm mb-4 ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+                            Switching to <strong>S1</strong> will limit questions to 5. Your extra
+                            <strong> {formData.config.leadQualification.questions.length - 5} question(s)</strong> will be permanently deleted.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => { setShowDowngradeModal(false); setPendingPlan(null); }}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDowngrade}
+                                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700"
+                            >
+                                Confirm & Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AdminLayout >
     );
 };

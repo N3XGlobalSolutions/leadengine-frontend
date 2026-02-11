@@ -19,6 +19,9 @@ export interface Message {
   summaryData?: SummaryData;
   showActions?: boolean; // For the "Schedule a call" buttons
   feedback?: 'up' | 'down'; // New field for feedback
+  // S2-specific fields
+  conversationalTransition?: string; // Thinking text before question
+  isSoftDQ?: boolean; // Soft-disqualified lead visual
 }
 
 export interface ChatState {

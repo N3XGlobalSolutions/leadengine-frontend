@@ -7,7 +7,7 @@ export interface Client {
     status: 'Active' | 'Inactive' | 'Onboarding' | 'Paused';
     onboardedDate: string;
     totalUsers: number;
-    plan: 'Starter' | 'Pro' | 'Enterprise';
+    plan: 'S1' | 'S2' | 'S3';
     config?: TenantConfig;
     createdAt?: string;
     updatedAt?: string;
@@ -16,7 +16,7 @@ export interface Client {
 export interface CreateClientInput {
     name: string;
     slug: string;
-    plan: 'Starter' | 'Pro' | 'Enterprise';
+    plan: 'S1' | 'S2' | 'S3';
     config: TenantConfig;
 }
 
@@ -78,6 +78,12 @@ export interface DashboardLead {
     phone?: string;
     conversation_id?: string;
     metadata?: Record<string, any>;
+    s2_lead_output?: {
+        lead_priority: string;
+        reasoning_summary: string;
+        key_objections: string[];
+        recommended_next_step: string;
+    };
 }
 
 export interface SystemHealth {

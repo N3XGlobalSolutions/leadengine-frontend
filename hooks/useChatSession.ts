@@ -229,6 +229,16 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
             // Clean any [STEP:...] tags from the text (legacy cleanup)
             botText = botText.replace(/\[STEP:\w+\]/g, '').trim();
 
+            // S2: Strip conversational_transition from answer to avoid duplication
+            // (backend merges it into answer, but we show it separately as a thinking effect)
+            const transition = response.conversational_transition || undefined;
+            if (transition && botText.startsWith(transition)) {
+                botText = botText.slice(transition.length).trim();
+            }
+
+            // S2: Detect soft-disqualify state
+            const isSoftDQ = response.current_state === 's2_soft_dq';
+
             // Use explicit state from backend
             const isLeadCaptured = response.show_actions ||
                 response.current_state === 'completed' ||
@@ -249,9 +259,11 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
 
             // Add bot message with explicit flags from backend
             addMessage(MessageRole.Bot, botText, {
-                showActions: isLeadCaptured,
+                showActions: isLeadCaptured && !isSoftDQ,
                 isSummary: isSummary,
-                summaryData: summaryData
+                summaryData: summaryData,
+                conversationalTransition: transition,
+                isSoftDQ: isSoftDQ,
             });
 
             // If lead captured, log for verification

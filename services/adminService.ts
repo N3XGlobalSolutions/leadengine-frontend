@@ -88,10 +88,10 @@ const mapTenantToClient = (tenant: any): Client => {
     // Backend returns config with flat fields (snake_case)
     const backendConfig = tenant.config || {};
 
-    const planMap: Record<string, 'Starter' | 'Pro' | 'Enterprise'> = {
-        'S1': 'Starter',
-        'S2': 'Pro',
-        'S3': 'Enterprise'
+    const planMap: Record<string, 'S1' | 'S2' | 'S3'> = {
+        'S1': 'S1',
+        'S2': 'S2',
+        'S3': 'S3'
     };
 
     // Transform to Frontend TenantConfig (nested, camelCase)
@@ -119,8 +119,8 @@ const mapTenantToClient = (tenant: any): Client => {
             options: {},
             questions: backendConfig.qualification_questions?.map((q: any) => ({
                 id: q.id,
-                label: q.label || q.question, // Map from label, fallback to legacy question
-                instruction: q.instruction || q.question, // Map from instruction, fallback to legacy question
+                label: q.label || q.question,
+                instruction: q.instruction || q.question,
                 collects: q.collects || [],
                 options: q.quick_replies?.map((qr: any) => qr.text) || []
             })) || []
@@ -131,7 +131,6 @@ const mapTenantToClient = (tenant: any): Client => {
             maybeLater: 'No problem! Feel free to reach out whenever you are ready.'
         },
 
-        // New Settings Mappings
         welcome_message: backendConfig.welcome_message || "Hello! How can I help you today?",
         language: backendConfig.language || "en",
         tone: backendConfig.tone || "professional",
@@ -151,7 +150,7 @@ const mapTenantToClient = (tenant: any): Client => {
         status: tenant.is_active ? 'Active' : 'Inactive',
         onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         totalUsers: 0,
-        plan: planMap[backendConfig.plan] || 'Starter',
+        plan: planMap[backendConfig.plan] || 'S1',
         config: frontendConfig
     };
 };
@@ -261,7 +260,7 @@ export const updateClient = async (client: Client): Promise<Client> => {
 
     // We reverse the mapping logic from mapTenantToClient
     const backendConfig = {
-        plan: client.plan === 'Starter' ? 'S1' : client.plan === 'Pro' ? 'S2' : 'S3',
+        plan: client.plan,
         url_slug: client.slug,
 
         // Bot Branding
@@ -338,7 +337,7 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
     const backendPayload = {
         name: clientData.name,
         config: {
-            plan: clientData.plan === 'Starter' ? 'S1' : clientData.plan === 'Pro' ? 'S2' : 'S3',
+            plan: clientData.plan,
             url_slug: clientData.slug,
             company_name: clientData.config.companyName,
             bot_name: clientData.config.botName,

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Save, Trash2, Pause, Play, Building2, Users, Calendar,
     Globe, Palette, MessageSquare, Bot, AlertTriangle, Check, X, LayoutDashboard,
-    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw
+    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw, Plus, Sparkles
 } from 'lucide-react';
 import { Client, TenantDocument } from '../../types/admin';
 import { TenantConfig, Question } from '../../types/config';
@@ -58,6 +58,8 @@ export const AdminClientDetailPage = () => {
     // File Upload State
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [showDowngradeModal, setShowDowngradeModal] = useState(false);
+    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | null>(null);
 
     useEffect(() => {
         const fetchClient = async () => {
@@ -305,6 +307,56 @@ export const AdminClientDetailPage = () => {
         setClient({ ...client, [field]: value });
     };
 
+    // --- Plan Change Handler ---
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3';
+    const MIN_QUESTIONS = 5;
+    const MAX_QUESTIONS = 15;
+
+    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3') => {
+        if (!client) return;
+        const currentQuestionCount = client.config?.leadQualification?.questions?.length || 0;
+        const isDowngrade = isS2OrHigher(client.plan) && newPlan === 'S1' && currentQuestionCount > 5;
+
+        if (isDowngrade) {
+            setPendingPlan(newPlan);
+            setShowDowngradeModal(true);
+        } else {
+            updateField('plan', newPlan);
+        }
+    };
+
+    const confirmDowngrade = () => {
+        if (!client || !pendingPlan) return;
+        const trimmedQuestions = (client.config?.leadQualification?.questions || []).slice(0, 5);
+        const newConfig = JSON.parse(JSON.stringify(client.config));
+        newConfig.leadQualification.questions = trimmedQuestions;
+        setClient({ ...client, plan: pendingPlan, config: newConfig });
+        setShowDowngradeModal(false);
+        setPendingPlan(null);
+    };
+
+    // --- Add/Remove Question Handlers (S2/S3 only) ---
+    const addQuestion = () => {
+        if (!client?.config) return;
+        const questions = client.config.leadQualification.questions;
+        if (questions.length >= MAX_QUESTIONS) return;
+        const newQ: Question = {
+            id: `q${questions.length + 1}`,
+            label: '',
+            instruction: '',
+            collects: [],
+            options: []
+        };
+        updateConfig('leadQualification.questions', [...questions, newQ]);
+    };
+
+    const removeQuestion = (index: number) => {
+        if (!client?.config) return;
+        const questions = client.config.leadQualification.questions;
+        if (questions.length <= MIN_QUESTIONS) return;
+        updateConfig('leadQualification.questions', questions.filter((_, i) => i !== index));
+    };
+
     // --- System Questions Helpers ---
 
     /**
@@ -489,10 +541,10 @@ export const AdminClientDetailPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Plan</label>
-                                    <select value={client.plan} onChange={(e) => updateField('plan', e.target.value)} className={inputClass}>
-                                        <option value="Starter">Starter</option>
-                                        <option value="Pro">Pro</option>
-                                        <option value="Enterprise">Enterprise</option>
+                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3')} className={inputClass}>
+                                        <option value="S1">S1 (Starter)</option>
+                                        <option value="S2">S2 (Professional)</option>
+                                        <option value="S3">S3 (Enterprise)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -724,7 +776,11 @@ export const AdminClientDetailPage = () => {
                                 <div>
                                     <h3 className={`font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-800'}`}>Dynamic Questions</h3>
                                     <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                                        Name & phone are <strong>auto-handled by the state machine</strong>. Questions 1-5 below are your custom qualification questions.
+                                        Name & phone are <strong>auto-handled by the state machine</strong>.
+                                        {isS2OrHigher(client.plan)
+                                            ? <> You have <strong>{client.config?.leadQualification?.questions?.length || 0}</strong> of {MAX_QUESTIONS} possible questions. Minimum 5 required.</>
+                                            : <> Questions 1-5 below are your custom qualification questions.</>
+                                        }
                                     </p>
                                 </div>
                             </div>
@@ -762,6 +818,16 @@ export const AdminClientDetailPage = () => {
                                                 <span className="ml-auto px-2 py-1 text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-400 rounded whitespace-nowrap">
                                                     Auto-handled
                                                 </span>
+                                            )}
+                                            {/* Remove button: S2/S3 only, not system, only if > 5 user questions */}
+                                            {!isSystem && isS2OrHigher(client.plan) && (client.config?.leadQualification?.questions?.length || 0) > MIN_QUESTIONS && (
+                                                <button
+                                                    onClick={() => actualIndex >= 0 && removeQuestion(actualIndex)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    title="Remove question"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pl-0 sm:pl-11">
@@ -810,6 +876,20 @@ export const AdminClientDetailPage = () => {
                                     </div>
                                 );
                             })}
+
+                            {/* Add Question Button (S2/S3 only, max 15) */}
+                            {isS2OrHigher(client.plan) && (client.config?.leadQualification?.questions?.length || 0) < MAX_QUESTIONS && (
+                                <button
+                                    onClick={addQuestion}
+                                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors ${isDark
+                                        ? 'border-indigo-700 text-indigo-400 hover:bg-indigo-900/20'
+                                        : 'border-indigo-300 text-indigo-600 hover:bg-indigo-50'
+                                        }`}
+                                >
+                                    <Plus size={18} />
+                                    Add Question ({client.config?.leadQualification?.questions?.length || 0}/{MAX_QUESTIONS})
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -1033,6 +1113,30 @@ export const AdminClientDetailPage = () => {
                         </div>
                     </div>
 
+                    {/* S2 Features Badge Card */}
+                    {isS2OrHigher(client.plan) && (
+                        <div className={cardClass}>
+                            <h3 className={`text-sm font-semibold uppercase tracking-wide mb-4 flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                                <Sparkles size={14} /> S2 Features
+                            </h3>
+                            <div className="space-y-2.5">
+                                {[
+                                    'Conversational Transitions',
+                                    'Lead Intelligence',
+                                    'Soft-DQ Handling',
+                                    `Dynamic Questions (${client.config?.leadQualification?.questions?.length || 5})`
+                                ].map((feature) => (
+                                    <div key={feature} className="flex items-center gap-2">
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isDark ? 'bg-green-900/50' : 'bg-green-100'}`}>
+                                            <Check size={12} className={isDark ? 'text-green-400' : 'text-green-600'} />
+                                        </div>
+                                        <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{feature}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Quick Links */}
                     <div className={cardClass}>
                         <h3 className={`text-sm font-semibold uppercase tracking-wide mb-4 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
@@ -1091,6 +1195,37 @@ export const AdminClientDetailPage = () => {
                     </div>
                 )
             }
+            {/* Plan Downgrade Confirmation Modal */}
+            {showDowngradeModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className={`max-w-md w-full mx-4 rounded-2xl shadow-2xl p-6 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <AlertTriangle size={20} className="text-amber-600" />
+                            </div>
+                            <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Downgrade Plan?</h3>
+                        </div>
+                        <p className={`text-sm mb-4 ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+                            Switching to <strong>S1</strong> will limit questions to 5. Your extra
+                            <strong> {(client?.config?.leadQualification?.questions?.length || 0) - 5} question(s)</strong> will be permanently deleted.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => { setShowDowngradeModal(false); setPendingPlan(null); }}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDowngrade}
+                                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700"
+                            >
+                                Confirm & Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 };

@@ -8,6 +8,8 @@ import { AdminLayout } from '../../components/admin/AdminLayout';
 import { getClients, getTenantLeads, updateLeadStatus } from '../../services/adminService';
 import { Client, DashboardLead } from '../../types/admin';
 import ConversationViewer from '../../components/admin/ConversationViewer';
+import { PriorityBadge } from '../../components/admin/PriorityBadge';
+import { S2LeadInsights } from '../../components/admin/S2LeadInsights';
 
 export const AdminLeadsPage = () => {
     const { isDark } = useAdminTheme();
@@ -19,6 +21,12 @@ export const AdminLeadsPage = () => {
     const [selectedLead, setSelectedLead] = useState<DashboardLead | null>(null);
     const [loading, setLoading] = useState(true);
     const [leadsLoading, setLeadsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState<'overview' | 'chat'>('overview');
+
+    // Reset tab when lead changes
+    useEffect(() => {
+        if (selectedLead) setActiveTab('overview');
+    }, [selectedLead]);
 
     // Filters
     const [clientSearch, setClientSearch] = useState('');
@@ -195,6 +203,7 @@ export const AdminLeadsPage = () => {
                                         <tr>
                                             <th className="px-3 sm:px-6 py-3">Lead Name</th>
                                             <th className="px-3 sm:px-6 py-3">Status</th>
+                                            <th className="px-3 sm:px-6 py-3 hidden lg:table-cell">Priority</th>
                                             <th className="px-3 sm:px-6 py-3 hidden sm:table-cell">Contact</th>
                                             <th className="px-3 sm:px-6 py-3 hidden md:table-cell">Captured</th>
                                             <th className="px-3 sm:px-6 py-3 text-right">Action</th>
@@ -202,9 +211,9 @@ export const AdminLeadsPage = () => {
                                     </thead>
                                     <tbody className={`divide-y ${isDark ? 'divide-slate-700' : 'divide-gray-100'}`}>
                                         {leadsLoading ? (
-                                            <tr><td colSpan={5} className="p-6 sm:p-8 text-center text-gray-500 text-xs sm:text-sm">Loading leads...</td></tr>
+                                            <tr><td colSpan={6} className="p-6 sm:p-8 text-center text-gray-500 text-xs sm:text-sm">Loading leads...</td></tr>
                                         ) : filteredLeads.length === 0 ? (
-                                            <tr><td colSpan={5} className="p-6 sm:p-8 text-center text-gray-500 text-xs sm:text-sm">No leads found.</td></tr>
+                                            <tr><td colSpan={6} className="p-6 sm:p-8 text-center text-gray-500 text-xs sm:text-sm">No leads found.</td></tr>
                                         ) : filteredLeads.map(lead => (
                                             <tr key={lead.id} className={`group transition-colors ${hoverClass} ${selectedLead?.id === lead.id ? (isDark ? 'bg-indigo-900/20' : 'bg-indigo-50') : ''}`}>
                                                 <td className="px-3 sm:px-6 py-4 font-medium">
@@ -218,6 +227,13 @@ export const AdminLeadsPage = () => {
                                                                     'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}`}>
                                                         {lead.status}
                                                     </span>
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
+                                                    {(lead as any).metadata?.s2_lead_output?.lead_priority ? (
+                                                        <PriorityBadge priority={(lead as any).metadata.s2_lead_output.lead_priority} />
+                                                    ) : (
+                                                        <span className={`text-xs ${textSub}`}>—</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden sm:table-cell">
                                                     <div className="space-y-1">
@@ -247,95 +263,151 @@ export const AdminLeadsPage = () => {
 
                 {/* --- RIGHT DRAWER: LEAD DETAILS --- */}
                 {selectedLead && (
-                    <div className={`fixed inset-0 lg:relative lg:inset-auto lg:w-[450px] xl:w-[500px] border-l flex flex-col shadow-xl z-50 lg:z-20 ${bgClass} ${borderClass} transition-transform duration-300`}>
-                        <div className={`p-4 sm:p-6 border-b flex justify-between items-start ${borderClass}`}>
-                            <div className="flex-1 min-w-0">
-                                <h3 className={`text-lg sm:text-xl font-bold ${textMain} truncate`}>{selectedLead.name}</h3>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <span className={`text-xs ${textSub}`}>Status:</span>
-                                    <select
-                                        value={selectedLead.status}
-                                        onChange={(e) => handleStatusChange(selectedLead.id, e.target.value)}
-                                        className={`text-xs font-medium bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-indigo-500 font-bold`}
-                                    >
-                                        <option value="new">New</option>
-                                        <option value="qualified">Qualified</option>
-                                        <option value="disqualified">Disqualified</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <button onClick={() => setSelectedLead(null)} className={`${textSub} hover:text-gray-700 flex-shrink-0 ml-2`}>
-                                <X size={24} />
-                            </button>
-                        </div>
+                    <>
+                        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity" onClick={() => setSelectedLead(null)} />
+                        <div className={`fixed inset-y-0 right-0 w-full sm:w-[600px] border-l shadow-2xl z-50 flex flex-col ${bgClass} ${borderClass} transform transition-transform duration-300`}>
 
-                        <div className="flex-1 overflow-y-auto">
-                            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-                                {/* Contact Info */}
-                                <div className={`p-3 sm:p-4 rounded-xl ${isDark ? 'bg-slate-900/50' : 'bg-gray-50'}`}>
-                                    <h4 className={`text-sm font-semibold mb-3 ${textMain}`}>Contact Information</h4>
-                                    <div className="space-y-3">
+                            {/* Header */}
+                            <div className={`flex-shrink-0 p-6 border-b ${borderClass} bg-white/50 dark:bg-slate-900/50 backdrop-blur-md sticky top-0 z-10`}>
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="flex-1 min-w-0 pr-4">
+                                        <h3 className={`text-2xl font-bold ${textMain} truncate mb-2`}>{selectedLead.name}</h3>
                                         <div className="flex items-center gap-3">
-                                            <Mail size={16} className="text-gray-400 flex-shrink-0" />
-                                            <span className={`text-sm ${textMain} break-all`}>{(selectedLead as any).email || 'No email'}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <Phone size={16} className="text-gray-400 flex-shrink-0" />
-                                            <span className={`text-sm ${textMain}`}>{(selectedLead as any).phone || 'No phone'}</span>
-                                        </div>
-                                        <div className="flex items-start gap-3">
-                                            <Calendar size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
-                                            <span className={`text-sm ${textMain}`}>Captured: {new Date(selectedLead.created_at).toLocaleString()}</span>
+                                            <select
+                                                value={selectedLead.status}
+                                                onChange={(e) => handleStatusChange(selectedLead.id, e.target.value)}
+                                                className={`text-sm font-semibold bg-transparent border-none p-0 focus:ring-0 cursor-pointer 
+                                                    ${selectedLead.status === 'qualified' ? 'text-emerald-600' :
+                                                        selectedLead.status === 'disqualified' ? 'text-red-600' : 'text-blue-600'} 
+                                                    uppercase tracking-wide`}
+                                            >
+                                                <option value="new">New</option>
+                                                <option value="qualified">Qualified</option>
+                                                <option value="disqualified">Disqualified</option>
+                                            </select>
+                                            {(selectedLead as any).metadata?.s2_lead_output && typeof (selectedLead as any).metadata.s2_lead_output === 'object' && (selectedLead as any).metadata.s2_lead_output.lead_priority && (
+                                                <PriorityBadge priority={(selectedLead as any).metadata.s2_lead_output.lead_priority} />
+                                            )}
                                         </div>
                                     </div>
+                                    <button
+                                        onClick={() => setSelectedLead(null)}
+                                        className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${textSub}`}
+                                    >
+                                        <X size={24} />
+                                    </button>
                                 </div>
 
-                                {/* Metadata / Form Data */}
-                                {(selectedLead as any).metadata && (
-                                    <div>
-                                        <h4 className={`text-sm font-semibold mb-3 ${textMain}`}>Collected Data</h4>
-                                        <div className={`rounded-xl border overflow-hidden ${borderClass}`}>
-                                            {Object.entries((selectedLead as any).metadata).map(([key, value], i) => {
-                                                // Handle both old format (string) and new format ({label, answer})
-                                                let displayKey = key.replace(/_/g, ' ');
-                                                let displayValue = '';
+                                {/* Tabs */}
+                                <div className="flex space-x-1 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+                                    <button
+                                        onClick={() => setActiveTab('overview')}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all
+                                            ${activeTab === 'overview'
+                                                ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                                                : `${textSub} hover:text-gray-900 dark:hover:text-gray-300`}`}
+                                    >
+                                        <Layout size={16} />
+                                        Overview
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('chat')}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all
+                                            ${activeTab === 'chat'
+                                                ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
+                                                : `${textSub} hover:text-gray-900 dark:hover:text-gray-300`}`}
+                                    >
+                                        <MessageSquare size={16} />
+                                        Conversation
+                                    </button>
+                                </div>
+                            </div>
 
-                                                if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
-                                                    // New format from state machine
-                                                    displayKey = (value as any).label;
-                                                    displayValue = (value as any).answer || 'Not provided';
-                                                } else {
-                                                    // Old format or simple value
-                                                    displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
-                                                }
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto">
+                                {activeTab === 'overview' ? (
+                                    <div className="p-6 space-y-8">
 
-                                                return (
-                                                    <div key={key} className={`flex flex-col sm:flex-row text-sm p-3 ${i % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-900/30' : 'bg-gray-50')}`}>
-                                                        <span className={`sm:w-1/3 font-medium capitalize ${textSub} mb-1 sm:mb-0`}>{displayKey}</span>
-                                                        <span className={`sm:w-2/3 ${textMain} break-words`}>{displayValue}</span>
+                                        {/* 1. S2 Intelligence (Top Priority) */}
+                                        {(selectedLead as any).metadata?.s2_lead_output && (
+                                            <section className="animate-fade-in-up">
+                                                <S2LeadInsights data={(selectedLead as any).metadata.s2_lead_output} isDark={isDark} />
+                                            </section>
+                                        )}
+
+                                        {/* 2. Contact Grid */}
+                                        <section>
+                                            <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Contact Details</h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <Mail size={16} className="text-gray-400" />
+                                                        <span className={`text-xs ${textSub}`}>Email</span>
                                                     </div>
-                                                );
-                                            })}
+                                                    <div className={`text-sm font-medium truncate ${textMain}`}>{(selectedLead as any).email || '—'}</div>
+                                                </div>
+                                                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <Phone size={16} className="text-gray-400" />
+                                                        <span className={`text-xs ${textSub}`}>Phone</span>
+                                                    </div>
+                                                    <div className={`text-sm font-medium ${textMain}`}>{(selectedLead as any).phone || '—'}</div>
+                                                </div>
+                                                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <Calendar size={16} className="text-gray-400" />
+                                                        <span className={`text-xs ${textSub}`}>Captured</span>
+                                                    </div>
+                                                    <div className={`text-sm font-medium ${textMain}`}>{new Date(selectedLead.created_at).toLocaleDateString()}</div>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        {/* 3. Collected Data Grid */}
+                                        {(selectedLead as any).metadata && (
+                                            <section>
+                                                <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Captured Data</h4>
+                                                <div className="grid grid-cols-1 gap-3">
+                                                    {Object.entries((selectedLead as any).metadata)
+                                                        .filter(([key]) => key !== 's2_lead_output')
+                                                        .map(([key, value], i) => {
+                                                            let displayKey = key.replace(/_/g, ' ');
+                                                            let displayValue = '';
+                                                            if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
+                                                                displayKey = (value as any).label;
+                                                                displayValue = (value as any).answer || '—';
+                                                            } else {
+                                                                displayValue = typeof value === 'string' ? value : String(value || '—');
+                                                            }
+
+                                                            return (
+                                                                <div key={key} className={`flex items-start justify-between p-4 rounded-xl border transition-colors hover:border-indigo-200 dark:hover:border-indigo-800 ${isDark ? 'bg-slate-800/30 border-slate-800' : 'bg-white border-gray-100'}`}>
+                                                                    <span className={`text-sm font-medium capitalize ${textSub}`}>{displayKey}</span>
+                                                                    <span className={`text-sm font-semibold text-right max-w-[60%] break-words ${textMain}`}>{displayValue}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                </div>
+                                            </section>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex flex-col">
+                                        <div className="flex-1 min-h-0 bg-gray-50 dark:bg-slate-900/50">
+                                            {(selectedLead as any).conversation_id ? (
+                                                <ConversationViewer conversationId={(selectedLead as any).conversation_id} />
+                                            ) : (
+                                                <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center">
+                                                    <MessageSquare size={48} className="mb-4 opacity-20" />
+                                                    <p>No conversation transcript available.</p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
-
-                                {/* Conversation History */}
-                                <div>
-                                    <h4 className={`text-sm font-semibold mb-3 ${textMain}`}>Conversation History</h4>
-                                    <div className={`rounded-xl border overflow-hidden h-80 sm:h-96 ${borderClass}`}>
-                                        {(selectedLead as any).conversation_id ? (
-                                            <ConversationViewer conversationId={(selectedLead as any).conversation_id} />
-                                        ) : (
-                                            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                                                No conversation linked.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
                             </div>
                         </div>
-                    </div>
+                    </>
                 )}
             </div>
         </AdminLayout>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, Building2, Users, Calendar, ChevronRight, Pause, Play, RefreshCw } from 'lucide-react';
+import { Search, Plus, Building2, Users, Calendar, ChevronRight, Pause, Play, RefreshCw, Sparkles } from 'lucide-react';
 import { Client } from '@/types/admin';
 import { getClients, getAllClientConversationCounts } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
@@ -77,12 +77,14 @@ export const AdminClientsPage = () => {
 
     const getPlanColor = (plan: string) => {
         const colors: Record<string, { light: string; dark: string }> = {
-            Enterprise: { light: 'bg-purple-100 text-purple-800', dark: 'bg-purple-900/50 text-purple-400' },
-            Pro: { light: 'bg-indigo-100 text-indigo-800', dark: 'bg-indigo-900/50 text-indigo-400' },
-            Starter: { light: 'bg-gray-100 text-gray-800', dark: 'bg-gray-700 text-gray-400' },
+            S3: { light: 'bg-purple-100 text-purple-800', dark: 'bg-purple-900/50 text-purple-400' },
+            S2: { light: 'bg-indigo-100 text-indigo-800', dark: 'bg-indigo-900/50 text-indigo-400' },
+            S1: { light: 'bg-gray-100 text-gray-800', dark: 'bg-gray-700 text-gray-400' },
         };
-        return colors[plan] || colors.Starter;
+        return colors[plan] || colors.S1;
     };
+
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3';
 
     return (
         <AdminLayout>
@@ -182,6 +184,11 @@ export const AdminClientsPage = () => {
                                     }`}>
                                     {client.plan}
                                 </span>
+                                {isS2OrHigher(client.plan) && (
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                                        <Sparkles size={10} /> S2 Features
+                                    </span>
+                                )}
                             </div>
 
                             <div className={`flex items-center gap-4 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>

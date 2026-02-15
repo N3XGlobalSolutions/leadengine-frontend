@@ -358,17 +358,17 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         await handleBotResponse(text);
     };
 
-    const handleScheduleCall = () => {
+    const handleScheduleCall = async () => {
         setQuickReplies([]);
         addMessage(MessageRole.User, 'Yes, schedule a call.');
-        addMessage(MessageRole.Bot, 'Thank you for confirming. Our team will contact you shortly to schedule the call.');
+        await handleBotResponse('Yes, schedule a call');
         setIsChatEnded(true);
     };
 
-    const handleMaybeLater = () => {
+    const handleMaybeLater = async () => {
         setQuickReplies([]);
         addMessage(MessageRole.User, 'Maybe later.');
-        addMessage(MessageRole.Bot, 'No problem at all. Feel free to reach out whenever you\'re ready.');
+        await handleBotResponse('Maybe later');
         setIsChatEnded(true);
     };
 

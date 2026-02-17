@@ -236,8 +236,8 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 botText = botText.slice(transition.length).trim();
             }
 
-            // S2: Detect soft-disqualify state
-            const isSoftDQ = response.current_state === 's2_soft_dq';
+            // S2/S3: Detect soft-disqualify state
+            const isSoftDQ = response.current_state === 's2_soft_dq' || response.current_state === 's3_soft_dq';
 
             // Use explicit state from backend
             const isLeadCaptured = response.show_actions ||

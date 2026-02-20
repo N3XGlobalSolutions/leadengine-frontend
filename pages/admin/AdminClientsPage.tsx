@@ -96,10 +96,32 @@ export const AdminClientsPage = () => {
                         Manage all your client configurations and settings
                     </p>
                 </div>
-                <Link to="/admin/clients/new" className="inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 transition-all hover:scale-105">
-                    <Plus size={20} className="mr-2" />
-                    Add New Client
-                </Link>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={async () => {
+                            setLoading(true);
+                            const data = await getClients();
+                            setClients(data);
+                            setLoading(false);
+
+                            // Re-fetch counts
+                            if (data.length > 0) {
+                                const clientIds = data.map(c => c.id);
+                                const counts = await getAllClientConversationCounts(clientIds);
+                                setConversationCounts(counts);
+                            }
+                        }}
+                        disabled={loading}
+                        className={`p-2.5 rounded-xl border transition-colors ${isDark ? 'border-slate-700 hover:bg-slate-800 text-slate-400' : 'border-gray-200 hover:bg-gray-50 text-gray-500'}`}
+                        title="Refresh Clients List"
+                    >
+                        <RefreshCw size={20} className={`${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <Link to="/admin/clients/new" className="inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 transition-all hover:scale-105">
+                        <Plus size={20} className="mr-2" />
+                        Add New Client
+                    </Link>
+                </div>
             </div>
 
             {/* Filters */}
@@ -186,7 +208,7 @@ export const AdminClientsPage = () => {
                                 </span>
                                 {isS2OrHigher(client.plan) && (
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
-                                        <Sparkles size={10} /> S2 Features
+                                        <Sparkles size={10} /> {client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
                                     </span>
                                 )}
                             </div>

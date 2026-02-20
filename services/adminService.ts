@@ -147,7 +147,7 @@ const mapTenantToClient = (tenant: any): Client => {
         id: tenant.tenant_id,
         name: tenant.name,
         slug: backendConfig.url_slug || tenant.tenant_id,
-        status: tenant.is_active ? 'Active' : 'Inactive',
+        status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), // Use backend status if available
         onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         totalUsers: 0,
         plan: planMap[backendConfig.plan] || 'S1',
@@ -223,12 +223,11 @@ export const getClientById = async (id: string): Promise<Client | null> => {
 // --- Conversation Count Functions ---
 /**
  * Get the number of conversations (users) for a specific client.
- * Each conversation represents one user interaction.
+ * Uses the native backend count endpoint for an exact count without pagination limits.
  */
 export const getClientConversationCount = async (clientId: string): Promise<number> => {
     try {
-        const conversations = await chatService.getTenantConversations(clientId);
-        return conversations.length;
+        return await chatService.getTenantConversationCount(clientId);
     } catch (e) {
         console.error(`Error fetching conversation count for client ${clientId}:`, e);
         return 0;
@@ -305,7 +304,8 @@ export const updateClient = async (client: Client): Promise<Client> => {
 
     const payload = {
         name: client.name,
-        is_active: client.status !== 'Inactive', // Basic status mapping
+        status: client.status, // Send strict status
+        is_active: client.status !== 'Inactive', // Basic status mapping (legacy)
         config: backendConfig
     };
 
@@ -318,15 +318,16 @@ export const deleteClient = async (id: string): Promise<void> => {
 };
 
 export const toggleClientPause = async (id: string): Promise<Client> => {
-    // Backend doesn't support 'Pause' yet, only 'Active' (true/false) via is_active
-    // We can toggle is_active
     const client = await getClientById(id);
     if (!client) throw new Error("Client not found");
 
-    const newStatus = client.status === 'Active' ? false : true;
+    // Toggle between Active and Paused
+    // If currently Active (or Onboarding), switch to Paused
+    // If Paused, switch to Active
+    const newStatus = client.status === 'Paused' ? 'Active' : 'Paused';
 
     const res = await api.put(`/tenants/${id}`, {
-        is_active: newStatus
+        status: newStatus
     });
 
     return mapTenantToClient(res.data);

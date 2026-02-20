@@ -84,6 +84,12 @@ export interface DashboardLead {
         key_objections: string[];
         recommended_next_step: string;
     };
+    s3_lead_output?: {
+        lead_priority: string;
+        reasoning_summary: string;
+        key_objections: string[];
+        recommended_next_step: string;
+    };
 }
 
 export interface SystemHealth {

@@ -339,7 +339,8 @@ export const AdminClientDetailPage = () => {
     const addQuestion = () => {
         if (!client?.config) return;
         const questions = client.config.leadQualification.questions;
-        if (questions.length >= MAX_QUESTIONS) return;
+        const limit = client.plan === 'S3' ? 30 : 15;
+        if (questions.length >= limit) return;
         const newQ: Question = {
             id: `q${questions.length + 1}`,
             label: '',
@@ -465,6 +466,27 @@ export const AdminClientDetailPage = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <button
+                        onClick={async () => {
+                            if (!clientId) return;
+                            setLoading(true);
+                            // Re-fetch all data
+                            const [clientData, docs, count] = await Promise.all([
+                                getClientById(clientId),
+                                getTenantDocuments(clientId),
+                                getClientConversationCount(clientId)
+                            ]);
+                            setClient(clientData);
+                            setDocuments(docs);
+                            setConversationCount(count);
+                            setLoading(false);
+                        }}
+                        disabled={loading}
+                        className={`p-2 rounded-lg transition-colors border ${isDark ? 'border-slate-700 hover:bg-slate-700 text-slate-400' : 'border-gray-200 hover:bg-gray-100 text-gray-500'}`}
+                        title="Refresh Client Data"
+                    >
+                        <RefreshCw size={20} className={`${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
                         onClick={handleTogglePause}
                         className={`inline-flex items-center px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-all ${client.status === 'Paused'
                             ? 'bg-green-600 hover:bg-green-700 text-white'
@@ -552,7 +574,6 @@ export const AdminClientDetailPage = () => {
                                     <select value={client.status} onChange={(e) => updateField('status', e.target.value)} className={inputClass}>
                                         <option value="Active">Active</option>
                                         <option value="Inactive">Inactive</option>
-                                        <option value="Onboarding">Onboarding</option>
                                         <option value="Paused">Paused</option>
                                     </select>
                                 </div>
@@ -877,8 +898,8 @@ export const AdminClientDetailPage = () => {
                                 );
                             })}
 
-                            {/* Add Question Button (S2/S3 only, max 15) */}
-                            {isS2OrHigher(client.plan) && (client.config?.leadQualification?.questions?.length || 0) < MAX_QUESTIONS && (
+                            {/* Add Question Button (S2/S3 only, max 15/30) */}
+                            {isS2OrHigher(client.plan) && (client.config?.leadQualification?.questions?.length || 0) < (client.plan === 'S3' ? 30 : 15) && (
                                 <button
                                     onClick={addQuestion}
                                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors ${isDark
@@ -887,7 +908,7 @@ export const AdminClientDetailPage = () => {
                                         }`}
                                 >
                                     <Plus size={18} />
-                                    Add Question ({client.config?.leadQualification?.questions?.length || 0}/{MAX_QUESTIONS})
+                                    Add Question ({client.config?.leadQualification?.questions?.length || 0}/{client.plan === 'S3' ? 30 : 15})
                                 </button>
                             )}
                         </div>
@@ -1117,7 +1138,7 @@ export const AdminClientDetailPage = () => {
                     {isS2OrHigher(client.plan) && (
                         <div className={cardClass}>
                             <h3 className={`text-sm font-semibold uppercase tracking-wide mb-4 flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                                <Sparkles size={14} /> S2 Features
+                                <Sparkles size={14} /> {client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
                             </h3>
                             <div className="space-y-2.5">
                                 {[

@@ -149,7 +149,8 @@ export const AddClientPage = () => {
     // --- Add/Remove Question Handlers (S2/S3 only) ---
     const addQuestion = () => {
         const questions = formData.config.leadQualification.questions;
-        if (questions.length >= MAX_QUESTIONS) return;
+        const limit = formData.plan === 'S3' ? 30 : 15;
+        if (questions.length >= limit) return;
         const newQ: Question = {
             id: `q${questions.length + 1}`,
             label: '',
@@ -545,6 +546,7 @@ export const AddClientPage = () => {
                                     />
                                     <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
                                         Define the criteria and prompts used to validate and qualify leads. This will help identify warm leads vs cold leads.
+                                        {formData.plan === 'S3' && <span className="block mt-1 text-indigo-500 font-medium">✨ S3 Lead Intelligence active: The AI will use this criteria for deeper analysis.</span>}
                                     </p>
                                 </div>
                             </div>
@@ -562,7 +564,7 @@ export const AddClientPage = () => {
                                 <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
                                     The bot will <strong>automatically collect name and phone</strong> before asking these qualification questions.
                                     {isS2OrHigher(formData.plan)
-                                        ? <> You have <strong>{formData.config.leadQualification.questions.length}</strong> of {MAX_QUESTIONS} possible questions. Minimum 5 required.</>
+                                        ? <> You have <strong>{formData.config.leadQualification.questions.length}</strong> of {formData.plan === 'S3' ? 30 : 15} possible questions. Minimum 5 required.</>
                                         : <> Define exactly 5 custom questions below. Adding "Quick Reply Options" helps users answer faster.</>
                                     }
                                 </p>
@@ -630,8 +632,8 @@ export const AddClientPage = () => {
                             </div>
                         ))}
 
-                        {/* Add Question Button (S2/S3 only, max 15) */}
-                        {isS2OrHigher(formData.plan) && formData.config.leadQualification.questions.length < MAX_QUESTIONS && (
+                        {/* Add Question Button (S2/S3 only, max 15/30) */}
+                        {isS2OrHigher(formData.plan) && formData.config.leadQualification.questions.length < (formData.plan === 'S3' ? 30 : 15) && (
                             <button
                                 onClick={addQuestion}
                                 className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors ${isDark
@@ -640,7 +642,7 @@ export const AddClientPage = () => {
                                     }`}
                             >
                                 <Plus size={18} />
-                                Add Question ({formData.config.leadQualification.questions.length}/{MAX_QUESTIONS})
+                                Add Question ({formData.config.leadQualification.questions.length}/{formData.plan === 'S3' ? 30 : 15})
                             </button>
                         )}
                     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Search, Filter, User, MessageSquare, Phone, Mail, Calendar,
-    ArrowRight, X, Layout, ChevronRight, CheckCircle, Clock, AlertTriangle
+    ArrowRight, X, Layout, ChevronRight, CheckCircle, Clock, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -10,6 +10,7 @@ import { Client, DashboardLead } from '../../types/admin';
 import ConversationViewer from '../../components/admin/ConversationViewer';
 import { PriorityBadge } from '../../components/admin/PriorityBadge';
 import { S2LeadInsights } from '../../components/admin/S2LeadInsights';
+import { S3LeadInsights } from '../../components/admin/S3LeadInsights';
 
 export const AdminLeadsPage = () => {
     const { isDark } = useAdminTheme();
@@ -32,6 +33,8 @@ export const AdminLeadsPage = () => {
     const [clientSearch, setClientSearch] = useState('');
     const [leadSearch, setLeadSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [priorityFilter, setPriorityFilter] = useState('all');
+    const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest');
 
     // Initial Load
     useEffect(() => {
@@ -74,12 +77,25 @@ export const AdminLeadsPage = () => {
         c.slug.toLowerCase().includes(clientSearch.toLowerCase())
     );
 
-    const filteredLeads = leads.filter(l => {
-        const matchesSearch = l.name.toLowerCase().includes(leadSearch.toLowerCase()) ||
-            (l as any).email?.toLowerCase().includes(leadSearch.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const filteredLeads = leads
+        .filter(l => {
+            const matchesSearch = l.name.toLowerCase().includes(leadSearch.toLowerCase()) ||
+                (l as any).email?.toLowerCase().includes(leadSearch.toLowerCase());
+            const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
+
+            const leadPriority = ((l as any).metadata?.s3_lead_output?.lead_priority ||
+                (l as any).metadata?.s2_lead_output?.lead_priority ||
+                (l as any).metadata?._s3_priority ||
+                (l as any).metadata?._s2_priority)?.toLowerCase();
+            const matchesPriority = priorityFilter === 'all' || leadPriority === priorityFilter;
+
+            return matchesSearch && matchesStatus && matchesPriority;
+        })
+        .sort((a, b) => {
+            const dateA = new Date(a.created_at).getTime();
+            const dateB = new Date(b.created_at).getTime();
+            return dateSort === 'newest' ? dateB - dateA : dateA - dateB;
+        });
 
     // Stats
     const stats = {
@@ -160,7 +176,21 @@ export const AdminLeadsPage = () => {
                                         <h2 className={`text-xl sm:text-2xl font-bold ${textMain}`}>{selectedClient.name} Leads</h2>
                                         <p className={`text-xs sm:text-sm ${textSub}`}>Manage leads captured by the AI agent.</p>
                                     </div>
-                                    <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                                    <div className="flex flex-wrap gap-2 w-full sm:w-auto items-center">
+                                        <button
+                                            onClick={async () => {
+                                                if (!selectedClient) return;
+                                                setLeadsLoading(true);
+                                                const data = await getTenantLeads(selectedClient.id);
+                                                setLeads(data);
+                                                setLeadsLoading(false);
+                                            }}
+                                            disabled={leadsLoading}
+                                            className={`p-2 rounded-lg border transition-colors ${isDark ? 'border-slate-700 hover:bg-slate-800 text-slate-400' : 'border-gray-200 hover:bg-gray-50 text-gray-500'}`}
+                                            title="Refresh Leads"
+                                        >
+                                            <RefreshCw size={16} className={`${leadsLoading ? 'animate-spin' : ''}`} />
+                                        </button>
                                         {['new', 'qualified', 'disqualified'].map(s => (
                                             <div key={s} className={`px-2 sm:px-3 py-1 rounded-lg border text-xs font-medium flex items-center gap-1 sm:gap-2 ${borderClass}`}>
                                                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-red-500'
@@ -183,16 +213,36 @@ export const AdminLeadsPage = () => {
                                             onChange={(e) => setLeadSearch(e.target.value)}
                                         />
                                     </div>
-                                    <select
-                                        className={`px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200'}`}
-                                        value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value)}
-                                    >
-                                        <option value="all">All Statuses</option>
-                                        <option value="new">New</option>
-                                        <option value="qualified">Qualified</option>
-                                        <option value="disqualified">Disqualified</option>
-                                    </select>
+                                    <div className="flex gap-2">
+                                        <select
+                                            className={`px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200'}`}
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                        >
+                                            <option value="all">All Statuses</option>
+                                            <option value="new">New</option>
+                                            <option value="qualified">Qualified</option>
+                                            <option value="disqualified">Disqualified</option>
+                                        </select>
+                                        <select
+                                            className={`px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200'}`}
+                                            value={priorityFilter}
+                                            onChange={(e) => setPriorityFilter(e.target.value)}
+                                        >
+                                            <option value="all">All Priorities</option>
+                                            <option value="high">High</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="low">Low</option>
+                                        </select>
+                                        <select
+                                            className={`px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200'}`}
+                                            value={dateSort}
+                                            onChange={(e) => setDateSort(e.target.value as 'newest' | 'oldest')}
+                                        >
+                                            <option value="newest">Newest First</option>
+                                            <option value="oldest">Oldest First</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
@@ -229,7 +279,9 @@ export const AdminLeadsPage = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
-                                                    {(lead as any).metadata?.s2_lead_output?.lead_priority ? (
+                                                    {(lead as any).metadata?.s3_lead_output?.lead_priority ? (
+                                                        <PriorityBadge priority={(lead as any).metadata.s3_lead_output.lead_priority} />
+                                                    ) : (lead as any).metadata?.s2_lead_output?.lead_priority ? (
                                                         <PriorityBadge priority={(lead as any).metadata.s2_lead_output.lead_priority} />
                                                     ) : (
                                                         <span className={`text-xs ${textSub}`}>—</span>
@@ -285,7 +337,9 @@ export const AdminLeadsPage = () => {
                                                 <option value="qualified">Qualified</option>
                                                 <option value="disqualified">Disqualified</option>
                                             </select>
-                                            {(selectedLead as any).metadata?.s2_lead_output && typeof (selectedLead as any).metadata.s2_lead_output === 'object' && (selectedLead as any).metadata.s2_lead_output.lead_priority && (
+                                            {(selectedLead as any).metadata?.s3_lead_output?.lead_priority ? (
+                                                <PriorityBadge priority={(selectedLead as any).metadata.s3_lead_output.lead_priority} />
+                                            ) : (selectedLead as any).metadata?.s2_lead_output?.lead_priority && (
                                                 <PriorityBadge priority={(selectedLead as any).metadata.s2_lead_output.lead_priority} />
                                             )}
                                         </div>
@@ -328,10 +382,10 @@ export const AdminLeadsPage = () => {
                                 {activeTab === 'overview' ? (
                                     <div className="p-6 space-y-8">
 
-                                        {/* 1. S2 Intelligence (Top Priority) */}
-                                        {(selectedLead as any).metadata?.s2_lead_output && (
+                                        {/* 1. Lead Intelligence (S3 Only) */}
+                                        {(selectedLead as any).metadata?.s3_lead_output && (
                                             <section className="animate-fade-in-up">
-                                                <S2LeadInsights data={(selectedLead as any).metadata.s2_lead_output} isDark={isDark} />
+                                                <S3LeadInsights data={(selectedLead as any).metadata.s3_lead_output} isDark={isDark} />
                                             </section>
                                         )}
 
@@ -339,13 +393,6 @@ export const AdminLeadsPage = () => {
                                         <section>
                                             <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Contact Details</h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <Mail size={16} className="text-gray-400" />
-                                                        <span className={`text-xs ${textSub}`}>Email</span>
-                                                    </div>
-                                                    <div className={`text-sm font-medium truncate ${textMain}`}>{(selectedLead as any).email || '—'}</div>
-                                                </div>
                                                 <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
                                                     <div className="flex items-center gap-3 mb-1">
                                                         <Phone size={16} className="text-gray-400" />
@@ -369,7 +416,8 @@ export const AdminLeadsPage = () => {
                                                 <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Captured Data</h4>
                                                 <div className="grid grid-cols-1 gap-3">
                                                     {Object.entries((selectedLead as any).metadata)
-                                                        .filter(([key]) => key !== 's2_lead_output')
+                                                        .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 'email')
+                                                        .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
                                                         .map(([key, value], i) => {
                                                             let displayKey = key.replace(/_/g, ' ');
                                                             let displayValue = '';

@@ -24,6 +24,11 @@ export const chatService = {
         return res.data;
     },
 
+    getTenantConversationCount: async (tenantId: string): Promise<number> => {
+        const res = await api.get<{ count: number }>(`/chat/tenants/${tenantId}/conversations/count`);
+        return res.data.count;
+    },
+
     getConversation: async (conversationId: string): Promise<Conversation> => {
         const res = await api.get<Conversation>(`/chat/conversations/${conversationId}`);
         return res.data;

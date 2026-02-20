@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Search, User, MessageSquare, Phone, Mail, Calendar,
-    ArrowLeft, X, Layout, ChevronRight, CheckCircle, Clock, Filter
+    ArrowLeft, X, Layout, ChevronRight, CheckCircle, Clock, Filter, RefreshCw
 } from 'lucide-react';
 import { getTenantLeads, getClientById, updateLeadStatus } from '../services/adminService';
 import { DashboardLead, Client } from '../types/admin';
 import ConversationViewer from '../components/admin/ConversationViewer';
 import { PriorityBadge } from '../components/admin/PriorityBadge';
-import { S2LeadInsights } from '../components/admin/S2LeadInsights';
+import { S3LeadInsights } from '../components/admin/S3LeadInsights';
 
 export const ClientLeadsPage = () => {
     const { tenantId } = useParams<{ tenantId: string }>();
@@ -20,10 +20,13 @@ export const ClientLeadsPage = () => {
     const [leads, setLeads] = useState<DashboardLead[]>([]);
     const [selectedLead, setSelectedLead] = useState<DashboardLead | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
     // Filters
     const [leadSearch, setLeadSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [priorityFilter, setPriorityFilter] = useState('all');
+    const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest');
 
     // Load Client & Leads
     useEffect(() => {
@@ -80,13 +83,26 @@ export const ClientLeadsPage = () => {
     };
 
     // Filter Logic
-    const filteredLeads = leads.filter(l => {
-        const matchesSearch = l.name.toLowerCase().includes(leadSearch.toLowerCase()) ||
-            (l as any).email?.toLowerCase().includes(leadSearch.toLowerCase()) ||
-            (l as any).phone?.includes(leadSearch);
-        const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const filteredLeads = leads
+        .filter(l => {
+            const matchesSearch = l.name.toLowerCase().includes(leadSearch.toLowerCase()) ||
+                (l as any).email?.toLowerCase().includes(leadSearch.toLowerCase()) ||
+                (l as any).phone?.includes(leadSearch);
+            const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
+
+            const leadPriority = ((l as any).metadata?.s3_lead_output?.lead_priority ||
+                (l as any).metadata?.s2_lead_output?.lead_priority ||
+                (l as any).metadata?._s3_priority ||
+                (l as any).metadata?._s2_priority)?.toLowerCase();
+            const matchesPriority = priorityFilter === 'all' || leadPriority === priorityFilter;
+
+            return matchesSearch && matchesStatus && matchesPriority;
+        })
+        .sort((a, b) => {
+            const dateA = new Date(a.created_at).getTime();
+            const dateB = new Date(b.created_at).getTime();
+            return dateSort === 'newest' ? dateB - dateA : dateA - dateB;
+        });
 
     if (loading) {
         return (
@@ -151,9 +167,41 @@ export const ClientLeadsPage = () => {
                                     <option value="qualified">Qualified</option>
                                     <option value="disqualified">Disqualified</option>
                                 </select>
+                                <select
+                                    className="px-3 py-2 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                    value={priorityFilter}
+                                    onChange={(e) => setPriorityFilter(e.target.value)}
+                                >
+                                    <option value="all">All Priorities</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                                <select
+                                    className="px-3 py-2 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                    value={dateSort}
+                                    onChange={(e) => setDateSort(e.target.value as 'newest' | 'oldest')}
+                                >
+                                    <option value="newest">Newest First</option>
+                                    <option value="oldest">Oldest First</option>
+                                </select>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <button
+                                    onClick={async () => {
+                                        if (!tenantId) return;
+                                        setRefreshing(true);
+                                        const leadsData = await getTenantLeads(tenantId);
+                                        setLeads(leadsData);
+                                        setRefreshing(false);
+                                    }}
+                                    disabled={refreshing}
+                                    className="p-2 rounded-lg border border-gray-100 bg-white hover:bg-gray-50 text-gray-500 transition-colors"
+                                    title="Refresh Leads"
+                                >
+                                    <RefreshCw size={16} className={`${refreshing ? 'animate-spin' : ''}`} />
+                                </button>
                                 {['new', 'qualified', 'disqualified'].map(s => (
                                     <div key={s} className="px-2 sm:px-3 py-1 rounded-lg border border-gray-100 text-xs font-medium flex items-center gap-1 sm:gap-2 bg-gray-50">
                                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s === 'new' ? 'bg-blue-500' : s === 'qualified' ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -179,45 +227,52 @@ export const ClientLeadsPage = () => {
                                 <tbody className="divide-y divide-gray-50">
                                     {filteredLeads.length === 0 ? (
                                         <tr><td colSpan={6} className="p-8 text-center text-gray-500">No leads found.</td></tr>
-                                    ) : filteredLeads.map(lead => (
-                                        <tr
-                                            key={lead.id}
-                                            onClick={() => handleSelectLead(lead)}
-                                            className={`group transition-colors cursor-pointer hover:bg-gray-50 ${selectedLead?.id === lead.id ? 'bg-indigo-50 hover:bg-indigo-50' : ''}`}
-                                        >
-                                            <td className="px-3 sm:px-6 py-4 font-medium">
-                                                <div className="text-gray-900">{lead.name}</div>
-                                            </td>
-                                            <td className="px-3 sm:px-6 py-4">
-                                                <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
+                                    ) : filteredLeads.map(lead => {
+                                        const leadPriority = (lead as any).metadata?.s3_lead_output?.lead_priority ||
+                                            (lead as any).metadata?.s2_lead_output?.lead_priority ||
+                                            (lead as any).metadata?._s3_priority ||
+                                            (lead as any).metadata?._s2_priority;
+
+                                        return (
+                                            <tr
+                                                key={lead.id}
+                                                onClick={() => handleSelectLead(lead)}
+                                                className={`group transition-colors cursor-pointer hover:bg-gray-50 ${selectedLead?.id === lead.id ? 'bg-indigo-50 hover:bg-indigo-50' : ''}`}
+                                            >
+                                                <td className="px-3 sm:px-6 py-4 font-medium">
+                                                    <div className="text-gray-900">{lead.name}</div>
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4">
+                                                    <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
                                                     ${lead.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                                                        lead.status === 'qualified' ? 'bg-green-100 text-green-800' :
-                                                            lead.status === 'disqualified' ? 'bg-red-100 text-red-800' :
-                                                                'bg-gray-100 text-gray-800'}`}>
-                                                    {lead.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
-                                                {(lead as any).metadata?.s2_lead_output?.lead_priority ? (
-                                                    <PriorityBadge priority={(lead as any).metadata.s2_lead_output.lead_priority} />
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 sm:px-6 py-4 hidden sm:table-cell">
-                                                <div className="space-y-1">
-                                                    {(lead as any).email && <div className="flex items-center gap-2 text-xs text-gray-500"><Mail size={12} /> <span className="truncate max-w-[200px]">{(lead as any).email}</span></div>}
-                                                    {(lead as any).phone && <div className="flex items-center gap-2 text-xs text-gray-500"><Phone size={12} /> {(lead as any).phone}</div>}
-                                                </div>
-                                            </td>
-                                            <td className="px-3 sm:px-6 py-4 text-xs text-gray-500 hidden md:table-cell">
-                                                {new Date(lead.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-3 sm:px-6 py-4 text-right">
-                                                <ChevronRight size={16} className={`text-gray-300 group-hover:text-indigo-600 transition-colors ${selectedLead?.id === lead.id ? 'text-indigo-600' : ''}`} />
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                            lead.status === 'qualified' ? 'bg-green-100 text-green-800' :
+                                                                lead.status === 'disqualified' ? 'bg-red-100 text-red-800' :
+                                                                    'bg-gray-100 text-gray-800'}`}>
+                                                        {lead.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
+                                                    {leadPriority ? (
+                                                        <PriorityBadge priority={leadPriority} />
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4 hidden sm:table-cell">
+                                                    <div className="space-y-1">
+                                                        {(lead as any).email && <div className="flex items-center gap-2 text-xs text-gray-500"><Mail size={12} /> <span className="truncate max-w-[200px]">{(lead as any).email}</span></div>}
+                                                        {(lead as any).phone && <div className="flex items-center gap-2 text-xs text-gray-500"><Phone size={12} /> {(lead as any).phone}</div>}
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4 text-xs text-gray-500 hidden md:table-cell">
+                                                    {new Date(lead.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4 text-right">
+                                                    <ChevronRight size={16} className={`text-gray-300 group-hover:text-indigo-600 transition-colors ${selectedLead?.id === lead.id ? 'text-indigo-600' : ''}`} />
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -240,6 +295,17 @@ export const ClientLeadsPage = () => {
                                             <option value="qualified">Qualified</option>
                                             <option value="disqualified">Disqualified</option>
                                         </select>
+                                        {((selectedLead as any).metadata?.s3_lead_output?.lead_priority ||
+                                            (selectedLead as any).metadata?.s2_lead_output?.lead_priority ||
+                                            (selectedLead as any).metadata?._s3_priority ||
+                                            (selectedLead as any).metadata?._s2_priority) && (
+                                                <PriorityBadge priority={
+                                                    (selectedLead as any).metadata?.s3_lead_output?.lead_priority ||
+                                                    (selectedLead as any).metadata?.s2_lead_output?.lead_priority ||
+                                                    (selectedLead as any).metadata?._s3_priority ||
+                                                    (selectedLead as any).metadata?._s2_priority
+                                                } />
+                                            )}
                                     </div>
                                 </div>
                                 <button onClick={() => handleSelectLead(null)} className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 ml-2">
@@ -273,7 +339,8 @@ export const ClientLeadsPage = () => {
                                         <h4 className="text-sm font-semibold text-gray-900 mb-3">Collected Data</h4>
                                         <div className="rounded-xl border border-gray-100 overflow-hidden">
                                             {Object.entries((selectedLead as any).metadata)
-                                                .filter(([key]) => key !== 's2_lead_output')
+                                                .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 'email')
+                                                .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
                                                 .map(([key, value], i) => {
                                                     let displayKey = key.replace(/_/g, ' ');
                                                     let displayValue = '';
@@ -295,9 +362,11 @@ export const ClientLeadsPage = () => {
                                     </div>
                                 )}
 
-                                {/* S2 Lead Intelligence */}
-                                {(selectedLead as any).metadata?.s2_lead_output && (
-                                    <S2LeadInsights data={(selectedLead as any).metadata.s2_lead_output} />
+                                {/* S3 Lead Intelligence */}
+                                {(selectedLead as any).metadata?.s3_lead_output && (
+                                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                        <S3LeadInsights data={(selectedLead as any).metadata.s3_lead_output} isDark={false} />
+                                    </div>
                                 )}
 
                                 {/* Conversation History */}

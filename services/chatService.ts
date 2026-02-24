@@ -45,7 +45,7 @@ export const chatService = {
         // Backend Message: { message_id, conversation_id, role, content, sources, created_at, ... }
         // Frontend Message: { id, role, text, timestamp, ... }
 
-        const res = await api.get<any[]>(`/chat/conversations/${conversationId}/messages`);
+        const res = await api.get<any[]>(`/chat/conversations/${conversationId}/messages?limit=1000`);
 
         return res.data.map(msg => ({
             id: msg.message_id,

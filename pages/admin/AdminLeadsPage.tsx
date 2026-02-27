@@ -230,9 +230,9 @@ export const AdminLeadsPage = () => {
                                             onChange={(e) => setPriorityFilter(e.target.value)}
                                         >
                                             <option value="all">All Priorities</option>
-                                            <option value="high">High</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="low">Low</option>
+                                            <option value="high">Hot Lead</option>
+                                            <option value="medium">Warm Lead</option>
+                                            <option value="low">Cold Lead</option>
                                         </select>
                                         <select
                                             className={`px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200'}`}

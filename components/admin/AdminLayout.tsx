@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, User as UserIcon, Settings, LogOut, Bell, Sun, Moon, HelpCircle, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, User as UserIcon, Settings, LogOut, Bell, Sun, Moon, HelpCircle, Building2, AlertCircle } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { NotificationPopover } from './NotificationPopover';
 
 export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { logout, user } = useAdminAuth();
+    const { logout, user, sessionExpired } = useAdminAuth();
     const { isDark, toggleTheme } = useAdminTheme();
     const navigate = useNavigate();
     const location = useLocation();
@@ -153,6 +153,22 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                         </div>
                     </div>
                 </header>
+
+                {/* Session Expired Warning Banner */}
+                {sessionExpired && (
+                    <div className="sticky top-16 z-30 w-full bg-amber-500 text-amber-950 px-6 py-2.5 flex items-center justify-between gap-4 shadow-md">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <AlertCircle size={16} className="flex-shrink-0" />
+                            <span>Your session has expired. You can keep working, but please save your changes and log in again to continue.</span>
+                        </div>
+                        <button
+                            onClick={() => { logout(); navigate('/admin/login'); }}
+                            className="text-xs font-bold underline whitespace-nowrap hover:opacity-75 transition-opacity"
+                        >
+                            Log In Again
+                        </button>
+                    </div>
+                )}
 
                 <div className="p-8">
                     {children}

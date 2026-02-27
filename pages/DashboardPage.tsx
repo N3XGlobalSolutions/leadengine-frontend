@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Users, CheckCircle, MessageSquare, ArrowUpRight, MoreHorizontal, Clock, ChevronRight, LogOut, TrendingUp, Sparkles } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getDashboardMetrics, getDailyMetrics, getRecentLeads, getClientById } from '../services/adminService';
+import { getDashboardMetrics, getDailyMetrics, getRecentLeads, getClientById, getTenantLeads } from '../services/adminService';
 import { DashboardMetrics, DailyMetric, DashboardLead, Client } from '../types/admin';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 
@@ -94,6 +94,7 @@ export const DashboardPage = () => {
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
     const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
     const [recentLeads, setRecentLeads] = useState<DashboardLead[]>([]);
+    const [allLeads, setAllLeads] = useState<DashboardLead[]>([]);
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState('7');
 
@@ -112,6 +113,13 @@ export const DashboardPage = () => {
                 setMetrics(metricsData);
                 setDailyMetrics(dailyData);
                 setRecentLeads(leadsData);
+
+                // Fetch all leads for priority breakdown (S2/S3 only)
+                const plan = clientData?.plan;
+                if (plan === 'S2' || plan === 'S3') {
+                    const all = await getTenantLeads(tenantId);
+                    setAllLeads(all);
+                }
             } catch (err) {
                 console.error("Failed to fetch dashboard data", err);
             } finally {
@@ -149,11 +157,23 @@ export const DashboardPage = () => {
 
     const config = client.config;
     const companyName = config.companyName || client.name;
-    // Hot leads are qualified leads
+    const isS2orS3 = client.plan === 'S2' || client.plan === 'S3';
+
+    // Priority breakdown from AI metadata (S2/S3)
+    const getPriority = (lead: DashboardLead) =>
+        (lead.metadata?.s3_lead_output?.lead_priority ||
+            lead.metadata?.s2_lead_output?.lead_priority ||
+            lead.metadata?._s3_priority ||
+            lead.metadata?._s2_priority || '').toLowerCase();
+
+    const hotLeadsCount = isS2orS3 ? allLeads.filter(l => getPriority(l) === 'high').length : metrics.leads_by_status.qualified;
+    const warmLeadsCount = isS2orS3 ? allLeads.filter(l => getPriority(l) === 'medium').length : 0;
+    const coldLeadsCount = isS2orS3 ? allLeads.filter(l => getPriority(l) === 'low').length : metrics.leads_by_status.new + metrics.leads_by_status.disqualified;
+
+    // Qualification rate
     const hotLeads = metrics.leads_by_status.qualified;
-    // Cold leads are new (not yet contacted) + disqualified (rejected)
     const coldLeads = metrics.leads_by_status.new + metrics.leads_by_status.disqualified;
-    const totalLeads = metrics.leads || 1; // Avoid div by zero
+    const totalLeads = metrics.leads || 1;
     const qualRate = Math.round((hotLeads / totalLeads) * 100);
 
     return (
@@ -310,16 +330,60 @@ export const DashboardPage = () => {
                                 ></div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 hover:shadow-lg transition-shadow">
-                                    <p className="text-xs text-emerald-700 font-bold mb-2 uppercase tracking-wide">Hot Leads</p>
-                                    <p className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{hotLeads}</p>
+                            {isS2orS3 ? (
+                                // S2/S3: Status row + AI priority breakdown
+                                <div className="space-y-4">
+                                    {/* Row 1: Qualified / Disqualified */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-3.5 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 hover:shadow-md transition-shadow">
+                                            <p className="text-xs text-emerald-700 font-bold mb-1 uppercase tracking-wide">Qualified</p>
+                                            <p className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{metrics.leads_by_status.qualified}</p>
+                                        </div>
+                                        <div className="p-3.5 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border border-red-200 hover:shadow-md transition-shadow">
+                                            <p className="text-xs text-red-700 font-bold mb-1 uppercase tracking-wide">Disqualified</p>
+                                            <p className="text-2xl font-black bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">{metrics.leads_by_status.disqualified}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Divider + AI label */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-px bg-gray-200" />
+                                        <span className="text-xs text-gray-400 font-semibold uppercase tracking-widest whitespace-nowrap">AI Priority</span>
+                                        <div className="flex-1 h-px bg-gray-200" />
+                                    </div>
+
+                                    {/* Row 2: Hot / Warm / Cold */}
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="p-3 bg-transparent rounded-xl border border-emerald-500 hover:shadow-md transition-shadow text-center">
+                                            <p className="text-xs text-emerald-700 font-bold mb-1 uppercase tracking-wide">Hot</p>
+                                            <p className="text-2xl font-black text-emerald-700">{hotLeadsCount}</p>
+                                            <p className="text-[10px] text-emerald-600 mt-0.5">leads</p>
+                                        </div>
+                                        <div className="p-3 bg-transparent rounded-xl border border-amber-500 hover:shadow-md transition-shadow text-center">
+                                            <p className="text-xs text-amber-700 font-bold mb-1 uppercase tracking-wide">Warm</p>
+                                            <p className="text-2xl font-black text-amber-700">{warmLeadsCount}</p>
+                                            <p className="text-[10px] text-amber-600 mt-0.5">leads</p>
+                                        </div>
+                                        <div className="p-3 bg-transparent rounded-xl border border-rose-500 hover:shadow-md transition-shadow text-center">
+                                            <p className="text-xs text-rose-700 font-bold mb-1 uppercase tracking-wide">Cold</p>
+                                            <p className="text-2xl font-black text-rose-700">{coldLeadsCount}</p>
+                                            <p className="text-[10px] text-rose-600 mt-0.5">leads</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="p-4 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border border-red-200 hover:shadow-lg transition-shadow">
-                                    <p className="text-xs text-red-700 font-bold mb-2 uppercase tracking-wide">Cold Leads</p>
-                                    <p className="text-2xl font-black bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">{coldLeads}</p>
+                            ) : (
+                                // S1: Original two-column Hot / Cold
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 hover:shadow-lg transition-shadow">
+                                        <p className="text-xs text-emerald-700 font-bold mb-2 uppercase tracking-wide">Hot Leads</p>
+                                        <p className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{hotLeads}</p>
+                                    </div>
+                                    <div className="p-4 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border border-red-200 hover:shadow-lg transition-shadow">
+                                        <p className="text-xs text-red-700 font-bold mb-2 uppercase tracking-wide">Cold Leads</p>
+                                        <p className="text-2xl font-black bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">{coldLeads}</p>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Quick Actions */}

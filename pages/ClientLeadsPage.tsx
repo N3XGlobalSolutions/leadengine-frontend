@@ -173,9 +173,9 @@ export const ClientLeadsPage = () => {
                                     onChange={(e) => setPriorityFilter(e.target.value)}
                                 >
                                     <option value="all">All Priorities</option>
-                                    <option value="high">High</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="low">Low</option>
+                                    <option value="high">Hot Lead</option>
+                                    <option value="medium">Warm Lead</option>
+                                    <option value="low">Cold Lead</option>
                                 </select>
                                 <select
                                     className="px-3 py-2 rounded-lg text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"

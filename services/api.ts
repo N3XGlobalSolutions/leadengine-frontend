@@ -12,21 +12,25 @@ export const api = axios.create({
 });
 
 // --- Token Refresh State ---
-let isRefreshing = false;
+// Singleton promise: ensures only ONE refresh call is in flight at a time,
+// even when multiple concurrent requests all hit 401 simultaneously.
+let refreshPromise: Promise<string> | null = null;
+
+// Queue of requests waiting for a refresh to complete
 let failedQueue: Array<{
     resolve: (token: string) => void;
     reject: (error: any) => void;
 }> = [];
 
 /**
- * Process the queue of failed requests after token refresh
+ * Process the queue of failed requests with the result of a refresh attempt
  */
 const processQueue = (error: any, token: string | null = null) => {
-    failedQueue.forEach((promise) => {
+    failedQueue.forEach((prom) => {
         if (error) {
-            promise.reject(error);
+            prom.reject(error);
         } else {
-            promise.resolve(token!);
+            prom.resolve(token!);
         }
     });
     failedQueue = [];
@@ -50,43 +54,45 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle 401 with Token Refresh
+// Response Interceptor: Handle 401 with Token Refresh (no forced redirects)
 api.interceptors.response.use(
     (response: AxiosResponse) => response,
     async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // Only handle 401 errors
+        // Only intercept 401 errors
         if (error.response?.status !== 401) {
             return Promise.reject(error);
         }
 
-        // Prevent infinite loops - if the refresh endpoint itself fails, logout
-        if (originalRequest?.url?.includes('/auth/refresh') || originalRequest?.url?.includes('/auth/login')) {
-            // For login failures, DO NOT redirect - let the UI handle the error
-            if (!originalRequest.url.includes('/auth/login')) {
-                authService.logout();
-                window.location.href = '/admin/login';
-            }
+        // If this is the login or refresh endpoint itself, just reject — don't loop
+        if (
+            originalRequest?.url?.includes('/auth/refresh') ||
+            originalRequest?.url?.includes('/auth/login')
+        ) {
             return Promise.reject(error);
         }
 
-        // Prevent multiple retry attempts on the same request
+        // Prevent double-retrying the same request
         if (originalRequest._retry) {
+            // The retry itself failed — clear tokens so the proactive refresh loop
+            // in AdminAuthContext can detect expiry and show a graceful message.
             authService.logout();
-            window.location.href = '/admin/login';
+            refreshPromise = null;
             return Promise.reject(error);
         }
 
-        // Check if we have a refresh token
+        // If no refresh token is available, clear and reject — let the router handle navigation
         if (!authService.hasRefreshToken()) {
             authService.logout();
-            window.location.href = '/admin/login';
             return Promise.reject(error);
         }
 
-        // If already refreshing, queue this request
-        if (isRefreshing) {
+        // Mark the original request as already retried
+        originalRequest._retry = true;
+
+        // If a refresh is already in flight, queue this request to retry after it resolves
+        if (refreshPromise) {
             return new Promise((resolve, reject) => {
                 failedQueue.push({ resolve, reject });
             })
@@ -97,28 +103,25 @@ api.interceptors.response.use(
                 .catch((err) => Promise.reject(err));
         }
 
-        // Start the refresh process
-        originalRequest._retry = true;
-        isRefreshing = true;
+        // Start a singleton refresh — all concurrent 401s will share this promise
+        refreshPromise = authService.refreshToken().finally(() => {
+            refreshPromise = null;
+        });
 
         try {
-            // Attempt to refresh the token
-            const newToken = await authService.refreshToken();
+            const newToken = await refreshPromise;
 
-            // Process queued requests with new token
+            // Unblock all queued requests with the new token
             processQueue(null, newToken);
 
-            // Retry the original request with new token
+            // Retry the original request
             originalRequest.headers.set('Authorization', `Bearer ${newToken}`);
             return api(originalRequest);
         } catch (refreshError) {
-            // Refresh failed - logout and redirect
+            // Refresh failed — unblock queued requests with error
             processQueue(refreshError, null);
             authService.logout();
-            window.location.href = '/admin/login';
             return Promise.reject(refreshError);
-        } finally {
-            isRefreshing = false;
         }
     }
 );

@@ -6,6 +6,7 @@ import { jwtDecode } from 'jwt-decode';
 interface AdminAuthContextType {
     user: User | null;
     isAuthenticated: boolean;
+    sessionExpired: boolean;
     login: (email: string, password: string) => Promise<void>;
     register: (data: UserRegister) => Promise<void>;
     logout: () => void;
@@ -17,12 +18,13 @@ const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefin
 // Refresh token 5 minutes before expiration
 const REFRESH_BUFFER_SECONDS = 5 * 60;
 
-// Check for token expiration every minute
-const CHECK_INTERVAL_MS = 60 * 1000;
+// Check for token expiration every 5 minutes (token now lasts 12h, no need to check every minute)
+const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [sessionExpired, setSessionExpired] = useState(false);
     const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     /**
@@ -52,35 +54,13 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         try {
             await authService.refreshToken();
             console.log('🔄 Token refreshed proactively');
+            setSessionExpired(false);
             return true;
         } catch (error) {
             console.error('❌ Proactive token refresh failed:', error);
             return false;
         }
     }, []);
-
-    /**
-     * Setup proactive token refresh interval
-     */
-    const setupRefreshInterval = useCallback(() => {
-        // Clear any existing interval
-        if (refreshIntervalRef.current) {
-            clearInterval(refreshIntervalRef.current);
-        }
-
-        // Check token expiration periodically
-        refreshIntervalRef.current = setInterval(async () => {
-            // If token is expiring soon, refresh proactively
-            if (isTokenExpiringSoon(REFRESH_BUFFER_SECONDS)) {
-                const success = await silentRefresh();
-                if (!success && isTokenExpiringSoon(0)) {
-                    // Token actually expired and refresh failed
-                    console.log('⚠️ Session expired, logging out');
-                    handleLogout();
-                }
-            }
-        }, CHECK_INTERVAL_MS);
-    }, [isTokenExpiringSoon, silentRefresh]);
 
     /**
      * Handle logout - clear state and tokens
@@ -92,7 +72,30 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
         authService.logout();
         setUser(null);
+        setSessionExpired(false);
     }, []);
+
+    /**
+     * Setup proactive token refresh interval.
+     * With a 12-hour token, this mostly serves as a safety net.
+     */
+    const setupRefreshInterval = useCallback(() => {
+        if (refreshIntervalRef.current) {
+            clearInterval(refreshIntervalRef.current);
+        }
+
+        refreshIntervalRef.current = setInterval(async () => {
+            if (isTokenExpiringSoon(REFRESH_BUFFER_SECONDS)) {
+                const success = await silentRefresh();
+                if (!success && isTokenExpiringSoon(0)) {
+                    // Token is truly expired and refresh failed — notify the user
+                    // but do NOT wipe their state immediately (they may have unsaved work)
+                    console.log('⚠️ Session expired and refresh failed');
+                    setSessionExpired(true);
+                }
+            }
+        }, CHECK_INTERVAL_MS);
+    }, [isTokenExpiringSoon, silentRefresh]);
 
     // Initial Load: Check for token and try to restore session
     useEffect(() => {
@@ -101,9 +104,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             if (token) {
                 try {
-                    // Check if token is expired
                     if (isTokenExpiringSoon(0)) {
-                        // Token expired - try to refresh
                         console.log('🔄 Token expired on load, attempting refresh...');
                         const refreshed = await silentRefresh();
 
@@ -112,11 +113,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                         }
                     }
 
-                    // Fetch fresh user data from backend
                     const userData = await authService.getCurrentUser();
                     setUser(userData);
-
-                    // Setup proactive refresh
                     setupRefreshInterval();
                 } catch (e) {
                     console.error('Session restoration failed:', e);
@@ -128,7 +126,6 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         initAuth();
 
-        // Cleanup interval on unmount
         return () => {
             if (refreshIntervalRef.current) {
                 clearInterval(refreshIntervalRef.current);
@@ -139,18 +136,14 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const login = async (email: string, password: string) => {
         setIsLoading(true);
         try {
-            // 1. Call API
             const tokens = await authService.login({ email, password });
 
-            // 2. Storage
             localStorage.setItem('access_token', tokens.access_token);
             localStorage.setItem('refresh_token', tokens.refresh_token);
 
-            // 3. Set User State immediately (optimistic or fetch)
             const userData = await authService.getCurrentUser();
             setUser(userData);
-
-            // 4. Setup proactive refresh interval
+            setSessionExpired(false);
             setupRefreshInterval();
         } catch (error) {
             console.error('Login failed:', error);
@@ -164,7 +157,6 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setIsLoading(true);
         try {
             await authService.register(data);
-            // Auto login after register
             await login(data.email, data.password);
         } catch (error) {
             console.error('Registration failed:', error);
@@ -176,13 +168,13 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const logout = () => {
         handleLogout();
-        // Redirect handled by ProtectedRoute or calling component
     };
 
     return (
         <AdminAuthContext.Provider value={{
             user,
             isAuthenticated: !!user,
+            sessionExpired,
             login,
             register,
             logout,

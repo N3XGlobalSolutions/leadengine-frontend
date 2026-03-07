@@ -9,6 +9,7 @@ import { DashboardLead, Client } from '../types/admin';
 import ConversationViewer from '../components/admin/ConversationViewer';
 import { PriorityBadge } from '../components/admin/PriorityBadge';
 import { S3LeadInsights } from '../components/admin/S3LeadInsights';
+import { SkeletonLeadsTable } from '../components/admin/SkeletonLoader';
 
 export const ClientLeadsPage = () => {
     const { tenantId } = useParams<{ tenantId: string }>();
@@ -105,11 +106,7 @@ export const ClientLeadsPage = () => {
         });
 
     if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-        );
+        return <SkeletonLeadsTable rows={8} />;
     }
 
     if (!client) return <div className="text-center p-10">Client not found</div>;

@@ -20,7 +20,8 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // Role-Based Access Control and Tenant Isolation
-    const isPlatformAdmin = user.role === 'platform_admin' || user.role === 'aob_admin';
+    const isPlatformAdmin = user.role === 'platform_admin' || user.role === 'aob_admin' || user.role === 'sales_team';
+    const isSalesTeam = user.role === 'sales_team';
     const isClientUser = user.role === 'client_admin' || user.role === 'client_agent';
 
     // 1. If accessing a specific tenant route
@@ -30,7 +31,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
             // Redirect to their OWN dashboard
             return <Navigate to={`/${user.tenant_id}/dashboard`} replace />;
         }
-        // Platform admin can access any tenant
+        // Platform admin/Sales Team can access any tenant
     }
 
     // 2. If accessing generic admin routes (like /admin)
@@ -38,6 +39,11 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
         if (isClientUser) {
             // Client users shouldn't be in generic admin, send them home
             return <Navigate to={`/${user.tenant_id}/dashboard`} replace />;
+        }
+
+        // Block Sales Team from accessing User Management
+        if (isSalesTeam && location.pathname === '/admin/users') {
+            return <Navigate to="/admin" replace />;
         }
     }
 

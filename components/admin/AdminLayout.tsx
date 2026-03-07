@@ -68,10 +68,12 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                         <Users size={20} />
                         <span>Leads</span>
                     </Link>
-                    <Link to="/admin/users" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/users')}`}>
-                        <UserIcon size={20} />
-                        <span>Users</span>
-                    </Link>
+                    {user?.role !== 'sales_team' && (
+                        <Link to="/admin/users" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/users')}`}>
+                            <UserIcon size={20} />
+                            <span>Users</span>
+                        </Link>
+                    )}
                     <Link to="/admin/settings" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/settings')}`}>
                         <Settings size={20} />
                         <span>Settings</span>

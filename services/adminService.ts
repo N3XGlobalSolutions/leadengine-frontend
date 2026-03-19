@@ -472,7 +472,9 @@ export const generateApiKey = async (tenantId: string): Promise<string> => {
 // --- System Health ---
 export const getSystemHealth = async (): Promise<SystemHealth> => {
     try {
-        const response = await fetch('http://localhost:8000/health');
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+        const healthUrl = baseUrl.replace(/\/api$/, '') + '/health';
+        const response = await fetch(healthUrl);
         if (!response.ok) throw new Error('Health check failed');
         return await response.json();
     } catch (error) {

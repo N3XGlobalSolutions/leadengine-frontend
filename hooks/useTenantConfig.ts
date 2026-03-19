@@ -15,8 +15,8 @@ export const useTenantConfig = (tenantId?: string) => {
         const fetchConfig = async () => {
             try {
                 setLoading(true);
-                // Fetch public welcome config from backend
-                const response = await fetch(`http://localhost:8000/api/tenants/${tenantId}/welcome`);
+                const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                const response = await fetch(`${baseUrl}/tenants/${tenantId}/welcome`);
 
                 if (!response.ok) {
                     throw new Error('Failed to load client configuration');

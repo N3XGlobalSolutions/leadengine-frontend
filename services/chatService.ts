@@ -19,8 +19,10 @@ export const chatService = {
     },
 
     // Admin / Authorized Methods
-    getTenantConversations: async (tenantId: string): Promise<Conversation[]> => {
-        const res = await api.get<Conversation[]>(`/chat/tenants/${tenantId}/conversations`);
+    getTenantConversations: async (tenantId: string, skip: number = 0, limit: number = 100): Promise<Conversation[]> => {
+        const res = await api.get<Conversation[]>(`/chat/tenants/${tenantId}/conversations`, {
+            params: { skip, limit }
+        });
         return res.data;
     },
 

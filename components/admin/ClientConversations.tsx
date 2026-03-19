@@ -15,28 +15,54 @@ interface ClientConversationsProps {
 export const ClientConversations: React.FC<ClientConversationsProps> = ({ clientId, config }) => {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [skip, setSkip] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const LIMIT = 30;
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchConversations = async () => {
-            try {
-                const data = await chatService.getTenantConversations(clientId);
-                // Sort by last message time descending
-                const sorted = data.sort((a, b) =>
-                    new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
-                );
-                setConversations(sorted);
-            } catch (error) {
-                console.error("Failed to fetch conversations", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchConversations = async (currentSkip: number, isInitial: boolean = false) => {
+        try {
+            if (isInitial) setLoading(true);
+            else setLoadingMore(true);
 
+            const data = await chatService.getTenantConversations(clientId, currentSkip, LIMIT);
+
+            // Sort new data by last message time descending
+            const sortedData = data.sort((a, b) =>
+                new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+            );
+
+            if (isInitial) {
+                setConversations(sortedData);
+            } else {
+                setConversations(prev => [...prev, ...sortedData]);
+            }
+
+            // If we received fewer items than the limit, we've reached the end
+            setHasMore(data.length === LIMIT);
+
+        } catch (error) {
+            console.error("Failed to fetch conversations", error);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+
+    useEffect(() => {
         if (clientId) {
-            fetchConversations();
+            setSkip(0);
+            setHasMore(true);
+            fetchConversations(0, true);
         }
     }, [clientId]);
+
+    const handleLoadMore = () => {
+        const nextSkip = skip + LIMIT;
+        setSkip(nextSkip);
+        fetchConversations(nextSkip, false);
+    };
 
     if (loading) {
         return <div className="p-8 text-center text-gray-500">Loading conversations...</div>;
@@ -140,6 +166,25 @@ export const ClientConversations: React.FC<ClientConversationsProps> = ({ client
                         )}
                     </tbody>
                 </table>
+
+                {conversations.length > 0 && hasMore && (
+                    <div className="p-4 border-t border-gray-100 flex justify-center bg-gray-50/50">
+                        <button
+                            onClick={handleLoadMore}
+                            disabled={loadingMore}
+                            className="text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {loadingMore ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                    Loading...
+                                </>
+                            ) : (
+                                'Load More'
+                            )}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

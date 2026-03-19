@@ -184,11 +184,7 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
 
 export const getClients = async (): Promise<Client[]> => {
     try {
-        const res = await api.get('/tenants', {
-            params: { _t: Date.now() } // Cache buster
-        });
-
-        console.log('📦 Fetched Tenants:', res.data); // Debug log
+        const res = await api.get('/tenants');
 
         if (!Array.isArray(res.data)) {
             console.error('Expected array of tenants, got:', res.data);
@@ -412,7 +408,6 @@ export const deleteDocument = async (documentId: string, tenantId: string): Prom
 };
 
 export const getOnboardingData = async (range: '7d' | '30d' = '7d'): Promise<OnboardingData[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
     return range === '7d' ? MOCK_ONBOARDING_DATA_7_DAYS : MOCK_ONBOARDING_DATA_30_DAYS;
 };
 

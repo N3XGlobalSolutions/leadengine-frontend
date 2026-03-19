@@ -13,8 +13,10 @@ import {
     getClientConversationCount
 } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { ClientConversations } from '../../components/admin/ClientConversations';
+import { SkeletonClientDetail } from '../../components/admin/SkeletonLoader';
 
 // System questions that are auto-handled by the state machine
 // These are displayed as visual placeholders but never saved to the backend
@@ -41,6 +43,9 @@ export const AdminClientDetailPage = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
     const { isDark } = useAdminTheme();
+    const { user } = useAdminAuth();
+
+    const isReadOnly = user?.role === 'sales_team';
 
     const [client, setClient] = useState<Client | null>(null);
     const [documents, setDocuments] = useState<TenantDocument[]>([]);
@@ -65,19 +70,17 @@ export const AdminClientDetailPage = () => {
         const fetchClient = async () => {
             if (!clientId) return;
             setLoading(true);
-            const data = await getClientById(clientId);
+
+            // Fetch client data, documents, and conversation count in parallel
+            const [data, docs, count] = await Promise.all([
+                getClientById(clientId),
+                getTenantDocuments(clientId),
+                getClientConversationCount(clientId),
+            ]);
+
             setClient(data);
-
-            // Also fetch documents
-            const docs = await getTenantDocuments(clientId);
             setDocuments(docs);
-
-            // Fetch conversation count
-            setCountLoading(true);
-            const count = await getClientConversationCount(clientId);
             setConversationCount(count);
-            setCountLoading(false);
-
             setLoading(false);
         };
         fetchClient();
@@ -418,9 +421,7 @@ export const AdminClientDetailPage = () => {
     if (loading) {
         return (
             <AdminLayout>
-                <div className={`text-center py-12 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                    Loading client details...
-                </div>
+                <SkeletonClientDetail isDark={isDark} />
             </AdminLayout>
         );
     }
@@ -555,15 +556,15 @@ export const AdminClientDetailPage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className={labelClass}>Client Name</label>
-                                    <input type="text" value={client.name} onChange={(e) => updateField('name', e.target.value)} className={inputClass} />
+                                    <input type="text" value={client.name} onChange={(e) => updateField('name', e.target.value)} className={inputClass} disabled={isReadOnly} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>URL Slug</label>
-                                    <input type="text" value={client.slug} onChange={(e) => updateField('slug', e.target.value)} className={inputClass} />
+                                    <input type="text" value={client.slug} onChange={(e) => updateField('slug', e.target.value)} className={inputClass} disabled={isReadOnly} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Plan</label>
-                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3')} className={inputClass}>
+                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3')} className={inputClass} disabled={isReadOnly}>
                                         <option value="S1">S1 (Starter)</option>
                                         <option value="S2">S2 (Professional)</option>
                                         <option value="S3">S3 (Enterprise)</option>
@@ -571,7 +572,8 @@ export const AdminClientDetailPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Status</label>
-                                    <select value={client.status} onChange={(e) => updateField('status', e.target.value)} className={inputClass}>
+                                    <select value={client.status} onChange={(e) => updateField('status', e.target.value)} className={inputClass} disabled={isReadOnly}>
+                                        <option value="Onboarding">Onboarding</option>
                                         <option value="Active">Active</option>
                                         <option value="Inactive">Inactive</option>
                                         <option value="Paused">Paused</option>
@@ -955,7 +957,7 @@ export const AdminClientDetailPage = () => {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={handleUpload}
-                                            disabled={uploading}
+                                            disabled={uploading || isReadOnly}
                                             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                                         >
                                             {uploading ? 'Uploading...' : 'Confirm Upload'}
@@ -963,6 +965,7 @@ export const AdminClientDetailPage = () => {
                                         <button
                                             onClick={() => setSelectedFile(null)}
                                             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
+                                            disabled={isReadOnly}
                                         >
                                             Cancel
                                         </button>
@@ -979,10 +982,11 @@ export const AdminClientDetailPage = () => {
                                                     setSelectedFile(e.target.files[0]);
                                                 }
                                             }}
+                                            disabled={isReadOnly}
                                         />
                                         <label
                                             htmlFor="detail-file-upload"
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-indigo-700"
+                                            className={`px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium cursor-pointer hover:bg-indigo-700 ${isReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             Select File
                                         </label>

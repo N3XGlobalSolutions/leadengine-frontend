@@ -4,16 +4,19 @@ import { Search, Plus, Building2, Users, Calendar, ChevronRight, Pause, Play, Re
 import { Client } from '@/types/admin';
 import { getClients, getAllClientConversationCounts } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
+import { SkeletonClientsGrid } from '../../components/admin/SkeletonLoader';
 
-export const AdminClientsPage = () => {
+export const AdminClientsPage: React.FC = () => {
+    const { isDark } = useAdminTheme();
+    const { user } = useAdminAuth();
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [conversationCounts, setConversationCounts] = useState<Record<string, number>>({});
     const [countsLoading, setCountsLoading] = useState(false);
-    const { isDark } = useAdminTheme();
 
     // Function to fetch conversation counts
     const fetchConversationCounts = useCallback(async (clientIds: string[]) => {
@@ -117,10 +120,12 @@ export const AdminClientsPage = () => {
                     >
                         <RefreshCw size={20} className={`${loading ? 'animate-spin' : ''}`} />
                     </button>
-                    <Link to="/admin/clients/new" className="inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 transition-all hover:scale-105">
-                        <Plus size={20} className="mr-2" />
-                        Add New Client
-                    </Link>
+                    {user?.role !== 'sales_team' && (
+                        <Link to="/admin/clients/new" className="inline-flex items-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 transition-all hover:scale-105">
+                            <Plus size={20} className="mr-2" />
+                            Add New Client
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -158,9 +163,7 @@ export const AdminClientsPage = () => {
 
             {/* Clients Grid */}
             {loading ? (
-                <div className={`text-center py-12 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                    Loading clients...
-                </div>
+                <SkeletonClientsGrid isDark={isDark} count={6} />
             ) : filteredClients.length === 0 ? (
                 <div className={`text-center py-12 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                     No clients found matching your search.

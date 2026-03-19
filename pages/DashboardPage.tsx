@@ -5,6 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { getDashboardMetrics, getDailyMetrics, getRecentLeads, getClientById, getTenantLeads } from '../services/adminService';
 import { DashboardMetrics, DailyMetric, DashboardLead, Client } from '../types/admin';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
+import { SkeletonDashboard } from '../components/admin/SkeletonLoader';
 
 // Branded Header Component
 const DashboardHeader = ({ companyName, dateRange, setDateRange, onLogout }: any) => {
@@ -103,23 +104,20 @@ export const DashboardPage = () => {
             if (!tenantId) return;
             setLoading(true);
             try {
-                const [clientData, metricsData, dailyData, leadsData] = await Promise.all([
+                // Run all fetches in parallel — getTenantLeads is included speculatively
+                // so S2/S3 users don't pay an extra sequential round-trip
+                const [clientData, metricsData, dailyData, leadsData, allLeadsData] = await Promise.all([
                     getClientById(tenantId),
                     getDashboardMetrics(tenantId),
                     getDailyMetrics(tenantId, parseInt(dateRange)),
-                    getRecentLeads(tenantId)
+                    getRecentLeads(tenantId),
+                    getTenantLeads(tenantId),
                 ]);
                 setClient(clientData);
                 setMetrics(metricsData);
                 setDailyMetrics(dailyData);
                 setRecentLeads(leadsData);
-
-                // Fetch all leads for priority breakdown (S2/S3 only)
-                const plan = clientData?.plan;
-                if (plan === 'S2' || plan === 'S3') {
-                    const all = await getTenantLeads(tenantId);
-                    setAllLeads(all);
-                }
+                setAllLeads(allLeadsData);
             } catch (err) {
                 console.error("Failed to fetch dashboard data", err);
             } finally {
@@ -135,14 +133,7 @@ export const DashboardPage = () => {
     };
 
     if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600 font-medium">Loading Dashboard...</p>
-                </div>
-            </div>
-        );
+        return <SkeletonDashboard />;
     }
 
     if (!client || !metrics || !client.config) {

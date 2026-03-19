@@ -11,8 +11,11 @@ import { useAdminTheme } from '../contexts/AdminThemeContext';
 
 import { useNavigate } from 'react-router-dom';
 
+import { useAdminAuth } from '../contexts/AdminAuthContext';
+
 export const AdminPage = () => {
     const navigate = useNavigate();
+    const { user } = useAdminAuth();
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
     const [spotlightClient, setSpotlightClient] = useState<Client | null>(null);
@@ -21,11 +24,13 @@ export const AdminPage = () => {
 
     useEffect(() => {
         const fetchStats = async () => {
-            const data = await getDashboardStats();
+            const [data, pStats, health] = await Promise.all([
+                getDashboardStats(),
+                getPlatformStats(),
+                getSystemHealth(),
+            ]);
             setStats(data);
-            const pStats = await getPlatformStats();
             setPlatformStats(pStats);
-            const health = await getSystemHealth();
             setSystemHealth(health);
         };
         fetchStats();
@@ -79,17 +84,19 @@ export const AdminPage = () => {
                     />
                 </div>
 
-                <button
-                    onClick={() => navigate('/admin/clients/new')}
-                    className={`w-full p-3 sm:p-4 rounded-xl shadow-lg border flex items-center justify-center transition-all hover:scale-[1.01] hover:shadow-xl group ${isDark
-                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 shadow-indigo-900/30'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-indigo-200'
-                        }`}>
-                    <div className="bg-white/20 p-2 rounded-full mr-3 group-hover:bg-white/30 transition-colors">
-                        <Users size={20} className="text-white" />
-                    </div>
-                    <span className="text-base sm:text-lg font-bold tracking-wide">Add New Client</span>
-                </button>
+                {user?.role !== 'sales_team' && (
+                    <button
+                        onClick={() => navigate('/admin/clients/new')}
+                        className={`w-full p-3 sm:p-4 rounded-xl shadow-lg border flex items-center justify-center transition-all hover:scale-[1.01] hover:shadow-xl group ${isDark
+                            ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 shadow-indigo-900/30'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500 shadow-indigo-200'
+                            }`}>
+                        <div className="bg-white/20 p-2 rounded-full mr-3 group-hover:bg-white/30 transition-colors">
+                            <Users size={20} className="text-white" />
+                        </div>
+                        <span className="text-base sm:text-lg font-bold tracking-wide">Add New Client</span>
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

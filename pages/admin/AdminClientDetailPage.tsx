@@ -64,7 +64,7 @@ export const AdminClientDetailPage = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
-    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | null>(null);
+    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_MAX' | null>(null);
 
     useEffect(() => {
         const fetchClient = async () => {
@@ -311,11 +311,11 @@ export const AdminClientDetailPage = () => {
     };
 
     // --- Plan Change Handler ---
-    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3';
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_MAX';
     const MIN_QUESTIONS = 5;
     const MAX_QUESTIONS = 15;
 
-    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3') => {
+    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_MAX') => {
         if (!client) return;
         const currentQuestionCount = client.config?.leadQualification?.questions?.length || 0;
         const isDowngrade = isS2OrHigher(client.plan) && newPlan === 'S1' && currentQuestionCount > 5;
@@ -342,7 +342,7 @@ export const AdminClientDetailPage = () => {
     const addQuestion = () => {
         if (!client?.config) return;
         const questions = client.config.leadQualification.questions;
-        const limit = client.plan === 'S3' ? 30 : 15;
+        const limit = (client.plan === 'S3' || client.plan === 'S3_MAX') ? 30 : 15;
         if (questions.length >= limit) return;
         const newQ: Question = {
             id: `q${questions.length + 1}`,
@@ -564,10 +564,11 @@ export const AdminClientDetailPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Plan</label>
-                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3')} className={inputClass} disabled={isReadOnly}>
+                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3' | 'S3_MAX')} className={inputClass} disabled={isReadOnly}>
                                         <option value="S1">S1 (Starter)</option>
                                         <option value="S2">S2 (Professional)</option>
                                         <option value="S3">S3 (Enterprise)</option>
+                                        <option value="S3_MAX">S3 Max (Agentic AI)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -794,6 +795,33 @@ export const AdminClientDetailPage = () => {
                     {/* QUALIFICATIONS TAB */}
                     {activeTab === 'qualifications' && (
                         <div className="space-y-6">
+                            {client.plan === 'S3_MAX' ? (
+                                /* S3 Max: AI-generated questions — no manual editor */
+                                <div className={`p-6 rounded-xl border-2 ${isDark ? 'bg-emerald-900/20 border-emerald-700' : 'bg-emerald-50 border-emerald-200'}`}>
+                                    <div className="flex items-start gap-4">
+                                        <div className={`p-3 rounded-full ${isDark ? 'bg-emerald-800' : 'bg-emerald-100'}`}>
+                                            <Sparkles size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                                        </div>
+                                        <div>
+                                            <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>AI-Generated Questions</h3>
+                                            <p className={`text-sm mb-3 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                                                S3 Max uses <strong>Agentic AI</strong> to dynamically generate qualification questions based on your <strong>Knowledge Base</strong> and <strong>Lead Qualification Criteria (LQC)</strong>.
+                                            </p>
+                                            <div className={`space-y-2 text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Questions adapt to each lead's responses in real-time</div>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Strict guardrails: 3–20 questions per session</div>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Early completion when confidence is high (min 5 questions)</div>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> AI evaluates lead as Qualified or Disqualified automatically</div>
+                                            </div>
+                                            <p className={`text-xs mt-4 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                                No manual questions needed — the AI handles everything. Configure your Knowledge Base and LQC in the Knowledge tab.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* Standard plans: manual question editor */
+                                <>
                             <div className={`p-4 rounded-lg flex items-start gap-3 ${isDark ? 'bg-indigo-900/20 border border-indigo-800' : 'bg-indigo-50 border border-indigo-100'}`}>
                                 <Wand2 className="text-indigo-500 mt-1" size={20} />
                                 <div>
@@ -810,9 +838,7 @@ export const AdminClientDetailPage = () => {
 
                             {getDisplayQuestions().map((question, displayIndex) => {
                                 const isSystem = question.isSystemGenerated || false;
-                                // Calculate actual index in the backend questions array (skip system questions)
                                 const actualIndex = isSystem ? -1 : displayIndex - SYSTEM_QUESTIONS.length;
-                                // User-facing number (1-5 for qualification questions)
                                 const userFacingNumber = isSystem ? null : actualIndex + 1;
 
                                 const cardStyle = isSystem
@@ -901,7 +927,7 @@ export const AdminClientDetailPage = () => {
                             })}
 
                             {/* Add Question Button (S2/S3 only, max 15/30) */}
-                            {isS2OrHigher(client.plan) && (client.config?.leadQualification?.questions?.length || 0) < (client.plan === 'S3' ? 30 : 15) && (
+                            {(client.plan === 'S2' || client.plan === 'S3') && (client.config?.leadQualification?.questions?.length || 0) < (client.plan === 'S3' ? 30 : 15) && (
                                 <button
                                     onClick={addQuestion}
                                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors ${isDark
@@ -912,6 +938,8 @@ export const AdminClientDetailPage = () => {
                                     <Plus size={18} />
                                     Add Question ({client.config?.leadQualification?.questions?.length || 0}/{client.plan === 'S3' ? 30 : 15})
                                 </button>
+                            )}
+                                </>
                             )}
                         </div>
                     )}
@@ -1142,14 +1170,21 @@ export const AdminClientDetailPage = () => {
                     {isS2OrHigher(client.plan) && (
                         <div className={cardClass}>
                             <h3 className={`text-sm font-semibold uppercase tracking-wide mb-4 flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                                <Sparkles size={14} /> {client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
+                                <Sparkles size={14} /> {client.plan === 'S3_MAX' ? 'S3 Max Features' : client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
                             </h3>
                             <div className="space-y-2.5">
                                 {[
-                                    'Conversational Transitions',
-                                    'Lead Intelligence',
-                                    'Soft-DQ Handling',
-                                    `Dynamic Questions (${client.config?.leadQualification?.questions?.length || 5})`
+                                    ...(client.plan === 'S3_MAX' ? [
+                                        'Agentic AI Qualification',
+                                        'AI-Generated Questions',
+                                        'Dynamic Lead Evaluation',
+                                        'Confidence-based Completion',
+                                    ] : [
+                                        'Conversational Transitions',
+                                        'Lead Intelligence',
+                                        'Soft-DQ Handling',
+                                        `Dynamic Questions (${client.config?.leadQualification?.questions?.length || 5})`
+                                    ])
                                 ].map((feature) => (
                                     <div key={feature} className="flex items-center gap-2">
                                         <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isDark ? 'bg-green-900/50' : 'bg-green-100'}`}>

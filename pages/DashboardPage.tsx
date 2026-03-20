@@ -148,11 +148,12 @@ export const DashboardPage = () => {
 
     const config = client.config;
     const companyName = config.companyName || client.name;
-    const isS2orS3 = client.plan === 'S2' || client.plan === 'S3';
+    const isS2orS3 = client.plan === 'S2' || client.plan === 'S3' || client.plan === 'S3_MAX';
 
     // Priority breakdown from AI metadata (S2/S3)
     const getPriority = (lead: DashboardLead) =>
-        (lead.metadata?.s3_lead_output?.lead_priority ||
+        (lead.metadata?.s3_max_lead_output?.lead_priority ||
+            lead.metadata?.s3_lead_output?.lead_priority ||
             lead.metadata?.s2_lead_output?.lead_priority ||
             lead.metadata?._s3_priority ||
             lead.metadata?._s2_priority || '').toLowerCase();

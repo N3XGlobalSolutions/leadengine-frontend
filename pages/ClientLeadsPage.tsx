@@ -9,6 +9,7 @@ import { DashboardLead, Client } from '../types/admin';
 import ConversationViewer from '../components/admin/ConversationViewer';
 import { PriorityBadge } from '../components/admin/PriorityBadge';
 import { S3LeadInsights } from '../components/admin/S3LeadInsights';
+import { S3MaxLeadInsights } from '../components/admin/S3MaxLeadInsights';
 import { SkeletonLeadsTable } from '../components/admin/SkeletonLoader';
 
 export const ClientLeadsPage = () => {
@@ -91,7 +92,8 @@ export const ClientLeadsPage = () => {
                 (l as any).phone?.includes(leadSearch);
             const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
 
-            const leadPriority = ((l as any).metadata?.s3_lead_output?.lead_priority ||
+            const leadPriority = ((l as any).metadata?.s3_max_lead_output?.lead_priority ||
+                (l as any).metadata?.s3_lead_output?.lead_priority ||
                 (l as any).metadata?.s2_lead_output?.lead_priority ||
                 (l as any).metadata?._s3_priority ||
                 (l as any).metadata?._s2_priority)?.toLowerCase();
@@ -225,7 +227,8 @@ export const ClientLeadsPage = () => {
                                     {filteredLeads.length === 0 ? (
                                         <tr><td colSpan={6} className="p-8 text-center text-gray-500">No leads found.</td></tr>
                                     ) : filteredLeads.map(lead => {
-                                        const leadPriority = (lead as any).metadata?.s3_lead_output?.lead_priority ||
+                                        const leadPriority = (lead as any).metadata?.s3_max_lead_output?.lead_priority ||
+                                            (lead as any).metadata?.s3_lead_output?.lead_priority ||
                                             (lead as any).metadata?.s2_lead_output?.lead_priority ||
                                             (lead as any).metadata?._s3_priority ||
                                             (lead as any).metadata?._s2_priority;
@@ -292,11 +295,13 @@ export const ClientLeadsPage = () => {
                                             <option value="qualified">Qualified</option>
                                             <option value="disqualified">Disqualified</option>
                                         </select>
-                                        {((selectedLead as any).metadata?.s3_lead_output?.lead_priority ||
+                                        {((selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ||
+                                            (selectedLead as any).metadata?.s3_lead_output?.lead_priority ||
                                             (selectedLead as any).metadata?.s2_lead_output?.lead_priority ||
                                             (selectedLead as any).metadata?._s3_priority ||
                                             (selectedLead as any).metadata?._s2_priority) && (
                                                 <PriorityBadge priority={
+                                                    (selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ||
                                                     (selectedLead as any).metadata?.s3_lead_output?.lead_priority ||
                                                     (selectedLead as any).metadata?.s2_lead_output?.lead_priority ||
                                                     (selectedLead as any).metadata?._s3_priority ||
@@ -336,7 +341,7 @@ export const ClientLeadsPage = () => {
                                         <h4 className="text-sm font-semibold text-gray-900 mb-3">Collected Data</h4>
                                         <div className="rounded-xl border border-gray-100 overflow-hidden">
                                             {Object.entries((selectedLead as any).metadata)
-                                                .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 'email')
+                                                .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 's3_max_lead_output' && key !== 'email')
                                                 .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
                                                 .map(([key, value], i) => {
                                                     let displayKey = key.replace(/_/g, ' ');
@@ -359,8 +364,15 @@ export const ClientLeadsPage = () => {
                                     </div>
                                 )}
 
+                                {/* S3 Max Lead Intelligence */}
+                                {(selectedLead as any).metadata?.s3_max_lead_output && (
+                                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                        <S3MaxLeadInsights data={(selectedLead as any).metadata.s3_max_lead_output} isDark={false} />
+                                    </div>
+                                )}
+
                                 {/* S3 Lead Intelligence */}
-                                {(selectedLead as any).metadata?.s3_lead_output && (
+                                {(selectedLead as any).metadata?.s3_lead_output && !(selectedLead as any).metadata?.s3_max_lead_output && (
                                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                                         <S3LeadInsights data={(selectedLead as any).metadata.s3_lead_output} isDark={false} />
                                     </div>

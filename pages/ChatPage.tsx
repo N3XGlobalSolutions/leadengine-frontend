@@ -195,8 +195,31 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                             </span>
                         </div>
 
-                        {/* ⭐ NEW: Progress Indicator */}
-                        {questionProgress.total > 0 && !isChatEnded && questionProgress.current > 0 && (
+                        {/* ⭐ Progress Indicator */}
+                        {/* S3 Max: Dynamic estimated progress (no fixed total) */}
+                        {questionProgress.estimatedProgress !== null && !isChatEnded && questionProgress.estimatedProgress > 0 && (
+                            <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-gray-700">
+                                        Qualification Progress
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                        Estimated ~{Math.round(questionProgress.estimatedProgress * 100)}% Complete
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                    <div
+                                        className="h-2 rounded-full transition-all duration-700 ease-out"
+                                        style={{
+                                            width: `${Math.min(questionProgress.estimatedProgress * 100, 100)}%`,
+                                            ...themeStyles.progressBarStyle
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {/* S1/S2/S3: Step-based progress (has fixed total) */}
+                        {questionProgress.estimatedProgress === null && questionProgress.total > 0 && !isChatEnded && questionProgress.current > 0 && (
                             <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-sm font-medium text-gray-700">

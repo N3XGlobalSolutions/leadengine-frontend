@@ -26,13 +26,13 @@ export const AddClientPage = () => {
     const [error, setError] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
-    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | null>(null);
+    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_MAX' | null>(null);
 
     // Form state initialized with default 5 questions
     const [formData, setFormData] = useState<{
         name: string;
         slug: string;
-        plan: 'S1' | 'S2' | 'S3';
+        plan: 'S1' | 'S2' | 'S3' | 'S3_MAX';
         config: TenantConfig;
     }>({
         name: '',
@@ -112,11 +112,11 @@ export const AddClientPage = () => {
     };
 
     // --- Plan Change Handler ---
-    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3';
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_MAX';
     const MIN_QUESTIONS = 5;
     const MAX_QUESTIONS = 15;
 
-    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3') => {
+    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_MAX') => {
         const currentQuestionCount = formData.config.leadQualification.questions.length;
         const isDowngrade = isS2OrHigher(formData.plan) && newPlan === 'S1' && currentQuestionCount > 5;
 
@@ -149,7 +149,7 @@ export const AddClientPage = () => {
     // --- Add/Remove Question Handlers (S2/S3 only) ---
     const addQuestion = () => {
         const questions = formData.config.leadQualification.questions;
-        const limit = formData.plan === 'S3' ? 30 : 15;
+        const limit = (formData.plan === 'S3' || formData.plan === 'S3_MAX') ? 30 : 15;
         if (questions.length >= limit) return;
         const newQ: Question = {
             id: `q${questions.length + 1}`,
@@ -177,9 +177,12 @@ export const AddClientPage = () => {
             case 3:
                 return formData.config.welcome.highlightedHeadline.length >= 1;
             case 4:
-                // Knowledge Base - LQC is required
+                // Knowledge Base - LQC is required; Document upload mandatory for S3_MAX
+                if (formData.plan === 'S3_MAX' && !selectedFile) return false;
                 return leadQualificationCriteria.trim().length > 0;
             case 5:
+                // S3_MAX: questions are AI-generated, no manual questions needed
+                if (formData.plan === 'S3_MAX') return true;
                 // Ensure all 5 questions have at least a label and instruction
                 return formData.config.leadQualification.questions.every(q =>
                     q.label.trim().length > 0 && q.instruction.trim().length > 0
@@ -376,12 +379,13 @@ export const AddClientPage = () => {
                                 <label className={labelClass}>Plan</label>
                                 <select
                                     value={formData.plan}
-                                    onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3')}
+                                    onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3' | 'S3_MAX')}
                                     className={inputClass}
                                 >
                                     <option value="S1">S1 (Starter)</option>
                                     <option value="S2">S2 (Professional)</option>
                                     <option value="S3">S3 (Enterprise)</option>
+                                    <option value="S3_MAX">S3 Max (Agentic AI)</option>
                                 </select>
                             </div>
                         </div>
@@ -546,7 +550,8 @@ export const AddClientPage = () => {
                                     />
                                     <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
                                         Define the criteria and prompts used to validate and qualify leads. This will help identify warm leads vs cold leads.
-                                        {formData.plan === 'S3' && <span className="block mt-1 text-indigo-500 font-medium">✨ S3 Lead Intelligence active: The AI will use this criteria for deeper analysis.</span>}
+                                        {(formData.plan === 'S3' || formData.plan === 'S3_MAX') && <span className="block mt-1 text-indigo-500 font-medium">✨ {formData.plan === 'S3_MAX' ? 'S3 Max Agentic AI active: Questions will be AI-generated from your Knowledge Base and this criteria.' : 'S3 Lead Intelligence active: The AI will use this criteria for deeper analysis.'}</span>}
+                                        {formData.plan === 'S3_MAX' && !selectedFile && <span className="block mt-1 text-red-400 font-medium">⚠️ Document upload is required for S3 Max to generate questions.</span>}
                                     </p>
                                 </div>
                             </div>
@@ -557,6 +562,33 @@ export const AddClientPage = () => {
                 {/* Step 5: Qualifications (The Dynamic Part) */}
                 {currentStep === 5 && (
                     <div className="space-y-6">
+                        {formData.plan === 'S3_MAX' ? (
+                            /* S3 Max: AI-generated questions — no manual editor */
+                            <div className={`p-6 rounded-xl border-2 ${isDark ? 'bg-emerald-900/20 border-emerald-700' : 'bg-emerald-50 border-emerald-200'}`}>
+                                <div className="flex items-start gap-4">
+                                    <div className={`p-3 rounded-full ${isDark ? 'bg-emerald-800' : 'bg-emerald-100'}`}>
+                                        <Sparkles size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                                    </div>
+                                    <div>
+                                        <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>AI-Generated Questions</h3>
+                                        <p className={`text-sm mb-3 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                                            S3 Max uses <strong>Agentic AI</strong> to dynamically generate qualification questions based on your <strong>Knowledge Base</strong> and <strong>Lead Qualification Criteria (LQC)</strong>.
+                                        </p>
+                                        <div className={`space-y-2 text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Questions adapt to each lead's responses in real-time</div>
+                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Strict guardrails: 3–20 questions per session</div>
+                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Early completion when confidence is high (min 5 questions)</div>
+                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> AI evaluates lead as Qualified or Disqualified automatically</div>
+                                        </div>
+                                        <p className={`text-xs mt-4 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                            No manual questions needed — the AI handles everything. Make sure your Knowledge Base and LQC are well-configured in the previous step.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Standard plans: manual question editor */
+                            <>
                         <div className={`p-4 rounded-lg flex items-start gap-3 ${isDark ? 'bg-indigo-900/20 border border-indigo-800' : 'bg-indigo-50 border border-indigo-100'}`}>
                             <Wand2 className="text-indigo-500 mt-1" size={20} />
                             <div>
@@ -633,7 +665,7 @@ export const AddClientPage = () => {
                         ))}
 
                         {/* Add Question Button (S2/S3 only, max 15/30) */}
-                        {isS2OrHigher(formData.plan) && formData.config.leadQualification.questions.length < (formData.plan === 'S3' ? 30 : 15) && (
+                        {(formData.plan === 'S2' || formData.plan === 'S3') && formData.config.leadQualification.questions.length < (formData.plan === 'S3' ? 30 : 15) && (
                             <button
                                 onClick={addQuestion}
                                 className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors ${isDark
@@ -644,6 +676,8 @@ export const AddClientPage = () => {
                                 <Plus size={18} />
                                 Add Question ({formData.config.leadQualification.questions.length}/{formData.plan === 'S3' ? 30 : 15})
                             </button>
+                        )}
+                            </>
                         )}
                     </div>
                 )}

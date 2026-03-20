@@ -7,7 +7,7 @@ export interface Client {
     status: 'Active' | 'Inactive' | 'Onboarding' | 'Paused';
     onboardedDate: string;
     totalUsers: number;
-    plan: 'S1' | 'S2' | 'S3';
+    plan: 'S1' | 'S2' | 'S3' | 'S3_MAX';
     config?: TenantConfig;
     createdAt?: string;
     updatedAt?: string;
@@ -16,7 +16,7 @@ export interface Client {
 export interface CreateClientInput {
     name: string;
     slug: string;
-    plan: 'S1' | 'S2' | 'S3';
+    plan: 'S1' | 'S2' | 'S3' | 'S3_MAX';
     config: TenantConfig;
 }
 
@@ -89,6 +89,15 @@ export interface DashboardLead {
         reasoning_summary: string;
         key_objections: string[];
         recommended_next_step: string;
+    };
+    s3_max_lead_output?: {
+        verdict: string;
+        lead_priority: string;
+        reasoning_summary: string;
+        key_objections: string[];
+        recommended_next_step: string;
+        qualification_score: number;
+        dimension_scores?: Record<string, { score: number; notes: string }>;
     };
 }
 

@@ -107,10 +107,12 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         current: number;
         total: number;
         currentStepId: string | null;
+        estimatedProgress: number | null; // S3 Max: 0.0 - 1.0
     }>({
         current: 0,
         total: 0,
-        currentStepId: null
+        currentStepId: null,
+        estimatedProgress: null,
     });
 
     // Track when the session was created (for 24h expiry)
@@ -247,8 +249,17 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
             const isSummary = response.summary_data != null;
             const summaryData = response.summary_data || null;
 
-            // Update progress from backend (explicit state, not parsed from text)
-            if (response.total_steps !== undefined && response.total_steps > 0) {
+            // Update progress from backend
+            if (response.estimated_progress !== undefined && response.estimated_progress !== null) {
+                // S3 Max: Use dynamic estimated progress (0.0 - 1.0)
+                setQuestionProgress(prev => ({
+                    ...prev,
+                    current: response.current_step_index || prev.current,
+                    estimatedProgress: response.estimated_progress!,
+                    currentStepId: response.current_state || prev.currentStepId,
+                }));
+            } else if (response.total_steps !== undefined && response.total_steps > 0) {
+                // S1/S2/S3: Use step-based progress
                 setQuestionProgress(prev => ({
                     ...prev,
                     current: (response.current_step_index || 0) + 1,

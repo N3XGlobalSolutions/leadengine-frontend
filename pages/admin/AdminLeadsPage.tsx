@@ -11,6 +11,7 @@ import ConversationViewer from '../../components/admin/ConversationViewer';
 import { PriorityBadge } from '../../components/admin/PriorityBadge';
 import { S2LeadInsights } from '../../components/admin/S2LeadInsights';
 import { S3LeadInsights } from '../../components/admin/S3LeadInsights';
+import { S3MaxLeadInsights } from '../../components/admin/S3MaxLeadInsights';
 
 export const AdminLeadsPage = () => {
     const { isDark } = useAdminTheme();
@@ -83,7 +84,8 @@ export const AdminLeadsPage = () => {
                 (l as any).email?.toLowerCase().includes(leadSearch.toLowerCase());
             const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
 
-            const leadPriority = ((l as any).metadata?.s3_lead_output?.lead_priority ||
+            const leadPriority = ((l as any).metadata?.s3_max_lead_output?.lead_priority ||
+                (l as any).metadata?.s3_lead_output?.lead_priority ||
                 (l as any).metadata?.s2_lead_output?.lead_priority ||
                 (l as any).metadata?._s3_priority ||
                 (l as any).metadata?._s2_priority)?.toLowerCase();
@@ -279,7 +281,9 @@ export const AdminLeadsPage = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
-                                                    {(lead as any).metadata?.s3_lead_output?.lead_priority ? (
+                                                    {(lead as any).metadata?.s3_max_lead_output?.lead_priority ? (
+                                                        <PriorityBadge priority={(lead as any).metadata.s3_max_lead_output.lead_priority} />
+                                                    ) : (lead as any).metadata?.s3_lead_output?.lead_priority ? (
                                                         <PriorityBadge priority={(lead as any).metadata.s3_lead_output.lead_priority} />
                                                     ) : (lead as any).metadata?.s2_lead_output?.lead_priority ? (
                                                         <PriorityBadge priority={(lead as any).metadata.s2_lead_output.lead_priority} />
@@ -337,7 +341,9 @@ export const AdminLeadsPage = () => {
                                                 <option value="qualified">Qualified</option>
                                                 <option value="disqualified">Disqualified</option>
                                             </select>
-                                            {(selectedLead as any).metadata?.s3_lead_output?.lead_priority ? (
+                                            {(selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ? (
+                                                <PriorityBadge priority={(selectedLead as any).metadata.s3_max_lead_output.lead_priority} />
+                                            ) : (selectedLead as any).metadata?.s3_lead_output?.lead_priority ? (
                                                 <PriorityBadge priority={(selectedLead as any).metadata.s3_lead_output.lead_priority} />
                                             ) : (selectedLead as any).metadata?.s2_lead_output?.lead_priority && (
                                                 <PriorityBadge priority={(selectedLead as any).metadata.s2_lead_output.lead_priority} />
@@ -382,8 +388,13 @@ export const AdminLeadsPage = () => {
                                 {activeTab === 'overview' ? (
                                     <div className="p-6 space-y-8">
 
-                                        {/* 1. Lead Intelligence (S3 Only) */}
-                                        {(selectedLead as any).metadata?.s3_lead_output && (
+                                        {/* 1. Lead Intelligence (S3 Max Priority) */}
+                                        {(selectedLead as any).metadata?.s3_max_lead_output && (
+                                            <section className="animate-fade-in-up">
+                                                <S3MaxLeadInsights data={(selectedLead as any).metadata.s3_max_lead_output} isDark={isDark} />
+                                            </section>
+                                        )}
+                                        {(selectedLead as any).metadata?.s3_lead_output && !(selectedLead as any).metadata?.s3_max_lead_output && (
                                             <section className="animate-fade-in-up">
                                                 <S3LeadInsights data={(selectedLead as any).metadata.s3_lead_output} isDark={isDark} />
                                             </section>
@@ -416,7 +427,7 @@ export const AdminLeadsPage = () => {
                                                 <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Captured Data</h4>
                                                 <div className="grid grid-cols-1 gap-3">
                                                     {Object.entries((selectedLead as any).metadata)
-                                                        .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 'email')
+                                                        .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 's3_max_lead_output' && key !== 'email')
                                                         .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
                                                         .map(([key, value], i) => {
                                                             let displayKey = key.replace(/_/g, ' ');

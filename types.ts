@@ -55,6 +55,18 @@ export interface ChatResponse {
     recommended_next_step: string;  // What sales should do next
   };
   conversational_transition?: string; // S2 acknowledgment before question
+
+  // S3 Max (Agentic) fields
+  s3_max_lead_output?: {
+    verdict: string;                // "QUALIFIED" | "DISQUALIFIED"
+    lead_priority: string;          // "High" | "Medium" | "Low"
+    reasoning_summary: string;
+    key_objections: string[];
+    recommended_next_step: string;
+    qualification_score: number;    // 0-100
+    dimension_scores?: Record<string, { score: number; notes: string }>;
+  };
+  estimated_progress?: number;      // 0.0 - 1.0 for S3 Max dynamic progress bar
 }
 
 export interface Conversation {

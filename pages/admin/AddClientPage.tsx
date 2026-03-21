@@ -702,28 +702,35 @@ export const AddClientPage = () => {
 
                             <div className="pt-4">
                                 <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-2">Lead Qualification Flow</h3>
-                                <p className={`text-xs mb-3 italic ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                    Note: Name and phone are auto-collected by the state machine before these questions.
-                                </p>
-                                <div className="space-y-3">
-                                    {/* Show only the 5 qualification questions */}
-                                    {formData.config.leadQualification.questions.map((q, i) => (
-                                        <div key={i} className="flex gap-3">
-                                            <span className="font-mono text-gray-400">{i + 1}.</span>
-                                            <div>
-                                                <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{q.label}</p>
-                                                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>"{q.instruction}"</p>
-                                                {q.options && q.options.length > 0 && (
-                                                    <div className="flex gap-1 mt-1 flex-wrap">
-                                                        {q.options.map(opt => (
-                                                            <span key={opt} className="text-xs px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">{opt}</span>
-                                                        ))}
+                                {formData.plan === 'S3_MAX' ? (
+                                    <div className={`p-4 rounded-lg border ${isDark ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800'} text-sm`}>
+                                        ✨ <strong>S3 Max — AI-Generated Questions</strong>: The Agentic AI will automatically generate and ask qualification questions based on your Knowledge Base and LQC criteria. No manual questions needed.
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className={`text-xs mb-3 italic ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                            Note: Name and phone are auto-collected by the state machine before these questions.
+                                        </p>
+                                        <div className="space-y-3">
+                                            {formData.config.leadQualification.questions.map((q, i) => (
+                                                <div key={i} className="flex gap-3">
+                                                    <span className="font-mono text-gray-400">{i + 1}.</span>
+                                                    <div>
+                                                        <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{q.label}</p>
+                                                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>"{q.instruction}"</p>
+                                                        {q.options && q.options.length > 0 && (
+                                                            <div className="flex gap-1 mt-1 flex-wrap">
+                                                                {q.options.map(opt => (
+                                                                    <span key={opt} className="text-xs px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">{opt}</span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

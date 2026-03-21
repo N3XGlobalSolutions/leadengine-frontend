@@ -88,10 +88,11 @@ const mapTenantToClient = (tenant: any): Client => {
     // Backend returns config with flat fields (snake_case)
     const backendConfig = tenant.config || {};
 
-    const planMap: Record<string, 'S1' | 'S2' | 'S3'> = {
+    const planMap: Record<string, 'S1' | 'S2' | 'S3' | 'S3_MAX'> = {
         'S1': 'S1',
         'S2': 'S2',
-        'S3': 'S3'
+        'S3': 'S3',
+        'S3_MAX': 'S3_MAX'
     };
 
     // Transform to Frontend TenantConfig (nested, camelCase)
@@ -150,7 +151,7 @@ const mapTenantToClient = (tenant: any): Client => {
         status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), // Use backend status if available
         onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         totalUsers: 0,
-        plan: planMap[backendConfig.plan] || 'S1',
+        plan: (planMap[backendConfig.plan] || 'S1') as 'S1' | 'S2' | 'S3' | 'S3_MAX',
         config: frontendConfig
     };
 };
@@ -271,20 +272,21 @@ export const updateClient = async (client: Client): Promise<Client> => {
         sub_headline: client.config?.welcome?.subheadline,
         key_features: client.config?.welcome?.features,
 
-        // Qualifications
-        qualification_questions: client.config?.leadQualification?.questions?.map(q => ({
-
-            id: q.id,
-            label: q.label,
-            instruction: q.instruction,
-            collects: q.collects || [],
-            quick_replies: q.options?.map((opt, idx) => ({
-                id: String(idx + 1),
-                text: opt,
-                value: opt
+        // Qualifications — S3_MAX uses AI-generated questions, no manual list needed
+        qualification_questions: client.plan === 'S3_MAX'
+            ? []
+            : client.config?.leadQualification?.questions?.map(q => ({
+                id: q.id,
+                label: q.label,
+                instruction: q.instruction,
+                collects: q.collects || [],
+                quick_replies: q.options?.map((opt, idx) => ({
+                    id: String(idx + 1),
+                    text: opt,
+                    value: opt
+                })) || [],
+                required: true
             })) || [],
-            required: true
-        })),
 
         language: client.config?.language || "en",
         tone: client.config?.tone || "professional",
@@ -347,18 +349,21 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
             sub_headline: clientData.config.welcome.subheadline,
             key_features: clientData.config.welcome.features,
 
-            qualification_questions: clientData.config.leadQualification.questions.map(q => ({
-                id: q.id,
-                label: q.label,
-                instruction: q.instruction,
-                collects: q.collects || [],
-                quick_replies: q.options?.map((opt, idx) => ({
-                    id: String(idx + 1),
-                    text: opt,
-                    value: opt
-                })) || [],
-                required: true
-            })),
+            // S3_MAX uses AI-generated questions, no manual list needed
+            qualification_questions: clientData.plan === 'S3_MAX'
+                ? []
+                : clientData.config.leadQualification.questions.map(q => ({
+                    id: q.id,
+                    label: q.label,
+                    instruction: q.instruction,
+                    collects: q.collects || [],
+                    quick_replies: q.options?.map((opt, idx) => ({
+                        id: String(idx + 1),
+                        text: opt,
+                        value: opt
+                    })) || [],
+                    required: true
+                })),
 
             welcome_message: `${clientData.config.welcome.headline} ${clientData.config.welcome.highlightedHeadline}`,
             language: "en",

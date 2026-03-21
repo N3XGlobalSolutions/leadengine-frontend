@@ -277,9 +277,10 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 isSoftDQ: isSoftDQ,
             });
 
-            // If lead captured, log for verification
+            // If lead captured, log for verification and end the chat input
             if (isLeadCaptured) {
                 console.log('✅ Lead captured! Backend confirmed via show_actions flag.');
+                setIsChatEnded(true);
             }
 
             // Use quick replies from backend if provided, otherwise fall back to keyword matching

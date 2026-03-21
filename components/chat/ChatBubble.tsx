@@ -150,7 +150,8 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                 // Rest of data excluding name, phone, and internal fields
                 const remainingData = Object.entries(message.summaryData || {}).filter(([key]) => {
                   const lower = key.toLowerCase();
-                  return lower !== 'name' && lower !== 'phone' && key !== 'sessionId' && !key.startsWith('q0'); // Also skip q0 if it was the legacy ID
+                  return lower !== 'name' && lower !== 'phone' && key !== 'sessionId' && !key.startsWith('q0')
+                    && key !== 's3_max_lead_output' && key !== 's3_lead_output' && key !== 's2_lead_output';
                 });
 
                 return (

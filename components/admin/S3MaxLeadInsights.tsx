@@ -26,7 +26,7 @@ export const S3MaxLeadInsights: React.FC<S3MaxLeadInsightsProps> = ({ data, isDa
     const cardBg = isDark ? 'bg-slate-800/50' : 'bg-gradient-to-br from-cyan-50/50 to-blue-50/30';
     const borderColor = isDark ? 'border-cyan-500/20' : 'border-cyan-200/60';
     const textMain = isDark ? 'text-white' : 'text-gray-900';
-    const textSub = isDark ? 'text-slate-400' : 'text-gray-600';
+    const textSub = isDark ? 'text-slate-300' : 'text-gray-700';
     const sectionBg = isDark ? 'bg-slate-900/40' : 'bg-white/70';
 
     const isQualified = data.verdict === 'QUALIFIED';
@@ -95,23 +95,23 @@ export const S3MaxLeadInsights: React.FC<S3MaxLeadInsightsProps> = ({ data, isDa
                         <BarChart3 size={12} className="text-cyan-500" />
                         <span className={`text-xs font-medium uppercase tracking-wider ${textSub}`}>Dimension Analysis</span>
                     </div>
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-[auto_1fr_auto] gap-x-4 gap-y-2 items-center">
                         {Object.entries(data.dimension_scores).map(([dim, info]) => (
-                            <div key={dim} className="flex items-center gap-2">
-                                <span className={`text-xs w-20 capitalize truncate ${textSub}`}>
+                            <React.Fragment key={dim}>
+                                <span className={`text-xs font-medium whitespace-nowrap capitalize ${textMain}`}>
                                     {dim.replace(/_/g, ' ')}
                                 </span>
-                                <div className={`flex-1 h-1.5 rounded-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`}>
+                                <div className={`w-full h-2 rounded-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`}>
                                     <div
-                                        className={`h-1.5 rounded-full ${
+                                        className={`h-2 rounded-full ${
                                             info.score >= 70 ? 'bg-emerald-500' :
                                             info.score >= 40 ? 'bg-amber-400' : 'bg-red-400'
                                         }`}
                                         style={{ width: `${info.score}%` }}
                                     />
                                 </div>
-                                <span className={`text-xs w-8 text-right ${textSub}`}>{info.score}%</span>
-                            </div>
+                                <span className={`text-xs font-bold w-8 text-right ${textMain}`}>{info.score}%</span>
+                            </React.Fragment>
                         ))}
                     </div>
                 </div>

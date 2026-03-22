@@ -23,6 +23,7 @@ export const ClientLeadsPage = () => {
     const [selectedLead, setSelectedLead] = useState<DashboardLead | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [drawerWidth, setDrawerWidth] = useState(450);
 
     // Filters
     const [leadSearch, setLeadSearch] = useState('');
@@ -280,7 +281,38 @@ export const ClientLeadsPage = () => {
 
                     {/* DETAILS DRAWER / PANEL */}
                     {selectedLead && (
-                        <div className="fixed inset-0 lg:relative lg:inset-auto lg:w-1/2 xl:w-[450px] bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden z-50 lg:z-auto animate-in slide-in-from-right duration-300">
+                        <div 
+                            className="fixed inset-0 lg:relative lg:inset-auto bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden z-50 lg:z-auto animate-in slide-in-from-right duration-300"
+                            style={typeof window !== 'undefined' && window.innerWidth >= 1024 ? { width: `${drawerWidth}px`, flexShrink: 0 } : {}}
+                        >
+                            {/* Resize Handle */}
+                            <div 
+                                className="hidden lg:block absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-indigo-500/50 active:bg-indigo-500 z-50 transition-colors"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    const startX = e.clientX;
+                                    const startWidth = drawerWidth;
+                                    
+                                    const onMouseMove = (moveEvent: MouseEvent) => {
+                                        const delta = startX - moveEvent.clientX; 
+                                        const newWidth = startWidth + delta;
+                                        const maxWidth = window.innerWidth / 2;
+                                        const minWidth = 350;
+                                        setDrawerWidth(Math.min(Math.max(newWidth, minWidth), maxWidth));
+                                    };
+
+                                    const onMouseUp = () => {
+                                        document.removeEventListener('mousemove', onMouseMove);
+                                        document.removeEventListener('mouseup', onMouseUp);
+                                        document.body.style.cursor = '';
+                                    };
+
+                                    document.body.style.cursor = 'ew-resize';
+                                    document.addEventListener('mousemove', onMouseMove);
+                                    document.addEventListener('mouseup', onMouseUp);
+                                }}
+                            />
+                            
                             <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
                                 <div className="flex-1 min-w-0">
                                     <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedLead.name}</h3>

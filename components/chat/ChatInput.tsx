@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
 
 interface ChatInputProps {
@@ -18,6 +18,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
   secondaryColor = '#6366F1'
 }) => {
   const [input, setInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus input when bot finishes replying (disabled becomes false)
+  useEffect(() => {
+    if (!disabled && inputRef.current) {
+      // Small timeout to ensure DOM is fully ready and scrolling is done
+      const timeoutId = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [disabled]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +50,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         className="relative flex items-center w-full"
       >
         <input
+          ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}

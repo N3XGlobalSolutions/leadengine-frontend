@@ -167,6 +167,35 @@ export const getPlatformStats = async (): Promise<PlatformStats | null> => {
     }
 };
 
+export interface PlatformDailyPoint {
+    date: string;
+    display: string;
+    conversations: number;
+    leads: number;
+    messages: number;
+}
+
+export interface PlatformDailySummary {
+    today_conversations: number;
+    today_leads: number;
+    period_conversations: number;
+    period_leads: number;
+}
+
+export const getPlatformDailyMetrics = async (days: number = 7): Promise<{
+    data: PlatformDailyPoint[];
+    summary: PlatformDailySummary;
+} | null> => {
+    try {
+        const res = await api.get('/analytics/platform-daily', { params: { days } });
+        return { data: res.data.data, summary: res.data.summary };
+    } catch (e) {
+        console.error("Error fetching platform daily metrics:", e);
+        return null;
+    }
+};
+
+
 export const getDashboardStats = async (): Promise<DashboardStats> => {
     const platformStats = await getPlatformStats();
 

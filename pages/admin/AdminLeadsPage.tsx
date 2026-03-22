@@ -24,6 +24,7 @@ export const AdminLeadsPage = () => {
     const [loading, setLoading] = useState(true);
     const [leadsLoading, setLeadsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'chat'>('overview');
+    const [drawerWidth, setDrawerWidth] = useState(600);
 
     // Reset tab when lead changes
     useEffect(() => {
@@ -321,7 +322,37 @@ export const AdminLeadsPage = () => {
                 {selectedLead && (
                     <>
                         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity" onClick={() => setSelectedLead(null)} />
-                        <div className={`fixed inset-y-0 right-0 w-full sm:w-[600px] border-l shadow-2xl z-50 flex flex-col ${bgClass} ${borderClass} transform transition-transform duration-300`}>
+                        <div 
+                            className={`fixed inset-y-0 right-0 w-full sm:w-auto border-l shadow-2xl z-50 flex flex-col ${bgClass} ${borderClass}`}
+                            style={{ width: typeof window !== 'undefined' && window.innerWidth >= 640 ? `${drawerWidth}px` : '100%' }}
+                        >
+                            {/* Resize Handle */}
+                            <div 
+                                className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-indigo-500/50 active:bg-indigo-500 z-50 transition-colors"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    const startX = e.clientX;
+                                    const startWidth = drawerWidth;
+                                    
+                                    const onMouseMove = (moveEvent: MouseEvent) => {
+                                        const delta = startX - moveEvent.clientX; 
+                                        const newWidth = startWidth + delta;
+                                        const maxWidth = window.innerWidth / 2;
+                                        const minWidth = 400;
+                                        setDrawerWidth(Math.min(Math.max(newWidth, minWidth), maxWidth));
+                                    };
+
+                                    const onMouseUp = () => {
+                                        document.removeEventListener('mousemove', onMouseMove);
+                                        document.removeEventListener('mouseup', onMouseUp);
+                                        document.body.style.cursor = '';
+                                    };
+
+                                    document.body.style.cursor = 'ew-resize';
+                                    document.addEventListener('mousemove', onMouseMove);
+                                    document.addEventListener('mouseup', onMouseUp);
+                                }}
+                            />
 
                             {/* Header */}
                             <div className={`flex-shrink-0 p-6 border-b ${borderClass} bg-white/50 dark:bg-slate-900/50 backdrop-blur-md sticky top-0 z-10`}>

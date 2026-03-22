@@ -80,6 +80,7 @@ export const AdminClientsPage: React.FC = () => {
 
     const getPlanColor = (plan: string) => {
         const colors: Record<string, { light: string; dark: string }> = {
+            S3_MAX: { light: 'bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 shadow-sm border border-amber-300', dark: 'bg-gradient-to-r from-amber-600/50 to-yellow-600/50 text-amber-100 border border-amber-500/50 shadow-[0_0_15px_rgba(251,191,36,0.2)]' },
             S3: { light: 'bg-purple-100 text-purple-800', dark: 'bg-purple-900/50 text-purple-400' },
             S2: { light: 'bg-indigo-100 text-indigo-800', dark: 'bg-indigo-900/50 text-indigo-400' },
             S1: { light: 'bg-gray-100 text-gray-800', dark: 'bg-gray-700 text-gray-400' },
@@ -87,7 +88,7 @@ export const AdminClientsPage: React.FC = () => {
         return colors[plan] || colors.S1;
     };
 
-    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3';
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_MAX';
 
     return (
         <AdminLayout>
@@ -170,31 +171,42 @@ export const AdminClientsPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredClients.map((client) => (
+                    {filteredClients.map((client) => {
+                        const isS3Max = client.plan === 'S3_MAX';
+                        return (
                         <Link
                             key={client.id}
                             to={`/admin/clients/${client.id}`}
                             className={`group p-5 rounded-xl border transition-all hover:shadow-lg hover:-translate-y-1 ${isDark
-                                ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50'
-                                : 'bg-white border-gray-200 hover:border-indigo-300'
+                                ? isS3Max 
+                                    ? 'bg-slate-800/90 border-amber-500/50 hover:border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)] hover:shadow-[0_0_20px_rgba(251,191,36,0.2)]'
+                                    : 'bg-slate-800 border-slate-700 hover:border-indigo-500/50'
+                                : isS3Max
+                                    ? 'bg-gradient-to-br from-white to-amber-50 border-amber-300 hover:border-amber-400 hover:shadow-amber-100/50'
+                                    : 'bg-white border-gray-200 hover:border-indigo-300'
                                 }`}
                         >
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center text-lg font-bold ${isDark ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-100 text-indigo-700'
+                                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center text-lg font-bold ${isDark 
+                                            ? isS3Max ? 'bg-amber-900/50 text-amber-400' : 'bg-indigo-900/50 text-indigo-400' 
+                                            : isS3Max ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'
                                         }`}>
                                         {client.name.charAt(0)}
                                     </div>
                                     <div>
-                                        <h3 className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                        <h3 className={`font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                             {client.name}
+                                            {isS3Max && <Sparkles size={14} className="text-amber-500 animate-pulse" />}
                                         </h3>
                                         <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
                                             /{client.slug}
                                         </p>
                                     </div>
                                 </div>
-                                <ChevronRight className={`opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'text-indigo-400' : 'text-indigo-600'
+                                <ChevronRight className={`opacity-0 group-hover:opacity-100 transition-opacity ${isDark 
+                                        ? isS3Max ? 'text-amber-400' : 'text-indigo-400' 
+                                        : isS3Max ? 'text-amber-600' : 'text-indigo-600'
                                     }`} size={20} />
                             </div>
 
@@ -207,11 +219,11 @@ export const AdminClientsPage: React.FC = () => {
                                 </span>
                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${isDark ? getPlanColor(client.plan).dark : getPlanColor(client.plan).light
                                     }`}>
-                                    {client.plan}
+                                    {client.plan === 'S3_MAX' ? 'S3 MAX' : client.plan}
                                 </span>
                                 {isS2OrHigher(client.plan) && (
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
-                                        <Sparkles size={10} /> {client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
+                                        <Sparkles size={10} /> {client.plan === 'S3_MAX' ? 'Max Agentic' : client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
                                     </span>
                                 )}
                             </div>
@@ -231,7 +243,8 @@ export const AdminClientsPage: React.FC = () => {
                                 </div>
                             </div>
                         </Link>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </AdminLayout>

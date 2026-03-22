@@ -3,6 +3,7 @@ import { Users, DollarSign, Activity, TrendingUp, MessageCircle, Target } from '
 import { AdminLayout } from '../components/admin/AdminLayout';
 import { StatsCard } from '../components/admin/StatsCard';
 import { ClientOnboardingGraph } from '../components/admin/ClientOnboardingGraph';
+import { PlatformConversationsGraph } from '../components/admin/PlatformConversationsGraph';
 import { ClientListTable } from '../components/admin/ClientListTable';
 import { ClientSpotlight } from '../components/admin/ClientSpotlight';
 import { getDashboardStats, getSystemHealth, getPlatformStats } from '../services/adminService';
@@ -150,6 +151,11 @@ export const AdminPage = () => {
                         )}
                     </div>
                 </div>
+            </div>
+
+            {/* Platform Conversations Chart — full width below onboarding trends */}
+            <div className="mt-6">
+                <PlatformConversationsGraph />
             </div>
 
             <div className="mt-8">

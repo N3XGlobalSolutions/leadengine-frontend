@@ -29,9 +29,9 @@ export const AdminLoginPage = () => {
                     return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
                 }).join(''));
                 const payload = JSON.parse(jsonPayload);
-
-                if (payload.role === UserRole.PLATFORM_ADMIN || payload.role === UserRole.AOB_ADMIN) {
-                    navigate('/admin');
+                // Verify role
+                if (payload.role === UserRole.PLATFORM_ADMIN || payload.role === UserRole.SALES_TEAM) {
+                    navigate('/admin/clients');
                 } else if (payload.tenant_id) {
                     navigate(`/${payload.tenant_id}/dashboard`);
                 } else {

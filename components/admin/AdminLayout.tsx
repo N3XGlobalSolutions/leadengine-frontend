@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, User as UserIcon, Settings, LogOut, Bell, Sun, Moon, HelpCircle, Building2, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Users, User as UserIcon, Settings, LogOut, Bell, Sun, Moon, HelpCircle, Building2, AlertCircle, FileText } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
@@ -74,6 +74,12 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                             <span>Users</span>
                         </Link>
                     )}
+                    {user?.role === 'platform_admin' && (
+                        <Link to="/admin/audit-logs" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/audit-logs')}`}>
+                            <FileText size={20} />
+                            <span>Audit Logs</span>
+                        </Link>
+                    )}
                     <Link to="/admin/settings" className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${navLinkClass('/admin/settings')}`}>
                         <Settings size={20} />
                         <span>Settings</span>
@@ -111,7 +117,8 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
                     }`}>
                     <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-800'}`}>
                         {location.pathname.includes('/settings') ? 'Settings' :
-                            location.pathname.includes('/clients') ? 'Clients' : 'Dashboard'}
+                            location.pathname.includes('/clients') ? 'Clients' : 
+                            location.pathname.includes('/audit-logs') ? 'Audit Logs' : 'Dashboard'}
                     </h2>
                     <div className="flex items-center space-x-4">
                         {/* Theme Toggle */}

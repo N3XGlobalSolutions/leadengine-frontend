@@ -1,4 +1,4 @@
-import { Client, DashboardStats, OnboardingData, CreateClientInput, TenantDocument, DashboardMetrics, DailyMetric, DashboardLead, SystemHealth, PlatformStats } from '@/types/admin';
+import { Client, DashboardStats, OnboardingData, CreateClientInput, TenantDocument, DashboardMetrics, DailyMetric, DashboardLead, SystemHealth, PlatformStats, AuditLog } from '@/types/admin';
 import { api } from './api';
 import { TenantConfig } from '@/types/config';
 import { chatService } from './chatService';
@@ -152,7 +152,8 @@ const mapTenantToClient = (tenant: any): Client => {
         onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         totalUsers: 0,
         plan: (planMap[backendConfig.plan] || 'S1') as 'S1' | 'S2' | 'S3' | 'S3_MAX',
-        config: frontendConfig
+        config: frontendConfig,
+        createdBy: tenant.created_by
     };
 };
 
@@ -588,4 +589,15 @@ export const updateLeadStatus = async (leadId: string, status: string): Promise<
         params: { new_status: status }
     });
     return res.data;
+};
+
+// --- Audit Logs ---
+export const getAuditLogs = async (skip: number = 0, limit: number = 100): Promise<AuditLog[]> => {
+    try {
+        const res = await api.get('/audit-logs', { params: { skip, limit } });
+        return res.data;
+    } catch (e) {
+        console.error("Error fetching audit logs:", e);
+        return [];
+    }
 };

@@ -13,6 +13,7 @@ import { AdminClientDetailPage } from './pages/admin/AdminClientDetailPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminGuidePage } from './pages/admin/AdminGuidePage';
 import { AdminSupportPage } from './pages/admin/AdminSupportPage';
+import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { AdminThemeProvider } from './contexts/AdminThemeContext';
 import { ProtectedRoute } from './components/admin/ProtectedRoute';
@@ -72,6 +73,11 @@ export default function App() {
             <Route path="/admin/support" element={
               <ProtectedRoute>
                 <AdminSupportPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/audit-logs" element={
+              <ProtectedRoute>
+                <AdminAuditLogsPage />
               </ProtectedRoute>
             } />
 

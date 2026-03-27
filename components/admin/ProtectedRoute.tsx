@@ -20,7 +20,8 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // Role checking logic based on string values to avoid enum import issues
-    const isPlatformAdmin = user.role === 'platform_admin' || user.role === 'sales_team';
+    const isPlatformAdmin = user.role === 'platform_admin' || user.role === 'platform_operator' || user.role === 'sales_team';
+    const isPlatformOperator = user.role === 'platform_operator';
     const isSalesTeam = user.role === 'sales_team';
     const isClientUser = user.role === 'client_admin';
 

@@ -46,6 +46,7 @@ export const AdminClientDetailPage = () => {
     const { user } = useAdminAuth();
 
     const isReadOnly = user?.role === 'sales_team';
+    const isOperator = user?.role === 'platform_operator';
 
     const [client, setClient] = useState<Client | null>(null);
     const [documents, setDocuments] = useState<TenantDocument[]>([]);
@@ -500,12 +501,14 @@ export const AdminClientDetailPage = () => {
                             <><Pause size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Pause</>
                         )}
                     </button>
+                    {!isOperator && (
                     <button
                         onClick={() => setShowDeleteModal(true)}
                         className="inline-flex items-center px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm sm:text-base font-medium transition-all"
                     >
                         <Trash2 size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Delete
                     </button>
+                    )}
                     <button
                         onClick={handleSave}
                         disabled={saving}
@@ -967,9 +970,11 @@ export const AdminClientDetailPage = () => {
                                                     </p>
                                                 </div>
                                             </div>
+                                            {!isOperator && (
                                             <button onClick={() => handleDeleteDocument(doc.document_id)} className="p-2 text-red-500 hover:bg-red-50 rounded">
                                                 <Trash2 size={16} />
                                             </button>
+                                            )}
                                         </div>
                                     ))
                                 )}
@@ -1163,6 +1168,12 @@ export const AdminClientDetailPage = () => {
                                 <span className={isDark ? 'text-slate-400' : 'text-gray-500'}>Onboarded</span>
                                 <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{client.onboardedDate}</span>
                             </div>
+                            {client.createdBy && (
+                                <div className="flex justify-between">
+                                    <span className={isDark ? 'text-slate-400' : 'text-gray-500'}>Created By</span>
+                                    <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{client.createdBy}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 

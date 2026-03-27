@@ -11,6 +11,7 @@ export interface Client {
     config?: TenantConfig;
     createdAt?: string;
     updatedAt?: string;
+    createdBy?: string;
 }
 
 export interface CreateClientInput {
@@ -109,4 +110,16 @@ export interface SystemHealth {
         [key: string]: string;
     };
     version: string;
+}
+
+export interface AuditLog {
+    log_id: string;
+    action: string;
+    user_id: string;
+    user_name: string;
+    user_role: string;
+    tenant_id?: string;
+    description: string;
+    created_at: string;
+    ip_address?: string;
 }

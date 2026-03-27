@@ -1,5 +1,6 @@
 export enum UserRole {
     PLATFORM_ADMIN = 'platform_admin',
+    PLATFORM_OPERATOR = 'platform_operator',
     CLIENT_ADMIN = 'client_admin',
     SALES_TEAM = 'sales_team'
 }

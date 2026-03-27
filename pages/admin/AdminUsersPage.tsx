@@ -5,12 +5,14 @@ import { User, UserRole, UserRegister } from '../../types/auth'; // Ensure this 
 import { getUsers, updateUser, deleteUser, createUser, resetUserPassword } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
+import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
 export const AdminUsersPage = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const { isDark } = useAdminTheme();
+    const { user: currentUser } = useAdminAuth();
     const location = useLocation();
     const [highlightedUserId, setHighlightedUserId] = useState<string | null>(null);
 
@@ -300,12 +302,16 @@ export const AdminUsersPage = () => {
                                                 <button onClick={() => handleEditClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-indigo-400' : 'hover:bg-gray-200 text-indigo-600'}`}>
                                                     <Edit2 size={16} />
                                                 </button>
-                                                <button onClick={() => handleResetClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-amber-400' : 'hover:bg-gray-200 text-amber-600'}`} title="Reset Password">
-                                                    <Key size={16} />
-                                                </button>
-                                                <button onClick={() => handleDeleteClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-red-400' : 'hover:bg-gray-200 text-red-600'}`}>
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                {currentUser?.role !== 'platform_operator' && (
+                                                    <button onClick={() => handleResetClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-amber-400' : 'hover:bg-gray-200 text-amber-600'}`} title="Reset Password">
+                                                        <Key size={16} />
+                                                    </button>
+                                                )}
+                                                {currentUser?.role !== 'platform_operator' && (
+                                                    <button onClick={() => handleDeleteClick(user)} className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-600 text-red-400' : 'hover:bg-gray-200 text-red-600'}`}>
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -407,7 +413,7 @@ export const AdminUsersPage = () => {
                                     ))}
                                 </select>
                             </div>
-                            {createData.role !== UserRole.PLATFORM_ADMIN && (
+                            {createData.role !== UserRole.PLATFORM_ADMIN && createData.role !== UserRole.PLATFORM_OPERATOR && (
                                 <div>
                                     <label className={labelClass}>Tenant ID</label>
                                     <input

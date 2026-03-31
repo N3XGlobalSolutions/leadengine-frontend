@@ -17,6 +17,7 @@ import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { ClientConversations } from '../../components/admin/ClientConversations';
 import { SkeletonClientDetail } from '../../components/admin/SkeletonLoader';
+import QuestionMapEditor from '../../components/admin/QuestionMapEditor';
 
 // System questions that are auto-handled by the state machine
 // These are displayed as visual placeholders but never saved to the backend
@@ -50,7 +51,7 @@ export const AdminClientDetailPage = () => {
 
     const [client, setClient] = useState<Client | null>(null);
     const [documents, setDocuments] = useState<TenantDocument[]>([]);
-    const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'settings' | 'qualifications' | 'knowledge' | 'integration' | 'conversations'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'settings' | 'qualifications' | 'question_map' | 'knowledge' | 'integration' | 'conversations'>('general');
     const [generatedKey, setGeneratedKey] = useState<string>('');
     const [conversationCount, setConversationCount] = useState<number>(0);
     const [countLoading, setCountLoading] = useState(false);
@@ -65,7 +66,7 @@ export const AdminClientDetailPage = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
-    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_MAX' | null>(null);
+    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING' | null>(null);
 
     useEffect(() => {
         const fetchClient = async () => {
@@ -316,7 +317,7 @@ export const AdminClientDetailPage = () => {
     const MIN_QUESTIONS = 5;
     const MAX_QUESTIONS = 15;
 
-    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_MAX') => {
+    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING') => {
         if (!client) return;
         const currentQuestionCount = client.config?.leadQualification?.questions?.length || 0;
         const isDowngrade = isS2OrHigher(client.plan) && newPlan === 'S1' && currentQuestionCount > 5;
@@ -334,10 +335,12 @@ export const AdminClientDetailPage = () => {
         const trimmedQuestions = (client.config?.leadQualification?.questions || []).slice(0, 5);
         const newConfig = JSON.parse(JSON.stringify(client.config));
         newConfig.leadQualification.questions = trimmedQuestions;
-        setClient({ ...client, plan: pendingPlan, config: newConfig });
+        setClient({ ...client, plan: pendingPlan as 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING', config: newConfig });
+
         setShowDowngradeModal(false);
         setPendingPlan(null);
     };
+
 
     // --- Add/Remove Question Handlers (S2/S3 only) ---
     const addQuestion = () => {
@@ -533,16 +536,21 @@ export const AdminClientDetailPage = () => {
 
             {/* Tabs */}
             <div className={`flex border-b mb-6 ${isDark ? 'border-slate-700' : 'border-gray-200'} overflow-x-auto`}>
-                {['general', 'branding', 'settings', 'qualifications', 'knowledge', 'integration', 'conversations'].map((tab) => (
+                {['general', 'branding', 'settings', 'qualifications',
+                  ...(client.plan === 'S3_MAPPING' ? ['question_map'] : []),
+                  'knowledge', 'integration', 'conversations'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
-                        className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${activeTab === tab
+                        className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${
+                            activeTab === tab
                             ? 'border-indigo-500 text-indigo-500'
                             : `border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'}`
-                            }`}
+                        }`}
                     >
-                        {tab === 'integration' ? 'Generate Key' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        {tab === 'integration' ? 'Generate Key'
+                         : tab === 'question_map' ? '🗺️ Question Map'
+                         : tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                 ))}
             </div>
@@ -567,11 +575,12 @@ export const AdminClientDetailPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Plan</label>
-                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3' | 'S3_MAX')} className={inputClass} disabled={isReadOnly}>
+                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as any)} className={inputClass} disabled={isReadOnly}>
                                         <option value="S1">S1 (Starter)</option>
                                         <option value="S2">S2 (Professional)</option>
                                         <option value="S3">S3 (Enterprise)</option>
                                         <option value="S3_MAX">S3 Max (Agentic AI)</option>
+                                        <option value="S3_MAPPING">S3 Mapping (Structured + Claude)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -944,6 +953,32 @@ export const AdminClientDetailPage = () => {
                             )}
                                 </>
                             )}
+                        </div>
+                    )}
+                    {/* QUESTION MAP TAB (S3_MAPPING only) */}
+                    {activeTab === 'question_map' && (
+                        <div className={cardClass}>
+                            <div className={`flex items-center gap-2 mb-6`}>
+                                <span style={{ fontSize: '20px' }}>🗺️</span>
+                                <div>
+                                    <h2 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                        S3 Mapping — Question Map
+                                    </h2>
+                                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                        Define up to 20 structured questions. Claude Haiku handles branching follow-ups after.
+                                    </p>
+                                </div>
+                            </div>
+                            <QuestionMapEditor
+                                value={{
+                                    question_map: (client.config as any)?.question_map ?? [],
+                                    max_branching_questions: (client.config as any)?.max_branching_questions ?? 10,
+                                }}
+                                onChange={(updated) => {
+                                    updateConfig('question_map', updated.question_map);
+                                    updateConfig('max_branching_questions', updated.max_branching_questions);
+                                }}
+                            />
                         </div>
                     )}
 

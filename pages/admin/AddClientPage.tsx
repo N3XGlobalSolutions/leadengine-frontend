@@ -8,6 +8,7 @@ import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { TenantConfig, DEFAULT_TENANT_CONFIG, Question } from '../../types/config';
 import { createClient, ingestDocument } from '../../services/adminService';
+import QuestionMapEditor, { QuestionMapConfig } from '../../components/admin/QuestionMapEditor';
 
 const STEPS = [
     { id: 1, title: 'Basic Info', icon: Building2 },
@@ -26,19 +27,25 @@ export const AddClientPage = () => {
     const [error, setError] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
-    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_MAX' | null>(null);
+    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING' | null>(null);
 
     // Form state initialized with default 5 questions
     const [formData, setFormData] = useState<{
         name: string;
         slug: string;
-        plan: 'S1' | 'S2' | 'S3' | 'S3_MAX';
+        plan: 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING';
         config: TenantConfig;
     }>({
         name: '',
         slug: '',
         plan: 'S1',
         config: JSON.parse(JSON.stringify(DEFAULT_TENANT_CONFIG)) // Deep copy
+    });
+
+    // S3 Mapping: question map state (separate from S1/S2/S3 leadQualification questions)
+    const [questionMapConfig, setQuestionMapConfig] = useState<QuestionMapConfig>({
+        question_map: [],
+        max_branching_questions: 10,
     });
 
     // Note: Questions 0-1 (name/phone) are handled by the state machine and should NOT be stored in config
@@ -116,7 +123,7 @@ export const AddClientPage = () => {
     const MIN_QUESTIONS = 5;
     const MAX_QUESTIONS = 15;
 
-    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_MAX') => {
+    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING') => {
         const currentQuestionCount = formData.config.leadQualification.questions.length;
         const isDowngrade = isS2OrHigher(formData.plan) && newPlan === 'S1' && currentQuestionCount > 5;
 
@@ -133,7 +140,7 @@ export const AddClientPage = () => {
         const trimmedQuestions = formData.config.leadQualification.questions.slice(0, 5);
         setFormData(prev => ({
             ...prev,
-            plan: pendingPlan,
+            plan: pendingPlan as 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING',
             config: {
                 ...prev.config,
                 leadQualification: {
@@ -183,6 +190,8 @@ export const AddClientPage = () => {
             case 5:
                 // S3_MAX: questions are AI-generated, no manual questions needed
                 if (formData.plan === 'S3_MAX') return true;
+                // S3_MAPPING: at least 1 mapped question is needed
+                if (formData.plan === 'S3_MAPPING') return questionMapConfig.question_map.length >= 1;
                 // Ensure all 5 questions have at least a label and instruction
                 return formData.config.leadQualification.questions.every(q =>
                     q.label.trim().length > 0 && q.instruction.trim().length > 0
@@ -236,7 +245,12 @@ export const AddClientPage = () => {
                         ...finalConfig.leadQualification,
                         questions: allQuestions
                     },
-                    lead_qualification_criteria: leadQualificationCriteria || undefined
+                    lead_qualification_criteria: leadQualificationCriteria || undefined,
+                    // S3 Mapping: attach the question map
+                    ...(formData.plan === 'S3_MAPPING' ? {
+                        question_map: questionMapConfig.question_map,
+                        max_branching_questions: questionMapConfig.max_branching_questions,
+                    } : {}),
                 }
             });
 
@@ -379,13 +393,14 @@ export const AddClientPage = () => {
                                 <label className={labelClass}>Plan</label>
                                 <select
                                     value={formData.plan}
-                                    onChange={(e) => handlePlanChange(e.target.value as 'S1' | 'S2' | 'S3' | 'S3_MAX')}
+                                    onChange={(e) => handlePlanChange(e.target.value as any)}
                                     className={inputClass}
                                 >
                                     <option value="S1">S1 (Starter)</option>
                                     <option value="S2">S2 (Professional)</option>
                                     <option value="S3">S3 (Enterprise)</option>
                                     <option value="S3_MAX">S3 Max (Agentic AI)</option>
+                                    <option value="S3_MAPPING">S3 Mapping (Structured + Claude)</option>
                                 </select>
                             </div>
                         </div>
@@ -559,36 +574,55 @@ export const AddClientPage = () => {
                     </div>
                 )}
 
-                {/* Step 5: Qualifications (The Dynamic Part) */}
-                {currentStep === 5 && (
-                    <div className="space-y-6">
-                        {formData.plan === 'S3_MAX' ? (
-                            /* S3 Max: AI-generated questions — no manual editor */
-                            <div className={`p-6 rounded-xl border-2 ${isDark ? 'bg-emerald-900/20 border-emerald-700' : 'bg-emerald-50 border-emerald-200'}`}>
-                                <div className="flex items-start gap-4">
-                                    <div className={`p-3 rounded-full ${isDark ? 'bg-emerald-800' : 'bg-emerald-100'}`}>
-                                        <Sparkles size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
-                                    </div>
-                                    <div>
-                                        <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>AI-Generated Questions</h3>
-                                        <p className={`text-sm mb-3 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                                            S3 Max uses <strong>Agentic AI</strong> to dynamically generate qualification questions based on your <strong>Knowledge Base</strong> and <strong>Lead Qualification Criteria (LQC)</strong>.
-                                        </p>
-                                        <div className={`space-y-2 text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
-                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Questions adapt to each lead's responses in real-time</div>
-                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Strict guardrails: 3–20 questions per session</div>
-                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Early completion when confidence is high (min 5 questions)</div>
-                                            <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> AI evaluates lead as Qualified or Disqualified automatically</div>
+                    {currentStep === 5 && (
+                        <div className="space-y-6">
+                            {formData.plan === 'S3_MAX' ? (
+                                /* S3 Max: AI-generated questions — no manual editor */
+                                <div className={`p-6 rounded-xl border-2 ${isDark ? 'bg-emerald-900/20 border-emerald-700' : 'bg-emerald-50 border-emerald-200'}`}>
+                                    <div className="flex items-start gap-4">
+                                        <div className={`p-3 rounded-full ${isDark ? 'bg-emerald-800' : 'bg-emerald-100'}`}>
+                                            <Sparkles size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
                                         </div>
-                                        <p className={`text-xs mt-4 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
-                                            No manual questions needed — the AI handles everything. Make sure your Knowledge Base and LQC are well-configured in the previous step.
-                                        </p>
+                                        <div>
+                                            <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>AI-Generated Questions</h3>
+                                            <p className={`text-sm mb-3 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                                                S3 Max uses <strong>Agentic AI</strong> to dynamically generate qualification questions based on your <strong>Knowledge Base</strong> and <strong>Lead Qualification Criteria (LQC)</strong>.
+                                            </p>
+                                            <div className={`space-y-2 text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Questions adapt to each lead's responses in real-time</div>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Strict guardrails: 3–20 questions per session</div>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> Early completion when confidence is high (min 5 questions)</div>
+                                                <div className="flex items-center gap-2"><Check size={16} className="text-emerald-500" /> AI evaluates lead as Qualified or Disqualified automatically</div>
+                                            </div>
+                                            <p className={`text-xs mt-4 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                                No manual questions needed — the AI handles everything. Make sure your Knowledge Base and LQC are well-configured in the previous step.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ) : (
-                            /* Standard plans: manual question editor */
-                            <>
+                            ) : formData.plan === 'S3_MAPPING' ? (
+                                /* S3 Mapping: structured question map editor */
+                                <div className={cardClass}>
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <span style={{ fontSize: '22px' }}>🗺️</span>
+                                        <div>
+                                            <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Build Your Question Map</h3>
+                                            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                                Define up to 20 questions with signal scoring. Claude Haiku handles branching follow-ups after.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <QuestionMapEditor
+                                        value={questionMapConfig}
+                                        onChange={setQuestionMapConfig}
+                                    />
+                                    {questionMapConfig.question_map.length === 0 && (
+                                        <p className="mt-4 text-sm text-amber-500">⚠️ Add at least 1 question to continue.</p>
+                                    )}
+                                </div>
+                            ) : (
+                                /* Standard plans: manual question editor */
+                                <>
                         <div className={`p-4 rounded-lg flex items-start gap-3 ${isDark ? 'bg-indigo-900/20 border border-indigo-800' : 'bg-indigo-50 border border-indigo-100'}`}>
                             <Wand2 className="text-indigo-500 mt-1" size={20} />
                             <div>
@@ -705,6 +739,24 @@ export const AddClientPage = () => {
                                 {formData.plan === 'S3_MAX' ? (
                                     <div className={`p-4 rounded-lg border ${isDark ? 'bg-emerald-900/20 border-emerald-700 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-800'} text-sm`}>
                                         ✨ <strong>S3 Max — AI-Generated Questions</strong>: The Agentic AI will automatically generate and ask qualification questions based on your Knowledge Base and LQC criteria. No manual questions needed.
+                                    </div>
+                                ) : formData.plan === 'S3_MAPPING' ? (
+                                    <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/20 border-indigo-700 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-800'} text-sm`}>
+                                        <strong>🗺️ S3 Mapping</strong>: {questionMapConfig.question_map.length} mapped question{questionMapConfig.question_map.length !== 1 ? 's' : ''} + {questionMapConfig.max_branching_questions} Claude branching question{questionMapConfig.max_branching_questions !== 1 ? 's' : ''} = <strong>{questionMapConfig.question_map.length + questionMapConfig.max_branching_questions} total max</strong>
+                                        {questionMapConfig.question_map.length > 0 && (
+                                            <ul className="mt-2 space-y-1">
+                                                {questionMapConfig.question_map.slice(0, 5).map((q, i) => (
+                                                    <li key={i} className="flex items-start gap-2">
+                                                        <span className="font-mono text-xs opacity-60">{q.id}</span>
+                                                        <span>{q.question || <em>Untitled</em>}</span>
+                                                        <span className="ml-auto text-xs opacity-60">{q.quick_replies.length} opts</span>
+                                                    </li>
+                                                ))}
+                                                {questionMapConfig.question_map.length > 5 && (
+                                                    <li className="opacity-50 text-xs">...and {questionMapConfig.question_map.length - 5} more</li>
+                                                )}
+                                            </ul>
+                                        )}
                                     </div>
                                 ) : (
                                     <>

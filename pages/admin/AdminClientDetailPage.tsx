@@ -975,8 +975,17 @@ export const AdminClientDetailPage = () => {
                                     max_branching_questions: (client.config as any)?.max_branching_questions ?? 10,
                                 }}
                                 onChange={(updated) => {
-                                    updateConfig('question_map', updated.question_map);
-                                    updateConfig('max_branching_questions', updated.max_branching_questions);
+                                    setClient(prev => {
+                                        if (!prev || !prev.config) return prev;
+                                        return {
+                                            ...prev,
+                                            config: {
+                                                ...prev.config,
+                                                question_map: updated.question_map,
+                                                max_branching_questions: updated.max_branching_questions
+                                            }
+                                        };
+                                    });
                                 }}
                             />
                         </div>

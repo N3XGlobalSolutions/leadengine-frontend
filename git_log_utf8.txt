@@ -1,0 +1,63 @@
+﻿commit 97a8ecaba6d0c4ebcb579c03ea17bdb586de0aae
+Author: shriharshan <shriharshan123@gmail.com>
+Date:   Tue Mar 31 23:43:15 2026 +0530
+
+    S3 Mapping feature
+
+A	components/admin/QuestionMapEditor.tsx
+M	pages/admin/AddClientPage.tsx
+M	pages/admin/AdminClientDetailPage.tsx
+M	types/admin.ts
+
+commit 985ed925511863508442f372ecd86c6033742857
+Author: Sailesh <57102431+sailesh-b@users.noreply.github.com>
+Date:   Sun Mar 22 15:39:51 2026 +0200
+
+    major bugfix and enhancements S3 MAX, new analytiics dashboard
+
+A	components/admin/PlatformConversationsGraph.tsx
+M	components/admin/ProtectedRoute.tsx
+M	components/admin/S3MaxLeadInsights.tsx
+M	components/chat/ChatInput.tsx
+M	pages/AdminLoginPage.tsx
+M	pages/AdminPage.tsx
+M	pages/ClientLeadsPage.tsx
+M	pages/admin/AdminClientsPage.tsx
+M	pages/admin/AdminLeadsPage.tsx
+M	services/adminService.ts
+M	types/auth.ts
+
+commit ed1d151e0a4a23c551bed3a3796e261013bf5848
+Author: shriharshan <shriharshan123@gmail.com>
+Date:   Sat Mar 21 21:08:45 2026 +0530
+
+    bug fixes about S3 max intelligence and chat box disable after chat completed
+
+M	components/chat/ChatBubble.tsx
+M	hooks/useChatSession.ts
+
+commit 946ea53b1b13c936b39a37f649fdb5050ca91810
+Author: Sailesh <57102431+sailesh-b@users.noreply.github.com>
+Date:   Sat Mar 21 13:41:01 2026 +0200
+
+    S3 MAX bug fix
+
+M	pages/admin/AddClientPage.tsx
+M	services/adminService.ts
+
+commit 9a2de3466969e48344c499f079cd3babfbfae369
+Author: shriharshan <shriharshan123@gmail.com>
+Date:   Sat Mar 21 00:05:39 2026 +0530
+
+    Added S3 Max feature
+
+A	components/admin/S3MaxLeadInsights.tsx
+M	hooks/useChatSession.ts
+M	pages/ChatPage.tsx
+M	pages/ClientLeadsPage.tsx
+M	pages/DashboardPage.tsx
+M	pages/admin/AddClientPage.tsx
+M	pages/admin/AdminClientDetailPage.tsx
+M	pages/admin/AdminLeadsPage.tsx
+M	types.ts
+M	types/admin.ts

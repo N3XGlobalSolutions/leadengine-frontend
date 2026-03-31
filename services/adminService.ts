@@ -88,11 +88,12 @@ const mapTenantToClient = (tenant: any): Client => {
     // Backend returns config with flat fields (snake_case)
     const backendConfig = tenant.config || {};
 
-    const planMap: Record<string, 'S1' | 'S2' | 'S3' | 'S3_MAX'> = {
+    const planMap: Record<string, 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING'> = {
         'S1': 'S1',
         'S2': 'S2',
         'S3': 'S3',
-        'S3_MAX': 'S3_MAX'
+        'S3_MAX': 'S3_MAX',
+        'S3_MAPPING': 'S3_MAPPING'
     };
 
     // Transform to Frontend TenantConfig (nested, camelCase)
@@ -141,7 +142,9 @@ const mapTenantToClient = (tenant: any): Client => {
         lead_trigger_count: backendConfig.lead_trigger_count || 5,
         lead_form_enabled: backendConfig.lead_form_enabled ?? true,
         lead_form_fields: backendConfig.lead_form_fields || ["name", "phone"],
-        lead_qualification_criteria: backendConfig.lead_qualification_criteria
+        lead_qualification_criteria: backendConfig.lead_qualification_criteria,
+        question_map: backendConfig.question_map,
+        max_branching_questions: backendConfig.max_branching_questions
     };
 
     return {
@@ -151,7 +154,7 @@ const mapTenantToClient = (tenant: any): Client => {
         status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), // Use backend status if available
         onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         totalUsers: 0,
-        plan: (planMap[backendConfig.plan] || 'S1') as 'S1' | 'S2' | 'S3' | 'S3_MAX',
+        plan: (planMap[backendConfig.plan] || 'S1') as 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING',
         config: frontendConfig,
         createdBy: tenant.created_by
     };
@@ -302,8 +305,8 @@ export const updateClient = async (client: Client): Promise<Client> => {
         sub_headline: client.config?.welcome?.subheadline,
         key_features: client.config?.welcome?.features,
 
-        // Qualifications — S3_MAX uses AI-generated questions, no manual list needed
-        qualification_questions: client.plan === 'S3_MAX'
+        // Qualifications — S3_MAX and S3_MAPPING use different qualification mechanisms
+        qualification_questions: (client.plan === 'S3_MAX' || client.plan === 'S3_MAPPING')
             ? []
             : client.config?.leadQualification?.questions?.map(q => ({
                 id: q.id,
@@ -327,7 +330,9 @@ export const updateClient = async (client: Client): Promise<Client> => {
         lead_trigger_count: client.config?.lead_trigger_count,
         lead_form_enabled: client.config?.lead_form_enabled,
         lead_form_fields: client.config?.lead_form_fields,
-        lead_qualification_criteria: client.config?.lead_qualification_criteria
+        lead_qualification_criteria: client.config?.lead_qualification_criteria,
+        question_map: client.config?.question_map,
+        max_branching_questions: client.config?.max_branching_questions
     };
 
     const payload = {
@@ -379,8 +384,8 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
             sub_headline: clientData.config.welcome.subheadline,
             key_features: clientData.config.welcome.features,
 
-            // S3_MAX uses AI-generated questions, no manual list needed
-            qualification_questions: clientData.plan === 'S3_MAX'
+            // S3_MAX and S3_MAPPING use different qualification mechanisms
+            qualification_questions: (clientData.plan === 'S3_MAX' || clientData.plan === 'S3_MAPPING')
                 ? []
                 : clientData.config.leadQualification.questions.map(q => ({
                     id: q.id,
@@ -398,7 +403,9 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
             welcome_message: `${clientData.config.welcome.headline} ${clientData.config.welcome.highlightedHeadline}`,
             language: "en",
             tone: "professional",
-            lead_qualification_criteria: clientData.config.lead_qualification_criteria
+            lead_qualification_criteria: clientData.config.lead_qualification_criteria,
+            question_map: clientData.config.question_map,
+            max_branching_questions: clientData.config.max_branching_questions
         }
     };
 

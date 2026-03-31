@@ -53,6 +53,10 @@ export interface TenantConfig {
 
     // Lead Qualification Criteria
     lead_qualification_criteria?: string; // Natural language criteria for qualifying leads
+
+    // S3 Mapping
+    question_map?: any[];
+    max_branching_questions?: number;
 }
 
 // Default template with placeholder questions

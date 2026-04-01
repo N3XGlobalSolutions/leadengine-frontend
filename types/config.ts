@@ -56,7 +56,6 @@ export interface TenantConfig {
 
     // S3 Mapping
     question_map?: any[];
-    max_branching_questions?: number;
 }
 
 // Default template with placeholder questions

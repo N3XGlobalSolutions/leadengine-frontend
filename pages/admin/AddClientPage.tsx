@@ -45,7 +45,6 @@ export const AddClientPage = () => {
     // S3 Mapping: question map state (separate from S1/S2/S3 leadQualification questions)
     const [questionMapConfig, setQuestionMapConfig] = useState<QuestionMapConfig>({
         question_map: [],
-        max_branching_questions: 10,
     });
 
     // Note: Questions 0-1 (name/phone) are handled by the state machine and should NOT be stored in config
@@ -249,7 +248,6 @@ export const AddClientPage = () => {
                     // S3 Mapping: attach the question map
                     ...(formData.plan === 'S3_MAPPING' ? {
                         question_map: questionMapConfig.question_map,
-                        max_branching_questions: questionMapConfig.max_branching_questions,
                     } : {}),
                 }
             });
@@ -608,7 +606,7 @@ export const AddClientPage = () => {
                                         <div>
                                             <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Build Your Question Map</h3>
                                             <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                                Define up to 20 questions with signal scoring. Claude Haiku handles branching follow-ups after.
+                                                Define up to 30 deterministic questions with signal scoring. Questions may include an optional inline table.
                                             </p>
                                         </div>
                                     </div>
@@ -742,7 +740,7 @@ export const AddClientPage = () => {
                                     </div>
                                 ) : formData.plan === 'S3_MAPPING' ? (
                                     <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/20 border-indigo-700 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-800'} text-sm`}>
-                                        <strong>🗺️ S3 Mapping</strong>: {questionMapConfig.question_map.length} mapped question{questionMapConfig.question_map.length !== 1 ? 's' : ''} + {questionMapConfig.max_branching_questions} Claude branching question{questionMapConfig.max_branching_questions !== 1 ? 's' : ''} = <strong>{questionMapConfig.question_map.length + questionMapConfig.max_branching_questions} total max</strong>
+                                        <strong>🗺️ S3 Mapping</strong>: {questionMapConfig.question_map.length} deterministic question{questionMapConfig.question_map.length !== 1 ? 's' : ''}. <strong>{questionMapConfig.question_map.filter(q => q.table).length}</strong> with inline tables.
                                         {questionMapConfig.question_map.length > 0 && (
                                             <ul className="mt-2 space-y-1">
                                                 {questionMapConfig.question_map.slice(0, 5).map((q, i) => (

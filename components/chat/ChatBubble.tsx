@@ -58,6 +58,20 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                     ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
                     li: ({ children }) => <li className="text-gray-700">{children}</li>,
                     strong: ({ children }) => <strong className="font-semibold text-blue-900">{children}</strong>,
+                    table: ({ children }) => (
+                      <div className="overflow-x-auto my-3 rounded-lg border border-blue-100">
+                        <table className="min-w-full text-sm border-collapse">{children}</table>
+                      </div>
+                    ),
+                    thead: ({ children }) => <thead className="bg-blue-50">{children}</thead>,
+                    tbody: ({ children }) => <tbody>{children}</tbody>,
+                    tr: ({ children }) => <tr className="even:bg-gray-50">{children}</tr>,
+                    th: ({ children }) => (
+                      <th className="px-3 py-2 text-left font-semibold text-blue-800 border border-blue-100 whitespace-nowrap">{children}</th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="px-3 py-2 text-gray-700 border border-gray-100 whitespace-nowrap">{children}</td>
+                    ),
                   }}
                 >
                   {message.text}
@@ -102,6 +116,20 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                     h3: ({ children }) => <h3 className="text-base font-bold mb-1">{children}</h3>,
                     blockquote: ({ children }) => (
                       <blockquote className="border-l-4 border-gray-300 pl-3 italic text-gray-600 my-2">{children}</blockquote>
+                    ),
+                    table: ({ children }) => (
+                      <div className="overflow-x-auto my-3 rounded-lg border border-blue-100 shadow-sm">
+                        <table className="min-w-full text-sm border-collapse">{children}</table>
+                      </div>
+                    ),
+                    thead: ({ children }) => <thead className="bg-blue-50">{children}</thead>,
+                    tbody: ({ children }) => <tbody>{children}</tbody>,
+                    tr: ({ children }) => <tr className="even:bg-slate-50">{children}</tr>,
+                    th: ({ children }) => (
+                      <th className="px-3 py-2 text-left font-semibold text-blue-800 border border-blue-100 whitespace-nowrap text-xs">{children}</th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="px-3 py-2 text-gray-700 border border-gray-100 whitespace-nowrap text-xs">{children}</td>
                     ),
                   }}
                 >

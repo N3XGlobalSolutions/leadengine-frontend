@@ -144,7 +144,6 @@ const mapTenantToClient = (tenant: any): Client => {
         lead_form_fields: backendConfig.lead_form_fields || ["name", "phone"],
         lead_qualification_criteria: backendConfig.lead_qualification_criteria,
         question_map: backendConfig.question_map,
-        max_branching_questions: backendConfig.max_branching_questions
     };
 
     return {
@@ -332,7 +331,6 @@ export const updateClient = async (client: Client): Promise<Client> => {
         lead_form_fields: client.config?.lead_form_fields,
         lead_qualification_criteria: client.config?.lead_qualification_criteria,
         question_map: client.config?.question_map,
-        max_branching_questions: client.config?.max_branching_questions
     };
 
     const payload = {
@@ -405,7 +403,6 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
             tone: "professional",
             lead_qualification_criteria: clientData.config.lead_qualification_criteria,
             question_map: clientData.config.question_map,
-            max_branching_questions: clientData.config.max_branching_questions
         }
     };
 

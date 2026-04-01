@@ -965,14 +965,13 @@ export const AdminClientDetailPage = () => {
                                         S3 Mapping — Question Map
                                     </h2>
                                     <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                        Define up to 20 structured questions. Claude Haiku handles branching follow-ups after.
+                                        Define up to 30 deterministic questions. Any question can include an optional inline table rendered in the chat.
                                     </p>
                                 </div>
                             </div>
                             <QuestionMapEditor
                                 value={{
                                     question_map: (client.config as any)?.question_map ?? [],
-                                    max_branching_questions: (client.config as any)?.max_branching_questions ?? 10,
                                 }}
                                 onChange={(updated) => {
                                     setClient(prev => {
@@ -982,7 +981,6 @@ export const AdminClientDetailPage = () => {
                                             config: {
                                                 ...prev.config,
                                                 question_map: updated.question_map,
-                                                max_branching_questions: updated.max_branching_questions
                                             }
                                         };
                                     });

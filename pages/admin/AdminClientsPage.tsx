@@ -15,6 +15,8 @@ export const AdminClientsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [planFilter, setPlanFilter] = useState<string>('all');
+    const [sortOption, setSortOption] = useState<string>('newest');
     const [conversationCounts, setConversationCounts] = useState<Record<string, number>>({});
     const [countsLoading, setCountsLoading] = useState(false);
 
@@ -61,11 +63,26 @@ export const AdminClientsPage: React.FC = () => {
         return () => clearInterval(intervalId);
     }, [clients, fetchConversationCounts]);
 
-    const filteredClients = clients.filter(client => {
+    let filteredClients = clients.filter(client => {
         const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             client.slug.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const matchesPlan = planFilter === 'all' || client.plan === planFilter;
+        return matchesSearch && matchesStatus && matchesPlan;
+    });
+
+    filteredClients = filteredClients.sort((a, b) => {
+        if (sortOption === 'a-z') return a.name.localeCompare(b.name);
+        if (sortOption === 'z-a') return b.name.localeCompare(a.name);
+
+        // Fallbacks if createdAt is not available
+        const dateA = new Date(a.createdAt || a.onboardedDate || 0).getTime();
+        const dateB = new Date(b.createdAt || b.onboardedDate || 0).getTime();
+
+        if (sortOption === 'newest') return dateB - dateA; // Descending
+        if (sortOption === 'oldest') return dateA - dateB; // Ascending
+        
+        return 0;
     });
 
     const getStatusColor = (status: string) => {
@@ -81,6 +98,7 @@ export const AdminClientsPage: React.FC = () => {
     const getPlanColor = (plan: string) => {
         const colors: Record<string, { light: string; dark: string }> = {
             S3_MAX: { light: 'bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 shadow-sm border border-amber-300', dark: 'bg-gradient-to-r from-amber-600/50 to-yellow-600/50 text-amber-100 border border-amber-500/50 shadow-[0_0_15px_rgba(251,191,36,0.2)]' },
+            S3_MAPPING: { light: 'bg-emerald-100 text-emerald-800', dark: 'bg-emerald-900/50 text-emerald-400' },
             S3: { light: 'bg-purple-100 text-purple-800', dark: 'bg-purple-900/50 text-purple-400' },
             S2: { light: 'bg-indigo-100 text-indigo-800', dark: 'bg-indigo-900/50 text-indigo-400' },
             S1: { light: 'bg-gray-100 text-gray-800', dark: 'bg-gray-700 text-gray-400' },
@@ -88,7 +106,7 @@ export const AdminClientsPage: React.FC = () => {
         return colors[plan] || colors.S1;
     };
 
-    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_MAX';
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_MAX' || plan === 'S3_MAPPING';
 
     return (
         <AdminLayout>
@@ -131,32 +149,69 @@ export const AdminClientsPage: React.FC = () => {
             </div>
 
             {/* Filters */}
-            <div className={`p-4 rounded-xl border mb-6 flex flex-col md:flex-row gap-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
-                }`}>
-                <div className="relative flex-1">
-                    <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search clients by name or slug..."
-                        className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark
-                            ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500'
-                            : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
-                            }`}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+            <div className={`p-4 rounded-xl border mb-6 flex flex-col gap-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
+                <div className="flex flex-col md:flex-row gap-4">
+                    {/* Search */}
+                    <div className="relative flex-1">
+                        <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search clients by name or slug..."
+                            className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark
+                                ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500'
+                                : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
+                                }`}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    
+                    {/* Sort & Plan Filters */}
+                    <div className="flex flex-wrap sm:flex-nowrap gap-3">
+                        <select
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value)}
+                            className={`flex-1 sm:flex-none px-3 py-2.5 border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer ${isDark
+                                ? 'bg-slate-900 border-slate-600 text-slate-200'
+                                : 'bg-white border-gray-200 text-gray-700'
+                                }`}
+                        >
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="a-z">Name (A-Z)</option>
+                            <option value="z-a">Name (Z-A)</option>
+                        </select>
+
+                        <select
+                            value={planFilter}
+                            onChange={(e) => setPlanFilter(e.target.value)}
+                            className={`flex-1 sm:flex-none px-3 py-2.5 border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer ${isDark
+                                ? 'bg-slate-900 border-slate-600 text-slate-200'
+                                : 'bg-white border-gray-200 text-gray-700'
+                                }`}
+                        >
+                            <option value="all">All Plans</option>
+                            <option value="S1">S1</option>
+                            <option value="S2">S2</option>
+                            <option value="S3">S3</option>
+                            <option value="S3_MAX">S3 MAX</option>
+                            <option value="S3_MAPPING">S3 MAPPING</option>
+                        </select>
+                    </div>
                 </div>
-                <div className={`flex rounded-lg p-1 ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+
+                {/* Status Pills */}
+                <div className={`flex flex-wrap items-center gap-1.5 p-1 rounded-lg w-full sm:w-max ${isDark ? 'bg-slate-700/50' : 'bg-gray-100'}`}>
                     {['all', 'Active', 'Inactive', 'Onboarding', 'Paused'].map((status) => (
                         <button
                             key={status}
                             onClick={() => setStatusFilter(status)}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${statusFilter === status
-                                ? (isDark ? 'bg-slate-600 text-white' : 'bg-white text-gray-900 shadow-sm')
-                                : (isDark ? 'text-slate-400 hover:text-white' : 'text-gray-500 hover:text-gray-700')
+                            className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${statusFilter === status
+                                ? (isDark ? 'bg-slate-600 text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm')
+                                : (isDark ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50')
                                 }`}
                         >
-                            {status === 'all' ? 'All' : status}
+                            {status === 'all' ? 'All Status' : status}
                         </button>
                     ))}
                 </div>
@@ -219,11 +274,11 @@ export const AdminClientsPage: React.FC = () => {
                                 </span>
                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${isDark ? getPlanColor(client.plan).dark : getPlanColor(client.plan).light
                                     }`}>
-                                    {client.plan === 'S3_MAX' ? 'S3 MAX' : client.plan}
+                                    {client.plan === 'S3_MAX' ? 'S3 MAX' : client.plan === 'S3_MAPPING' ? 'S3 MAPPING' : client.plan}
                                 </span>
                                 {isS2OrHigher(client.plan) && (
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
-                                        <Sparkles size={10} /> {client.plan === 'S3_MAX' ? 'Max Agentic' : client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
+                                        <Sparkles size={10} /> {client.plan === 'S3_MAX' ? 'Max Agentic' : client.plan === 'S3_MAPPING' ? 'Mapping Engine' : client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
                                     </span>
                                 )}
                             </div>

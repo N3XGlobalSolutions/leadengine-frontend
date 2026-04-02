@@ -32,11 +32,13 @@ const lightenColor = (hex: string): string => adjustColor(hex, 80);
 const getThemeStyles = (primaryColor: string, secondaryColor: string) => {
     const isHex = isHexColor(primaryColor);
 
-    if (isHex) {
-        // Return inline style objects for custom hex colors
+        if (isHex) {
+        // We will tone it down aggressively for the glass outer background
         return {
             bgGradientStyle: {
-                background: `linear-gradient(to bottom right, ${lightenColor(primaryColor)}, #f8fafc, #f9fafb)`
+                background: `radial-gradient(circle at top left, ${lightenColor(primaryColor)}33, transparent 40%),
+                             radial-gradient(circle at bottom right, ${primaryColor}22, transparent 40%),
+                             #f8fafc`
             },
             iconBgStyle: { backgroundColor: primaryColor },
             loadingDotStyle: { backgroundColor: primaryColor },
@@ -128,41 +130,41 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
 
     return (
         <div
-            className={`min-h-screen font-sans flex flex-col ${!themeStyles.isCustom ? `bg-gradient-to-br ${themeStyles.bgGradient}` : ''}`}
+            className={`min-h-[100dvh] font-sans flex flex-col ${!themeStyles.isCustom ? `bg-gradient-to-br ${themeStyles.bgGradient}` : ''}`}
             style={themeStyles.isCustom ? themeStyles.bgGradientStyle : undefined}
         >
             {/* Header */}
-            <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-                    {/* Left: Company Branding */}
-                    <div className="flex items-center gap-3">
-                        <div
-                            className={`w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-md ${!themeStyles.isCustom ? themeStyles.iconBg : ''}`}
-                            style={themeStyles.isCustom ? themeStyles.iconBgStyle : undefined}
-                        >
-                            <MessageCircle size={20} />
+            <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-gray-100 shadow-sm relative">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+                        {/* Left: Company Branding */}
+                        <div className="flex items-center gap-3">
+                            <div
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm ${!themeStyles.isCustom ? themeStyles.iconBg : ''}`}
+                                style={themeStyles.isCustom ? themeStyles.iconBgStyle : undefined}
+                            >
+                                <MessageCircle size={20} strokeWidth={2.5} />
+                            </div>
+                            <span className="font-bold text-gray-800 text-lg tracking-tight">
+                                {config.shortName}
+                            </span>
                         </div>
-                        <span className="font-semibold text-gray-900 text-lg tracking-tight">
-                            {config.shortName}
-                        </span>
-                    </div>
 
-                    {/* Right: AI Assistant Badge */}
-                    <div className="flex items-center gap-3">
-                        <div className="text-right hidden sm:block">
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">AI Assistant</p>
-                            <p
-                                className={`text-sm font-bold ${!themeStyles.isCustom ? themeStyles.accent : ''}`}
-                                style={themeStyles.isCustom ? themeStyles.accentStyle : undefined}
-                            >{config.botDisplayName}</p>
-                        </div>
-                        <div className="w-9 h-9 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center overflow-hidden">
-                            <img
-                                src={config.botAvatar || "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"}
-                                alt={config.botDisplayName}
-                                className="w-6 h-6 object-contain"
-                            />
-                        </div>
+                        {/* Right: AI Assistant Badge */}
+                        <div className="flex items-center gap-3">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">AI Assistant</p>
+                                <p
+                                    className={`text-sm font-bold ${!themeStyles.isCustom ? themeStyles.accent : ''}`}
+                                    style={themeStyles.isCustom ? themeStyles.accentStyle : undefined}
+                                >{config.botDisplayName}</p>
+                            </div>
+                            <div className="w-10 h-10 rounded-full bg-slate-50 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                                <img
+                                    src={config.botAvatar || "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"}
+                                    alt={config.botDisplayName}
+                                    className="w-6 h-6 object-contain"
+                                />
+                            </div>
                     </div>
                 </div>
             </header>
@@ -301,7 +303,7 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
             {/* Fixed Bottom Input Area */}
             {
                 hasStarted && !isChatEnded && (
-                    <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/95 border-t border-gray-100 z-50">
+                    <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/90 pb-4 pt-2 z-50">
                         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
                             {/* Quick Replies */}
                             {quickReplies.length > 0 && !isLoading && (
@@ -331,8 +333,8 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
             }
 
             {/* Cookie Consent */}
-            <CookieConsent />
-        </div >
+            {hasStarted && <CookieConsent />}
+        </div>
     );
 };
 

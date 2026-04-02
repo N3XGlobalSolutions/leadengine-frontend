@@ -596,9 +596,13 @@ export const updateLeadStatus = async (leadId: string, status: string): Promise<
 };
 
 // --- Audit Logs ---
-export const getAuditLogs = async (skip: number = 0, limit: number = 100): Promise<AuditLog[]> => {
+export const getAuditLogs = async (skip: number = 0, limit: number = 100, startDate?: string, endDate?: string): Promise<AuditLog[]> => {
     try {
-        const res = await api.get('/audit-logs', { params: { skip, limit } });
+        const params: any = { skip, limit };
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
+        
+        const res = await api.get('/audit-logs', { params });
         return res.data;
     } catch (e) {
         console.error("Error fetching audit logs:", e);

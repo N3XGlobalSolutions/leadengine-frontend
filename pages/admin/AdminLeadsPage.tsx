@@ -12,6 +12,7 @@ import { PriorityBadge } from '../../components/admin/PriorityBadge';
 import { S2LeadInsights } from '../../components/admin/S2LeadInsights';
 import { S3LeadInsights } from '../../components/admin/S3LeadInsights';
 import { S3MaxLeadInsights } from '../../components/admin/S3MaxLeadInsights';
+import { S3MappingLeadInsights } from '../../components/admin/S3MappingLeadInsights';
 
 export const AdminLeadsPage = () => {
     const { isDark } = useAdminTheme();
@@ -85,7 +86,8 @@ export const AdminLeadsPage = () => {
                 (l as any).email?.toLowerCase().includes(leadSearch.toLowerCase());
             const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
 
-            const leadPriority = ((l as any).metadata?.s3_max_lead_output?.lead_priority ||
+            const leadPriority = ((l as any).metadata?.s3_mapping_lead_output?.lead_priority ||
+                (l as any).metadata?.s3_max_lead_output?.lead_priority ||
                 (l as any).metadata?.s3_lead_output?.lead_priority ||
                 (l as any).metadata?.s2_lead_output?.lead_priority ||
                 (l as any).metadata?._s3_priority ||
@@ -282,7 +284,9 @@ export const AdminLeadsPage = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
-                                                    {(lead as any).metadata?.s3_max_lead_output?.lead_priority ? (
+                                                    {(lead as any).metadata?.s3_mapping_lead_output?.lead_priority ? (
+                                                        <PriorityBadge priority={(lead as any).metadata.s3_mapping_lead_output.lead_priority} />
+                                                    ) : (lead as any).metadata?.s3_max_lead_output?.lead_priority ? (
                                                         <PriorityBadge priority={(lead as any).metadata.s3_max_lead_output.lead_priority} />
                                                     ) : (lead as any).metadata?.s3_lead_output?.lead_priority ? (
                                                         <PriorityBadge priority={(lead as any).metadata.s3_lead_output.lead_priority} />
@@ -372,7 +376,9 @@ export const AdminLeadsPage = () => {
                                                 <option value="qualified">Qualified</option>
                                                 <option value="disqualified">Disqualified</option>
                                             </select>
-                                            {(selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ? (
+                                            {(selectedLead as any).metadata?.s3_mapping_lead_output?.lead_priority ? (
+                                                <PriorityBadge priority={(selectedLead as any).metadata.s3_mapping_lead_output.lead_priority} />
+                                            ) : (selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ? (
                                                 <PriorityBadge priority={(selectedLead as any).metadata.s3_max_lead_output.lead_priority} />
                                             ) : (selectedLead as any).metadata?.s3_lead_output?.lead_priority ? (
                                                 <PriorityBadge priority={(selectedLead as any).metadata.s3_lead_output.lead_priority} />
@@ -419,7 +425,12 @@ export const AdminLeadsPage = () => {
                                 {activeTab === 'overview' ? (
                                     <div className="p-6 space-y-8">
 
-                                        {/* 1. Lead Intelligence (S3 Max Priority) */}
+                                        {/* 1. Lead Intelligence */}
+                                        {(selectedLead as any).metadata?.s3_mapping_lead_output && (
+                                            <section className="animate-fade-in-up">
+                                                <S3MappingLeadInsights data={(selectedLead as any).metadata.s3_mapping_lead_output} isDark={isDark} />
+                                            </section>
+                                        )}
                                         {(selectedLead as any).metadata?.s3_max_lead_output && (
                                             <section className="animate-fade-in-up">
                                                 <S3MaxLeadInsights data={(selectedLead as any).metadata.s3_max_lead_output} isDark={isDark} />
@@ -453,33 +464,44 @@ export const AdminLeadsPage = () => {
                                         </section>
 
                                         {/* 3. Collected Data Grid */}
-                                        {(selectedLead as any).metadata && (
-                                            <section>
-                                                <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Captured Data</h4>
-                                                <div className="grid grid-cols-1 gap-3">
-                                                    {Object.entries((selectedLead as any).metadata)
-                                                        .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 's3_max_lead_output' && key !== 'email')
-                                                        .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-                                                        .map(([key, value], i) => {
-                                                            let displayKey = key.replace(/_/g, ' ');
-                                                            let displayValue = '';
-                                                            if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
-                                                                displayKey = (value as any).label;
-                                                                displayValue = (value as any).answer || '—';
-                                                            } else {
-                                                                displayValue = typeof value === 'string' ? value : String(value || '—');
-                                                            }
-
-                                                            return (
-                                                                <div key={key} className={`flex items-start justify-between p-4 rounded-xl border transition-colors hover:border-indigo-200 dark:hover:border-indigo-800 ${isDark ? 'bg-slate-800/30 border-slate-800' : 'bg-white border-gray-100'}`}>
-                                                                    <span className={`text-sm font-medium capitalize ${textSub}`}>{displayKey}</span>
-                                                                    <span className={`text-sm font-semibold text-right max-w-[60%] break-words ${textMain}`}>{displayValue}</span>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                </div>
-                                            </section>
-                                        )}
+                                        {/* 3. Collected Data Grid - hide entirely for S3 mapping (data shown in insight panel above) */}
+                                        {(selectedLead as any).metadata && (() => {
+                                            const isS3Mapping = !!(selectedLead as any).metadata?.s3_mapping_lead_output;
+                                            // Keys that are always internal/redundant and should never show in captured data
+                                            const hiddenKeys = new Set([
+                                                's3_mapping_lead_output', 's2_lead_output', 's3_lead_output', 's3_max_lead_output', 'email',
+                                                // S3 mapping top-level meta — shown in the insight panel
+                                                ...(isS3Mapping ? ['lead_priority', 'source'] : []),
+                                            ]);
+                                            const visibleEntries = Object.entries((selectedLead as any).metadata)
+                                                .filter(([key]) => !hiddenKeys.has(key));
+                                            if (visibleEntries.length === 0) return null;
+                                            return (
+                                                <section>
+                                                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Captured Data</h4>
+                                                    <div className="grid grid-cols-1 gap-3">
+                                                        {visibleEntries
+                                                            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                                                            .map(([key, value]) => {
+                                                                let displayKey = key.replace(/_/g, ' ');
+                                                                let displayValue = '';
+                                                                if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
+                                                                    displayKey = (value as any).label;
+                                                                    displayValue = (value as any).answer || '—';
+                                                                } else {
+                                                                    displayValue = typeof value === 'string' ? value : String(value || '—');
+                                                                }
+                                                                return (
+                                                                    <div key={key} className={`flex items-start justify-between p-4 rounded-xl border transition-colors hover:border-indigo-200 dark:hover:border-indigo-800 ${isDark ? 'bg-slate-800/30 border-slate-800' : 'bg-white border-gray-100'}`}>
+                                                                        <span className={`text-sm font-medium capitalize ${textSub}`}>{displayKey}</span>
+                                                                        <span className={`text-sm font-semibold text-right max-w-[60%] break-words ${textMain}`}>{displayValue}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                    </div>
+                                                </section>
+                                            );
+                                        })()}
                                     </div>
                                 ) : (
                                     <div className="h-full flex flex-col">

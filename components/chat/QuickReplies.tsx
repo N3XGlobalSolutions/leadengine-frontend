@@ -15,59 +15,59 @@ const QuickReplies: React.FC<QuickRepliesProps> = ({
 }) => {
   if (!options || options.length === 0) return null;
 
-  // Determine if we should use inline styles (for hex colors) or class names
   const isHexColor = (color: string) => /^#([0-9A-F]{3}){1,2}$/i.test(color);
   const useCustomColors = isHexColor(primaryColor);
 
-  // Helper function to create a lighter version of a color
-  const lightenColor = (hex: string, percent: number = 90): string => {
-    if (!isHexColor(hex)) return hex;
-    const num = parseInt(hex.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = Math.min(255, (num >> 16) + amt);
-    const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
-    const B = Math.min(255, (num & 0x0000FF) + amt);
-    return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
+  const hexToRgb = (hex: string) => {
+    if (!isHexColor(hex)) return '79, 70, 229'; // Default indigo-600 rgb
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    const num = parseInt(h, 16);
+    return `${num >> 16}, ${(num >> 8) & 255}, ${num & 255}`;
   };
 
   return (
-    <div className="w-full overflow-x-auto no-scrollbar py-2 mb-2 px-1">
-      <div className="flex gap-2 whitespace-nowrap">
+    <div className="w-full overflow-x-auto no-scrollbar py-3 mb-1 px-1 -mx-1">
+      <div className="flex gap-2.5 whitespace-nowrap px-1">
         {options.map((option, index) => (
           <button
             key={index}
             onClick={() => onSelect(option)}
             className={`
-              px-4 py-2 
-              bg-white
-              border-2
+              px-5 py-2.5
+              border
               rounded-full 
-              text-sm font-medium 
-              shadow-sm hover:shadow-md
-              transition-all duration-200 
+              text-[14px] font-semibold tracking-wide
+              shadow-sm hover:shadow-[0_4px_14px_rgba(0,0,0,0.12)]
+              transition-all duration-300 ease-out
               animate-fade-in-up
               ${useCustomColors
-                ? ''
-                : 'text-indigo-600 border-indigo-300 hover:bg-indigo-50 hover:border-indigo-400'
+                ? 'backdrop-blur-sm'
+                : 'bg-indigo-50/80 backdrop-blur-sm text-indigo-700 border-indigo-200/50 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:scale-[1.03]'
               }
             `}
             style={{
               animationDelay: `${index * 50}ms`,
               ...(useCustomColors ? {
                 color: primaryColor,
-                borderColor: lightenColor(primaryColor, 60), // More visible: 40% instead of 70%
+                backgroundColor: `rgba(${hexToRgb(primaryColor)}, 0.1)`,
+                borderColor: `rgba(${hexToRgb(primaryColor)}, 0.2)`,
               } : {})
             }}
             onMouseEnter={(e) => {
               if (useCustomColors) {
-                e.currentTarget.style.backgroundColor = lightenColor(primaryColor, 95);
-                e.currentTarget.style.borderColor = lightenColor(primaryColor, 50);
+                e.currentTarget.style.backgroundColor = primaryColor;
+                e.currentTarget.style.color = 'white';
+                e.currentTarget.style.borderColor = primaryColor;
+                e.currentTarget.style.transform = 'scale(1.03)';
               }
             }}
             onMouseLeave={(e) => {
               if (useCustomColors) {
-                e.currentTarget.style.backgroundColor = 'white';
-                e.currentTarget.style.borderColor = lightenColor(primaryColor, 40); // Match default state
+                e.currentTarget.style.backgroundColor = `rgba(${hexToRgb(primaryColor)}, 0.1)`;
+                e.currentTarget.style.color = primaryColor;
+                e.currentTarget.style.borderColor = `rgba(${hexToRgb(primaryColor)}, 0.2)`;
+                e.currentTarget.style.transform = 'scale(1)';
               }
             }}
           >

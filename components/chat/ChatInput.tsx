@@ -56,18 +56,21 @@ const ChatInput: React.FC<ChatInputProps> = ({
           onChange={(e) => setInput(e.target.value)}
           placeholder={placeholder || "Type your message here..."}
           disabled={disabled}
-          className="w-full bg-gray-50 border border-gray-200 text-gray-800 placeholder-gray-400 rounded-xl py-4 pl-6 pr-14 shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-purple/20 focus:border-brand-purple focus:bg-white transition-all text-base disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+          className={`w-full bg-white/80 backdrop-blur-sm border ${
+            useCustomColors ? 'focus:border-transparent' : 'focus:border-indigo-500'
+          } text-slate-800 placeholder-slate-400 rounded-full py-4 pl-6 pr-14 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] focus:outline-none focus:ring-2 focus:bg-white transition-all text-base disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed`}
+          style={useCustomColors ? { outlineColor: primaryColor } : undefined}
         />
         <button
           type="submit"
           disabled={!input.trim() || disabled}
           className={`
-            absolute right-3 p-2.5 rounded-lg flex items-center justify-center transition-all duration-200
+            absolute right-2 p-2.5 rounded-full flex items-center justify-center transition-all duration-300
             ${!input.trim() || disabled
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
               : useCustomColors
-                ? 'text-white shadow-md hover:shadow-lg'
-                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md'
+                ? 'text-white shadow-md hover:shadow-lg hover:scale-105'
+                : 'bg-slate-900 text-white hover:bg-black shadow-md hover:shadow-lg hover:scale-105'
             }
           `}
           style={

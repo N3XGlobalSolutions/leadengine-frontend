@@ -82,12 +82,12 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
             // Regular message rendering
             <div
               className={`
-                px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl text-[15px] leading-relaxed shadow-sm break-words
+                px-4 py-3 sm:px-5 sm:py-3.5 text-[15px] leading-relaxed break-words relative w-fit
                 ${isBot
                   ? message.isSoftDQ
-                    ? 'bg-amber-50 text-gray-800 rounded-bl-none border-2 border-amber-300'
-                    : 'bg-white text-gray-800 rounded-bl-none border border-gray-100'
-                  : 'bg-white text-gray-800 rounded-br-none border border-gray-100'
+                    ? 'bg-amber-50/90 backdrop-blur-md text-gray-800 rounded-3xl rounded-bl-md border border-amber-200/50 shadow-sm'
+                    : 'bg-white text-gray-800 rounded-3xl rounded-bl-md shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)] border border-gray-100'
+                  : 'bg-slate-800 text-white rounded-3xl rounded-br-md shadow-[0_4px_14px_rgba(0,0,0,0.08)]'
                 }
               `}
             >
@@ -158,13 +158,14 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
               </h3>
 
               {(() => {
+                const sd = message.summaryData || {};
+
                 // Helper to find key case-insensitively
-                const findKey = (search: string) => Object.keys(message.summaryData || {}).find(k => k.toLowerCase() === search);
+                const findKey = (search: string) => Object.keys(sd).find(k => k.toLowerCase() === search);
 
                 const nameKey = findKey('name');
                 const phoneKey = findKey('phone');
 
-                // Handle both old format (string) and new format ({label, answer} object)
                 const getValue = (val: any): string => {
                   if (val === null || val === undefined) return '';
                   if (typeof val === 'string') return val;
@@ -172,19 +173,30 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                   return String(val);
                 };
 
-                const nameValue = nameKey ? getValue(message.summaryData![nameKey]) : null;
-                const phoneValue = phoneKey ? getValue(message.summaryData![phoneKey]) : null;
+                const nameValue = nameKey ? getValue(sd[nameKey]) : null;
+                const phoneValue = phoneKey ? getValue(sd[phoneKey]) : null;
 
-                // Rest of data excluding name, phone, and internal fields
-                const remainingData = Object.entries(message.summaryData || {}).filter(([key]) => {
+                // Detect S3 Mapping format: has `answers` array and `lead_priority`
+                const isS3Mapping = Array.isArray(sd.answers) && sd.lead_priority !== undefined;
+
+                // S3 Mapping: internal structural keys to skip in generic grid
+                const S3_INTERNAL_KEYS = new Set([
+                  'name', 'phone', 'answers', 'signal_breakdown', 'avg_signal_score',
+                  'total_questions', 'disqualified', 'sessionId', 's3_max_lead_output',
+                  's3_lead_output', 's2_lead_output',
+                ]);
+
+                // Generic remaining data (for non-mapping leads)
+                const remainingData = Object.entries(sd).filter(([key]) => {
                   const lower = key.toLowerCase();
+                  if (isS3Mapping) return !S3_INTERNAL_KEYS.has(key) && lower !== 'name' && lower !== 'phone';
                   return lower !== 'name' && lower !== 'phone' && key !== 'sessionId' && !key.startsWith('q0')
                     && key !== 's3_max_lead_output' && key !== 's3_lead_output' && key !== 's2_lead_output';
                 });
 
                 return (
                   <div>
-                    {/* Spotlight Section */}
+                    {/* Spotlight: Name + Phone */}
                     {(nameValue || phoneValue) && (
                       <div className="flex items-center gap-4 mb-6 pb-6 border-b border-dashed border-gray-200">
                         <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
@@ -202,61 +214,81 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                       </div>
                     )}
 
-                    {/* Remaining Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm text-gray-700">
-                      {remainingData.map(([key, value]) => {
-                        // Handle new format: {label, answer} object
-                        let label: string;
-                        let displayValue: string;
-
-                        const valueObj = value as { label?: string; answer?: string } | null;
-
-                        if (typeof value === 'object' && value !== null && valueObj?.label && valueObj?.answer !== undefined) {
-                          // New format from backend state machine
-                          label = valueObj.label;
-                          displayValue = valueObj.answer || 'Not provided';
-                        } else {
-                          // Old format: key-value pairs
-                          label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                          displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
-                        }
-
-                        // Choose icon based on key (simple heuristic)
-                        let icon = <Check className="w-3.5 h-3.5" />; // Default icon
-                        let bgClass = "bg-gray-100 text-gray-600";
-
-                        const lowerKey = key.toLowerCase();
-                        const lowerLabel = label.toLowerCase();
-                        if (lowerKey.includes('location') || lowerLabel.includes('location') || lowerLabel.includes('address') || lowerLabel.includes('area')) {
-                          icon = <MapPin className="w-3.5 h-3.5" />;
-                          bgClass = "bg-red-50 text-red-500";
-                        } else if (lowerKey.includes('budget') || lowerLabel.includes('budget') || lowerLabel.includes('price')) {
-                          icon = <DollarSign className="w-3.5 h-3.5" />;
-                          bgClass = "bg-green-50 text-green-600";
-                        } else if (lowerKey.includes('type') || lowerLabel.includes('type') || lowerLabel.includes('bhk') || lowerLabel.includes('property')) {
-                          icon = <Home className="w-3.5 h-3.5" />;
-                          bgClass = "bg-blue-50 text-blue-500";
-                        } else if (lowerKey.includes('move') || lowerLabel.includes('move') || lowerLabel.includes('timeline') || lowerLabel.includes('date')) {
-                          icon = <Calendar className="w-3.5 h-3.5" />;
-                          bgClass = "bg-purple-50 text-purple-500";
-                        } else if (lowerKey.includes('financ') || lowerLabel.includes('financ') || lowerLabel.includes('loan')) {
-                          icon = <CreditCard className="w-3.5 h-3.5" />;
-                          bgClass = "bg-yellow-50 text-yellow-600";
-                        }
-
-                        return (
-                          <div key={key} className="flex items-start gap-2.5">
-                            <div className={`mt-0.5 p-1 rounded ${bgClass}`}>
-                              {icon}
+                    {/* S3 Mapping: clean Q&A rows, no internal scoring data shown to customer */}
+                    {isS3Mapping && Array.isArray(sd.answers) && sd.answers.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm text-gray-700">
+                        {sd.answers.map((ans: any, i: number) => {
+                          if (!ans || typeof ans !== 'object') return null;
+                          const question = typeof ans.question === 'string' ? ans.question : `Question ${i + 1}`;
+                          const answer = typeof ans.answer === 'string' ? ans.answer : String(ans.answer || '—');
+                          return (
+                            <div key={i} className="flex items-start gap-2.5">
+                              <div className="mt-0.5 p-1 rounded bg-gray-100 text-gray-600">
+                                <Check className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="overflow-hidden">
+                                <span className="block text-xs text-gray-500 font-medium lowercase first-letter:uppercase">{question}</span>
+                                <span className="font-semibold truncate block" title={answer}>{answer}</span>
+                              </div>
                             </div>
-                            <div className="overflow-hidden">
-                              <span className="block text-xs text-gray-500 font-medium lowercase first-letter:uppercase">{label}</span>
-                              <span className="font-semibold truncate block" title={displayValue}>{displayValue}</span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Generic (non-S3-mapping) remaining grid */}
+                    {!isS3Mapping && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm text-gray-700">
+                        {remainingData.map(([key, value]) => {
+                          let label: string;
+                          let displayValue: string;
+
+                          const valueObj = value as { label?: string; answer?: string } | null;
+
+                          if (typeof value === 'object' && value !== null && valueObj?.label && valueObj?.answer !== undefined) {
+                            label = valueObj.label;
+                            displayValue = valueObj.answer || 'Not provided';
+                          } else {
+                            label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
+                          }
+
+                          let icon = <Check className="w-3.5 h-3.5" />;
+                          let bgClass = "bg-gray-100 text-gray-600";
+
+                          const lowerKey = key.toLowerCase();
+                          const lowerLabel = label.toLowerCase();
+                          if (lowerKey.includes('location') || lowerLabel.includes('location') || lowerLabel.includes('address') || lowerLabel.includes('area')) {
+                            icon = <MapPin className="w-3.5 h-3.5" />;
+                            bgClass = "bg-red-50 text-red-500";
+                          } else if (lowerKey.includes('budget') || lowerLabel.includes('budget') || lowerLabel.includes('price')) {
+                            icon = <DollarSign className="w-3.5 h-3.5" />;
+                            bgClass = "bg-green-50 text-green-600";
+                          } else if (lowerKey.includes('type') || lowerLabel.includes('type') || lowerLabel.includes('bhk') || lowerLabel.includes('property')) {
+                            icon = <Home className="w-3.5 h-3.5" />;
+                            bgClass = "bg-blue-50 text-blue-500";
+                          } else if (lowerKey.includes('move') || lowerLabel.includes('move') || lowerLabel.includes('timeline') || lowerLabel.includes('date')) {
+                            icon = <Calendar className="w-3.5 h-3.5" />;
+                            bgClass = "bg-purple-50 text-purple-500";
+                          } else if (lowerKey.includes('financ') || lowerLabel.includes('financ') || lowerLabel.includes('loan')) {
+                            icon = <CreditCard className="w-3.5 h-3.5" />;
+                            bgClass = "bg-yellow-50 text-yellow-600";
+                          }
+
+                          return (
+                            <div key={key} className="flex items-start gap-2.5">
+                              <div className={`mt-0.5 p-1 rounded ${bgClass}`}>
+                                {icon}
+                              </div>
+                              <div className="overflow-hidden">
+                                <span className="block text-xs text-gray-500 font-medium lowercase first-letter:uppercase">{label}</span>
+                                <span className="font-semibold truncate block" title={displayValue}>{displayValue}</span>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })()}

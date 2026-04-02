@@ -11,12 +11,16 @@ export default function AdminAuditLogsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(0);
+    const limit = 50;
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     const fetchLogs = async () => {
         setLoading(true);
         setError(null);
         try {
-            const data = await getAuditLogs(0, 500); // Fetch latest 500 
+            const data = await getAuditLogs(page * limit, limit, startDate, endDate);
             setLogs(data);
         } catch (err) {
             setError('Failed to fetch audit logs.');
@@ -27,7 +31,7 @@ export default function AdminAuditLogsPage() {
 
     useEffect(() => {
         fetchLogs();
-    }, []);
+    }, [page, startDate, endDate]);
 
     const filteredLogs = logs.filter(log =>
         log.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -88,18 +92,41 @@ export default function AdminAuditLogsPage() {
 
             {/* Controls */}
             <div className={`p-4 rounded-xl border mb-6 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}>
-                <div className="relative w-full max-w-md">
-                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search logs by user, action, description or tenant ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className={`w-full pl-10 pr-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark
-                                ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500'
-                                : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
-                            }`}
-                    />
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="relative flex-1">
+                        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} size={18} />
+                        <input
+                            type="text"
+                            placeholder="Filter visible logs..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={`w-full pl-10 pr-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark
+                                    ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500'
+                                    : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
+                                }`}
+                        />
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>From</span>
+                            <input 
+                                type="date" 
+                                value={startDate}
+                                onChange={(e) => { setStartDate(e.target.value); setPage(0); }}
+                                className={`px-3 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>To</span>
+                            <input 
+                                type="date" 
+                                value={endDate}
+                                onChange={(e) => { setEndDate(e.target.value); setPage(0); }}
+                                className={`px-3 py-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -177,6 +204,29 @@ export default function AdminAuditLogsPage() {
                             )}
                         </tbody>
                     </table>
+                </div>
+                
+                {/* Pagination Controls */}
+                <div className={`p-4 border-t flex items-center justify-between ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-gray-50'}`}>
+                    <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                        Showing page {page + 1} • {logs.length} logs
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPage(Math.max(0, page - 1))}
+                            disabled={page === 0 || loading}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                        >
+                            Previous
+                        </button>
+                        <button
+                            onClick={() => setPage(page + 1)}
+                            disabled={logs.length < limit || loading}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

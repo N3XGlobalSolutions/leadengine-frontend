@@ -11,7 +11,7 @@
  * - Max 30 questions enforced in UI
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { Plus, X, Trash2, ChevronDown, ChevronUp, Table as TableIcon } from 'lucide-react';
 
@@ -270,6 +270,19 @@ const QuestionMapEditor: React.FC<QuestionMapEditorProps> = ({ value, onChange }
   const [tableExpandedIndex, setTableExpandedIndex] = useState<number | null>(null);
 
   const questions = value.question_map ?? [];
+
+  // Auto-expand the table editor for the first question that already has a table.
+  // Only fires once per mount (ref-guarded) so the user keeps manual control after.
+  const hasAutoExpandedTable = useRef(false);
+  useEffect(() => {
+    if (!hasAutoExpandedTable.current && questions.length > 0) {
+      const idx = questions.findIndex(q => !!q.table);
+      if (idx !== -1) {
+        setTableExpandedIndex(idx);
+        hasAutoExpandedTable.current = true;
+      }
+    }
+  }, [questions]);
 
   // ── Mutators ──────────────────────────────────────────────────────────────
   const updateQuestion = (idx: number, updated: QuestionMapItem) => {

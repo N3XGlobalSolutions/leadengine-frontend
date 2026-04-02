@@ -12,6 +12,8 @@
  */
 
 import React, { useState } from 'react';
+import { useAdminTheme } from '../../contexts/AdminThemeContext';
+import { Plus, X, Trash2, ChevronDown, ChevronUp, Table as TableIcon } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type SignalLevel = 'high' | 'medium' | 'low' | 'disqualify';
@@ -45,11 +47,23 @@ interface QuestionMapEditorProps {
 }
 
 // ── Signal config ──────────────────────────────────────────────────────────────
-const SIGNAL_CONFIG: Record<SignalLevel, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  high:        { label: 'High',      color: '#16a34a', bg: '#f0fdf4', border: '#86efac', icon: '🟢' },
-  medium:      { label: 'Medium',    color: '#d97706', bg: '#fffbeb', border: '#fcd34d', icon: '🟡' },
-  low:         { label: 'Low',       color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', icon: '🔴' },
-  disqualify:  { label: 'Auto-Exit', color: '#7c3aed', bg: '#faf5ff', border: '#c4b5fd', icon: '⛔' },
+const SIGNAL_CONFIG: Record<SignalLevel, { label: string; icon: string; classes: { light: string; dark: string } }> = {
+  high: {
+    label: 'High', icon: '🟢',
+    classes: { light: 'bg-green-50 text-green-700 border-green-300', dark: 'bg-green-900/30 text-green-400 border-green-800' }
+  },
+  medium: {
+    label: 'Medium', icon: '🟡',
+    classes: { light: 'bg-amber-50 text-amber-700 border-amber-300', dark: 'bg-amber-900/30 text-amber-400 border-amber-800' }
+  },
+  low: {
+    label: 'Low', icon: '🔴',
+    classes: { light: 'bg-red-50 text-red-700 border-red-300', dark: 'bg-red-900/30 text-red-400 border-red-800' }
+  },
+  disqualify: {
+    label: 'Auto-Exit', icon: '⛔',
+    classes: { light: 'bg-purple-50 text-purple-700 border-purple-300', dark: 'bg-purple-900/30 text-purple-400 border-purple-800' }
+  },
 };
 
 const MAX_MAPPED_QUESTIONS = 30;
@@ -69,6 +83,19 @@ const emptyTable = (): QuestionMapTable => ({
   rows: [['', '']],
 });
 
+// ── Shared UI Helpers ──────────────────────────────────────────────────────────
+const useSharedStyles = () => {
+    const { isDark } = useAdminTheme();
+    return {
+        isDark,
+        inputClass: `w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${
+            isDark ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+        }`,
+        labelClass: `block text-xs font-semibold mb-1.5 tracking-wider uppercase ${isDark ? 'text-slate-400' : 'text-gray-500'}`,
+        cardClass: `rounded-xl border transition-all duration-200 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`,
+    };
+};
+
 // ── Sub-component: TableBuilder ────────────────────────────────────────────────
 interface TableBuilderProps {
   table: QuestionMapTable;
@@ -76,6 +103,7 @@ interface TableBuilderProps {
 }
 
 const TableBuilder: React.FC<TableBuilderProps> = ({ table, onChange }) => {
+  const { isDark, inputClass } = useSharedStyles();
   const colCount = table.headers.length;
 
   const updateHeader = (colIdx: number, val: string) => {
@@ -116,29 +144,23 @@ const TableBuilder: React.FC<TableBuilderProps> = ({ table, onChange }) => {
     onChange({ ...table, rows });
   };
 
-  const cellStyle: React.CSSProperties = {
-    padding: '4px 6px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '12px',
-    width: '100%',
-    boxSizing: 'border-box',
-    outline: 'none',
-  };
+  const cellClass = `px-2 py-1 border rounded text-xs w-full focus:outline-none transition-colors ${
+    isDark ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-gray-300 text-gray-900'
+  }`;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <div className="flex flex-col gap-4">
       {/* Header + column controls */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', minWidth: '100%', fontSize: '12px' }}>
+      <div className="overflow-x-auto pb-2">
+        <table className="min-w-full text-xs">
           <thead>
             <tr>
-              <th style={{ width: '24px' }} />
+              <th className="w-8"></th>
               {table.headers.map((h, ci) => (
-                <th key={ci} style={{ padding: '4px', verticalAlign: 'bottom' }}>
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <th key={ci} className="p-1 align-bottom font-medium">
+                  <div className="flex items-center gap-1">
                     <input
-                      style={{ ...cellStyle, fontWeight: 700, background: '#f0fdf4', borderColor: '#86efac' }}
+                      className={`${cellClass} font-semibold ${isDark ? 'bg-indigo-900/30 border-indigo-700 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}
                       value={h}
                       placeholder={`Col ${ci + 1}`}
                       onChange={e => updateHeader(ci, e.target.value)}
@@ -147,42 +169,48 @@ const TableBuilder: React.FC<TableBuilderProps> = ({ table, onChange }) => {
                       <button
                         onClick={() => removeColumn(ci)}
                         title="Remove column"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px', flexShrink: 0 }}
-                      >×</button>
+                        className={`p-1 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20`}
+                      >
+                        <X size={14} />
+                      </button>
                     )}
                   </div>
                 </th>
               ))}
-              <th style={{ padding: '4px' }}>
+              <th className="p-1 align-bottom">
                 <button
                   onClick={addColumn}
                   title="Add column"
-                  style={{ background: 'none', border: '1px dashed #d1d5db', borderRadius: '6px', cursor: 'pointer', color: '#6366f1', fontSize: '12px', padding: '2px 8px', whiteSpace: 'nowrap' }}
-                >+ col</button>
+                  className={`flex items-center gap-1 px-2 py-1 rounded border border-dashed whitespace-nowrap transition-colors ${isDark ? 'border-indigo-700 text-indigo-400 hover:bg-indigo-900/30' : 'border-indigo-300 text-indigo-600 hover:bg-indigo-50'}`}
+                >
+                  <Plus size={14} /> Col
+                </button>
               </th>
             </tr>
           </thead>
           <tbody>
             {table.rows.map((row, ri) => (
               <tr key={ri}>
-                <td style={{ padding: '4px', textAlign: 'center' }}>
+                <td className="p-1 text-center align-middle">
                   <button
                     onClick={() => removeRow(ri)}
                     title="Remove row"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '14px' }}
-                  >×</button>
+                    className="p-1 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <X size={14} />
+                  </button>
                 </td>
                 {table.headers.map((_, ci) => (
-                  <td key={ci} style={{ padding: '4px' }}>
+                  <td key={ci} className="p-1">
                     <input
-                      style={cellStyle}
+                      className={cellClass}
                       value={row[ci] ?? ''}
                       placeholder="—"
                       onChange={e => updateCell(ri, ci, e.target.value)}
                     />
                   </td>
                 ))}
-                <td />
+                <td></td>
               </tr>
             ))}
           </tbody>
@@ -190,31 +218,39 @@ const TableBuilder: React.FC<TableBuilderProps> = ({ table, onChange }) => {
       </div>
 
       {/* Add row */}
-      <button
-        onClick={addRow}
-        style={{ alignSelf: 'flex-start', background: 'none', border: '1px dashed #d1d5db', borderRadius: '6px', cursor: 'pointer', color: '#6b7280', fontSize: '12px', padding: '4px 12px' }}
-      >+ Add row</button>
+      <div>
+        <button
+          onClick={addRow}
+          className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg border border-dashed transition-colors ${isDark ? 'border-slate-600 text-slate-400 hover:bg-slate-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+        >
+          <Plus size={14} /> Add row
+        </button>
+      </div>
 
       {/* Live preview */}
       {table.rows.length > 0 && (
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+        <div className="mt-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400 mb-2">
             Preview (as shown in chat)
           </div>
-          <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '8px', background: '#f9fafb' }}>
-            <table style={{ borderCollapse: 'collapse', fontSize: '12px', width: '100%' }}>
+          <div className={`overflow-x-auto border rounded-lg p-2 ${isDark ? 'border-slate-700 bg-slate-900/50' : 'border-gray-200 bg-gray-50'}`}>
+            <table className="w-full text-xs text-left border-collapse">
               <thead>
-                <tr style={{ background: '#eff6ff' }}>
+                <tr className={isDark ? 'bg-indigo-900/40 text-indigo-300' : 'bg-indigo-50 text-indigo-700'}>
                   {table.headers.map((h, ci) => (
-                    <th key={ci} style={{ padding: '6px 10px', border: '1px solid #bfdbfe', textAlign: 'left', fontWeight: 700, color: '#1d4ed8', whiteSpace: 'nowrap' }}>{h || `Col ${ci + 1}`}</th>
+                    <th key={ci} className={`p-2 border font-bold ${isDark ? 'border-indigo-800' : 'border-indigo-200'}`}>
+                      {h || `Col ${ci + 1}`}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {table.rows.map((row, ri) => (
-                  <tr key={ri} style={{ background: ri % 2 === 0 ? '#fff' : '#f8faff' }}>
+                  <tr key={ri} className={ri % 2 === 0 ? (isDark ? 'bg-slate-800' : 'bg-white') : (isDark ? 'bg-slate-800/60' : 'bg-gray-50/50')}>
                     {table.headers.map((_, ci) => (
-                      <td key={ci} style={{ padding: '5px 10px', border: '1px solid #e5e7eb', color: '#374151' }}>{row[ci] || '—'}</td>
+                      <td key={ci} className={`p-2 border ${isDark ? 'border-slate-700 text-slate-300' : 'border-gray-200 text-gray-700'}`}>
+                        {row[ci] || '—'}
+                      </td>
                     ))}
                   </tr>
                 ))}
@@ -229,6 +265,7 @@ const TableBuilder: React.FC<TableBuilderProps> = ({ table, onChange }) => {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 const QuestionMapEditor: React.FC<QuestionMapEditorProps> = ({ value, onChange }) => {
+  const { isDark, inputClass, labelClass, cardClass } = useSharedStyles();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [tableExpandedIndex, setTableExpandedIndex] = useState<number | null>(null);
 
@@ -292,262 +329,206 @@ const QuestionMapEditor: React.FC<QuestionMapEditorProps> = ({ value, onChange }
     updateQuestion(qIdx, { ...questions[qIdx], table });
   };
 
-  // ── Styles ────────────────────────────────────────────────────────────────
-  const s = {
-    container: { display: 'flex', flexDirection: 'column' as const, gap: '16px' },
-    header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' },
-    badge: (n: number) => ({
-      background: n >= MAX_MAPPED_QUESTIONS ? '#fef2f2' : '#f0fdf4',
-      color: n >= MAX_MAPPED_QUESTIONS ? '#dc2626' : '#16a34a',
-      border: `1px solid ${n >= MAX_MAPPED_QUESTIONS ? '#fca5a5' : '#86efac'}`,
-      borderRadius: '9999px', padding: '2px 10px', fontSize: '12px', fontWeight: 600,
-    }),
-    card: (expanded: boolean) => ({
-      border: expanded ? '1px solid #6366f1' : '1px solid #e5e7eb',
-      borderRadius: '10px', overflow: 'hidden', background: '#fff',
-      boxShadow: expanded ? '0 0 0 3px rgba(99,102,241,0.12)' : '0 1px 3px rgba(0,0,0,0.06)',
-      transition: 'all 0.15s ease',
-    }),
-    qHeader: {
-      display: 'flex', alignItems: 'center', gap: '10px',
-      padding: '12px 16px', cursor: 'pointer', userSelect: 'none' as const,
-      background: '#fafafa', borderBottom: '1px solid #f3f4f6',
-    },
-    qNum: {
-      width: '28px', height: '28px', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', borderRadius: '50%', background: '#6366f1',
-      color: '#fff', fontSize: '12px', fontWeight: 700, flexShrink: 0,
-    },
-    qTitle: {
-      flex: 1, fontSize: '14px', color: '#374151', fontWeight: 500,
-      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
-    },
-    body: { padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: '14px' },
-    label: {
-      fontSize: '12px', fontWeight: 600, color: '#6b7280',
-      textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: '6px',
-    },
-    input: {
-      width: '100%', padding: '8px 12px', border: '1px solid #d1d5db',
-      borderRadius: '8px', fontSize: '14px', color: '#111827',
-      outline: 'none', boxSizing: 'border-box' as const, transition: 'border-color 0.15s',
-    },
-    optionRow: { display: 'flex', alignItems: 'flex-start', gap: '8px' },
-    signalSelect: (signal: SignalLevel) => ({
-      padding: '6px 8px', border: `1px solid ${SIGNAL_CONFIG[signal].border}`,
-      borderRadius: '8px', fontSize: '12px', color: SIGNAL_CONFIG[signal].color,
-      background: SIGNAL_CONFIG[signal].bg, fontWeight: 600,
-      cursor: 'pointer', outline: 'none', flexShrink: 0,
-    }),
-    exitMsgInput: {
-      marginTop: '6px', width: '100%', padding: '6px 10px',
-      border: '1px solid #c4b5fd', borderRadius: '6px', fontSize: '12px',
-      color: '#7c3aed', background: '#faf5ff', outline: 'none',
-      boxSizing: 'border-box' as const,
-    },
-    addOptionBtn: {
-      display: 'flex', alignItems: 'center', gap: '4px',
-      padding: '6px 12px', border: '1px dashed #d1d5db', borderRadius: '8px',
-      background: 'transparent', color: '#6b7280', fontSize: '13px', cursor: 'pointer',
-    },
-    removeBtn: {
-      padding: '4px 8px', border: 'none', background: 'transparent',
-      color: '#9ca3af', cursor: 'pointer', borderRadius: '6px',
-      fontSize: '16px', lineHeight: 1,
-    },
-    addQBtn: {
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-      padding: '12px', border: '2px dashed #d1d5db', borderRadius: '10px',
-      background: 'transparent',
-      color: questions.length >= MAX_MAPPED_QUESTIONS ? '#9ca3af' : '#6366f1',
-      fontSize: '14px', fontWeight: 600,
-      cursor: questions.length >= MAX_MAPPED_QUESTIONS ? 'not-allowed' : 'pointer',
-      opacity: questions.length >= MAX_MAPPED_QUESTIONS ? 0.5 : 1,
-    },
-    tableToggle: (hasTable: boolean) => ({
-      display: 'flex', alignItems: 'center', gap: '8px',
-      padding: '8px 12px', border: `1px solid ${hasTable ? '#bfdbfe' : '#d1d5db'}`,
-      borderRadius: '8px', background: hasTable ? '#eff6ff' : 'transparent',
-      cursor: 'pointer', fontSize: '13px', color: hasTable ? '#1d4ed8' : '#6b7280',
-      fontWeight: hasTable ? 600 : 400,
-    }),
-    infoBox: {
-      fontSize: '12px', color: '#6b7280', padding: '10px 14px',
-      background: '#f9fafb', border: '1px solid #e5e7eb',
-      borderRadius: '8px', lineHeight: 1.5,
-    },
-  };
-
   return (
-    <div style={s.container}>
+    <div className="flex flex-col gap-6">
       {/* Header */}
-      <div style={s.header}>
+      <div className="flex items-center justify-between">
         <div>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: '#111827' }}>Question Map</div>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-            Up to {MAX_MAPPED_QUESTIONS} deterministic questions — any question may include an inline table
-          </div>
+          <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Map Editor</h3>
+          <p className={`text-sm mt-0.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+            Up to {MAX_MAPPED_QUESTIONS} deterministic questions. Any question may include an inline table.
+          </p>
         </div>
-        <span style={s.badge(questions.length)}>{questions.length} / {MAX_MAPPED_QUESTIONS}</span>
+        <div className={`px-3 py-1 rounded-full text-xs font-bold border ${questions.length >= MAX_MAPPED_QUESTIONS ? (isDark ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-red-50 text-red-600 border-red-300') : (isDark ? 'bg-green-900/30 text-green-400 border-green-800' : 'bg-green-50 text-green-700 border-green-300')}`}>
+          {questions.length} / {MAX_MAPPED_QUESTIONS}
+        </div>
       </div>
 
       {/* Questions */}
-      {questions.map((q, qIdx) => {
-        const isExpanded = expandedIndex === qIdx;
-        const isTableExpanded = tableExpandedIndex === qIdx;
-        const hasTable = !!q.table;
+      <div className="flex flex-col gap-4">
+        {questions.map((q, qIdx) => {
+          const isExpanded = expandedIndex === qIdx;
+          const isTableExpanded = tableExpandedIndex === qIdx;
+          const hasTable = !!q.table;
 
-        return (
-          <div key={q.id} style={s.card(isExpanded)}>
-            {/* Collapsible header */}
-            <div style={s.qHeader} onClick={() => setExpandedIndex(isExpanded ? null : qIdx)}>
-              <span style={s.qNum}>{qIdx + 1}</span>
-              <span style={s.qTitle}>
-                {q.question || <em style={{ color: '#9ca3af' }}>Untitled question</em>}
-              </span>
-              {hasTable && <span title="Has inline table" style={{ fontSize: '14px' }}>📊</span>}
-              <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                {q.quick_replies.length} option{q.quick_replies.length !== 1 ? 's' : ''}
-              </span>
-              <button
-                style={{ ...s.removeBtn, color: '#ef4444' }}
-                onClick={(e) => { e.stopPropagation(); removeQuestion(qIdx); }}
-                title="Remove question"
-              >×</button>
-              <span style={{ color: '#9ca3af', fontSize: '12px' }}>{isExpanded ? '▲' : '▼'}</span>
-            </div>
-
-            {/* Body */}
-            {isExpanded && (
-              <div style={s.body}>
-
-                {/* Question text */}
-                <div>
-                  <div style={s.label}>Question Text</div>
-                  <input
-                    style={s.input}
-                    type="text"
-                    placeholder="e.g. What is the primary nature of your business activity?"
-                    value={q.question}
-                    onChange={(e) => updateQuestion(qIdx, { ...q, question: e.target.value })}
-                  />
+          return (
+            <div key={q.id} className={`${cardClass} overflow-hidden ${isExpanded ? (isDark ? 'ring-2 ring-indigo-500/50 border-indigo-500 shadow-lg' : 'ring-2 ring-indigo-500/20 border-indigo-500 shadow-md') : ''}`}>
+              {/* Collapsible header */}
+              <div 
+                className={`flex items-center gap-3 p-4 cursor-pointer select-none transition-colors ${isExpanded ? (isDark ? 'bg-slate-800 border-b border-slate-700' : 'bg-gray-50 border-b border-gray-200') : (isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50')}`}
+                onClick={() => setExpandedIndex(isExpanded ? null : qIdx)}
+              >
+                <div className="w-8 h-8 flex items-center justify-center rounded-full bg-indigo-600 text-white text-sm font-bold shrink-0">
+                  {qIdx + 1}
                 </div>
+                <div className={`flex-1 font-medium truncate ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>
+                  {q.question || <em className="text-gray-400 dark:text-slate-500">Untitled question</em>}
+                </div>
+                {hasTable && <span title="Has inline table"><TableIcon size={18} className="text-indigo-500 mx-2" /></span>}
+                <div className="text-xs text-gray-400 dark:text-slate-500 hidden sm:block">
+                  {q.quick_replies.length} option{q.quick_replies.length !== 1 ? 's' : ''}
+                </div>
+                <button
+                  className="p-1.5 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors ml-2"
+                  onClick={(e) => { e.stopPropagation(); removeQuestion(qIdx); }}
+                  title="Remove question"
+                >
+                  <Trash2 size={16} />
+                </button>
+                <div className="text-gray-400 ml-1">
+                  {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </div>
+              </div>
 
-                {/* Answer options */}
-                <div>
-                  <div style={s.label}>Answer Options &amp; Signal Levels</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {q.quick_replies.map((opt, oIdx) => (
-                      <div key={oIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={s.optionRow}>
-                          <select
-                            style={s.signalSelect(opt.signal)}
-                            value={opt.signal}
-                            onChange={(e) =>
-                              updateOption(qIdx, oIdx, { ...opt, signal: e.target.value as SignalLevel })
-                            }
-                          >
-                            {(Object.entries(SIGNAL_CONFIG) as [SignalLevel, typeof SIGNAL_CONFIG[SignalLevel]][]).map(([val, cfg]) => (
-                              <option key={val} value={val}>{cfg.icon} {cfg.label}</option>
-                            ))}
-                          </select>
+              {/* Body */}
+              {isExpanded && (
+                <div className="p-4 sm:p-5 flex flex-col gap-6">
+                  
+                  {/* Question text */}
+                  <div>
+                    <label className={labelClass}>Question Text</label>
+                    <input
+                      className={inputClass}
+                      type="text"
+                      placeholder="e.g. What is the primary nature of your business activity?"
+                      value={q.question}
+                      onChange={(e) => updateQuestion(qIdx, { ...q, question: e.target.value })}
+                    />
+                  </div>
 
-                          <input
-                            style={{ ...s.input, flex: 1 }}
-                            type="text"
-                            placeholder={`Option ${oIdx + 1} label...`}
-                            value={opt.text}
-                            onChange={(e) => updateOption(qIdx, oIdx, { ...opt, text: e.target.value })}
-                          />
+                  {/* Answer options */}
+                  <div>
+                    <label className={labelClass}>Answer Options & Signal Levels</label>
+                    <div className="flex flex-col gap-3">
+                      {q.quick_replies.map((opt, oIdx) => {
+                        const signalCfg = SIGNAL_CONFIG[opt.signal];
+                        return (
+                          <div key={oIdx} className="flex flex-col gap-1.5">
+                            <div className="flex items-start gap-2 sm:gap-3">
+                              <select
+                                className={`px-2 py-2 sm:py-1.5 border rounded-lg text-xs font-semibold cursor-pointer outline-none transition-colors shrink-0 ${isDark ? signalCfg.classes.dark : signalCfg.classes.light}`}
+                                value={opt.signal}
+                                onChange={(e) =>
+                                  updateOption(qIdx, oIdx, { ...opt, signal: e.target.value as SignalLevel })
+                                }
+                              >
+                                {(Object.entries(SIGNAL_CONFIG) as [SignalLevel, typeof SIGNAL_CONFIG[SignalLevel]][]).map(([val, cfg]) => (
+                                  <option key={val} value={val}>{cfg.icon} {cfg.label}</option>
+                                ))}
+                              </select>
 
-                          {q.quick_replies.length > 1 && (
-                            <button
-                              style={s.removeBtn}
-                              onClick={() => removeOption(qIdx, oIdx)}
-                              title="Remove option"
-                            >×</button>
-                          )}
+                              <input
+                                className={`${inputClass} flex-1`}
+                                type="text"
+                                placeholder={`Option ${oIdx + 1} label...`}
+                                value={opt.text}
+                                onChange={(e) => updateOption(qIdx, oIdx, { ...opt, text: e.target.value })}
+                              />
+
+                              {q.quick_replies.length > 1 && (
+                                <button
+                                  className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-800"
+                                  onClick={() => removeOption(qIdx, oIdx)}
+                                  title="Remove option"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Auto-exit message input */}
+                            {opt.signal === 'disqualify' && (
+                              <input
+                                className={`mt-1 w-full px-3 py-2 border rounded-lg text-sm outline-none transition-colors ${isDark ? 'bg-purple-900/20 border-purple-800 text-purple-300 placeholder-purple-500 focus:ring-2 focus:ring-purple-500' : 'bg-purple-50 border-purple-300 text-purple-700 placeholder-purple-400 focus:ring-2 focus:ring-purple-500'}`}
+                                type="text"
+                                placeholder="⛔ Custom exit message shown to user when they choose this option..."
+                                value={opt.exit_message ?? ''}
+                                onChange={(e) =>
+                                  updateOption(qIdx, oIdx, { ...opt, exit_message: e.target.value })
+                                }
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      <button
+                        className={`self-start flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border border-dashed transition-colors ${isDark ? 'text-slate-400 border-slate-600 hover:text-slate-300 hover:bg-slate-800' : 'text-gray-600 border-gray-300 hover:text-gray-800 hover:bg-gray-50'}`}
+                        onClick={() => addOption(qIdx)}
+                      >
+                        <Plus size={14} /> Add option
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Inline Table Section */}
+                  <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-900/30 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+                       <div>
+                         <label className={`${labelClass} !mb-0`}>Inline Table</label>
+                         <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Display a formatted table before the quick-replies.</p>
+                       </div>
+                       <button
+                         className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded hover:shadow-sm transition-all border ${hasTable ? (isDark ? 'bg-indigo-900/30 text-indigo-300 border-indigo-700 hover:bg-indigo-900/50' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100') : (isDark ? 'bg-transparent text-slate-300 border-slate-600 hover:bg-slate-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')}`}
+                         onClick={() => toggleTable(qIdx)}
+                       >
+                         <TableIcon size={14} />
+                         {hasTable ? 'Remove table' : 'Attach a table'}
+                       </button>
+                    </div>
+
+                    {hasTable && q.table && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                        <div
+                          className="flex items-center justify-between mb-3 cursor-pointer group select-none"
+                          onClick={() => setTableExpandedIndex(isTableExpanded ? null : qIdx)}
+                        >
+                          <span className={`text-sm font-semibold flex items-center gap-2 transition-colors ${isDark ? 'text-indigo-400 group-hover:text-indigo-300' : 'text-indigo-600 group-hover:text-indigo-700'}`}>
+                            {isTableExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            {isTableExpanded ? 'Hide table editor' : 'Edit table contents'}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-white text-gray-500 border border-gray-200'}`}>
+                            {q.table.headers.length} cols × {q.table.rows.length} rows
+                          </span>
                         </div>
 
-                        {/* Auto-exit message input */}
-                        {opt.signal === 'disqualify' && (
-                          <input
-                            style={s.exitMsgInput}
-                            type="text"
-                            placeholder="⛔ Custom exit message shown to user when they choose this option..."
-                            value={opt.exit_message ?? ''}
-                            onChange={(e) =>
-                              updateOption(qIdx, oIdx, { ...opt, exit_message: e.target.value })
-                            }
-                          />
+                        {isTableExpanded && (
+                          <div className={`mt-3 p-3 sm:p-4 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                            <TableBuilder
+                              table={q.table}
+                              onChange={(updated) => updateTable(qIdx, updated)}
+                            />
+                          </div>
                         )}
                       </div>
-                    ))}
-
-                    <button style={s.addOptionBtn} onClick={() => addOption(qIdx)}>
-                      + Add option
-                    </button>
+                    )}
                   </div>
+
                 </div>
-
-                {/* Inline Table Section */}
-                <div>
-                  <div style={s.label}>Inline Table (optional)</div>
-                  <button
-                    style={s.tableToggle(hasTable)}
-                    onClick={() => toggleTable(qIdx)}
-                  >
-                    <span>📊</span>
-                    {hasTable ? 'Remove table' : 'Attach a table to this question'}
-                  </button>
-
-                  {hasTable && q.table && (
-                    <div style={{ marginTop: '10px' }}>
-                      <div
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          marginBottom: '8px', cursor: 'pointer',
-                        }}
-                        onClick={() => setTableExpandedIndex(isTableExpanded ? null : qIdx)}
-                      >
-                        <span style={{ fontSize: '13px', color: '#1d4ed8', fontWeight: 600 }}>
-                          {isTableExpanded ? '▲ Hide table editor' : '▼ Edit table'}
-                        </span>
-                        <span style={{ fontSize: '11px', color: '#6b7280' }}>
-                          {q.table.headers.length} cols × {q.table.rows.length} rows
-                        </span>
-                      </div>
-
-                      {isTableExpanded && (
-                        <TableBuilder
-                          table={q.table}
-                          onChange={(updated) => updateTable(qIdx, updated)}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            )}
-          </div>
-        );
-      })}
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Add question */}
       <button
-        style={s.addQBtn}
+        className={`w-full flex items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed font-semibold text-sm transition-all duration-200 ${questions.length >= MAX_MAPPED_QUESTIONS ? (isDark ? 'border-slate-700 text-slate-500 bg-slate-800/30 cursor-not-allowed' : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed') : (isDark ? 'border-indigo-700/50 text-indigo-400 hover:text-indigo-300 hover:border-indigo-500 hover:bg-slate-800' : 'border-indigo-300 text-indigo-600 hover:text-indigo-700 hover:border-indigo-400 hover:bg-indigo-50')}`}
         onClick={addQuestion}
         disabled={questions.length >= MAX_MAPPED_QUESTIONS}
       >
-        + Add Question {questions.length >= MAX_MAPPED_QUESTIONS && '(limit reached)'}
+        <Plus size={18} />
+        Add Question {questions.length >= MAX_MAPPED_QUESTIONS && '(limit reached)'}
       </button>
 
       {/* Info box */}
-      <div style={s.infoBox}>
-        <strong>{questions.length} question{questions.length !== 1 ? 's' : ''}</strong> defined.
-        {' '}Signal scoring: 🟢 High (+3) | 🟡 Medium (+2) | 🔴 Low (+1) | ⛔ Auto-Exit (immediate){' '}
-        | 📊 Questions with tables render an HTML table in the chat before the quick-reply options.
+      <div className={`p-4 rounded-xl border text-sm leading-relaxed ${isDark ? 'bg-slate-900/50 border-slate-700 text-slate-300' : 'bg-blue-50/50 border-blue-100 text-gray-600'}`}>
+        <strong className={isDark ? 'text-white' : 'text-gray-900'}>{questions.length} question{questions.length !== 1 ? 's' : ''}</strong> defined.
+        <br/><br/>
+        <ul className="list-disc list-inside space-y-1 ml-1 text-xs">
+           <li><strong>Signal scoring:</strong> 🟢 High (+3) | 🟡 Medium (+2) | 🔴 Low (+1) | ⛔ Auto-Exit (immediate)</li>
+           <li><strong>Tables:</strong> Questions with tables render an HTML table in the chat before the quick-reply options.</li>
+        </ul>
       </div>
     </div>
   );

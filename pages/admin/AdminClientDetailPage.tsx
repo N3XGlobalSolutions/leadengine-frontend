@@ -549,7 +549,7 @@ export const AdminClientDetailPage = () => {
                         }`}
                     >
                         {tab === 'integration' ? 'Generate Key'
-                         : tab === 'question_map' ? '🗺️ Question Map'
+                         : tab === 'question_map' ? 'Question Map'
                          : tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                 ))}

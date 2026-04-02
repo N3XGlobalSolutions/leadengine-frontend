@@ -602,7 +602,7 @@ export const AddClientPage = () => {
                                 /* S3 Mapping: structured question map editor */
                                 <div className={cardClass}>
                                     <div className="flex items-center gap-3 mb-6">
-                                        <span style={{ fontSize: '22px' }}>🗺️</span>
+                                        <span style={{ fontSize: '22px' }}><Wand2 className="text-indigo-500 mt-1" size={20} /></span>
                                         <div>
                                             <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Build Your Question Map</h3>
                                             <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>

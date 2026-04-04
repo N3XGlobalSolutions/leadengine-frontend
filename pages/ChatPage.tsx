@@ -255,7 +255,7 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                                         onFeedback={(type) => handleFeedback(msg.id, type)}
                                     />
 
-                                    {msg.showActions && !isChatEnded && (
+                                    {msg.showActions && idx === messages.length - 1 && (
                                         <div className="mt-3 pl-11">
                                             <ActionButtons
                                                 onSchedule={handleScheduleCall}

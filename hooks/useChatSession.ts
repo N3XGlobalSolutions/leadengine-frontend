@@ -245,7 +245,11 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
             // DO NOT fallback to current_state === 'completed' — that would cause
             // every post-completion message (Maybe Later reply, etc.) to show buttons again.
             const isFirstCompletion = response.show_actions === true;
-            const isTerminalAction = response.suggested_actions?.includes('lead_captured');
+            // 'chat_ended' is sent by S3 Mapping and S3 Max for all terminal states
+            // 'lead_captured' is sent by S1/S2/S3 shared flow
+            const isTerminalAction =
+                response.suggested_actions?.includes('lead_captured') ||
+                response.suggested_actions?.includes('chat_ended');
 
             // showActions: show buttons ONLY when backend explicitly says show_actions=true
             // (i.e., the very first completion message, NOT on every reply after that)

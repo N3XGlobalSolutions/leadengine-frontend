@@ -241,12 +241,18 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
             // S2/S3: Detect soft-disqualify state
             const isSoftDQ = response.current_state === 's2_soft_dq' || response.current_state === 's3_soft_dq';
 
-            // Use explicit state from backend
-            const isLeadCaptured = response.show_actions ||
-                response.current_state === 'completed' ||
-                response.suggested_actions?.includes('lead_captured');
+            // TRUST ONLY response.show_actions from the backend.
+            // DO NOT fallback to current_state === 'completed' — that would cause
+            // every post-completion message (Maybe Later reply, etc.) to show buttons again.
+            const isFirstCompletion = response.show_actions === true;
+            const isTerminalAction = response.suggested_actions?.includes('lead_captured');
 
-            const isSummary = response.summary_data != null;
+            // showActions: show buttons ONLY when backend explicitly says show_actions=true
+            // (i.e., the very first completion message, NOT on every reply after that)
+            const shouldShowActions = isFirstCompletion && !isSoftDQ;
+
+            // isSummary: show lead summary card ONLY on the first completion message
+            const isSummary = response.summary_data != null && isFirstCompletion;
             const summaryData = response.summary_data || null;
 
             // Update progress from backend
@@ -270,16 +276,16 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
 
             // Add bot message with explicit flags from backend
             addMessage(MessageRole.Bot, botText, {
-                showActions: isLeadCaptured && !isSoftDQ,
+                showActions: shouldShowActions,
                 isSummary: isSummary,
                 summaryData: summaryData,
                 conversationalTransition: transition,
                 isSoftDQ: isSoftDQ,
             });
 
-            // If lead captured, log for verification and end the chat input
-            if (isLeadCaptured) {
-                console.log('✅ Lead captured! Backend confirmed via show_actions flag.');
+            // End chat input ONLY on first completion or terminal actions (schedule/later)
+            if (isFirstCompletion || isTerminalAction) {
+                console.log('✅ Lead captured! Ending chat input.');
                 setIsChatEnded(true);
             }
 

@@ -29,6 +29,7 @@ export const useTenantConfig = (tenantId?: string) => {
                 const branding = data.branding || {};
 
                 const transformedConfig: TenantConfig = {
+                    plan: branding.plan,
                     companyName: branding.company_name || data.tenant_name || 'QBot Client',
                     shortName: branding.company_name || data.tenant_name || branding.bot_name || 'QBot',
                     botName: branding.bot_name || 'AI Assistant',

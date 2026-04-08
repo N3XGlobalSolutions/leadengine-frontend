@@ -253,7 +253,9 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
 
             // showActions: show buttons ONLY when backend explicitly says show_actions=true
             // (i.e., the very first completion message, NOT on every reply after that)
-            const shouldShowActions = isFirstCompletion && !isSoftDQ;
+            // S3_MAX: agentic flow doesn't handle button responses — suppress action buttons entirely
+            const isS3Max = config.plan === 'S3_MAX';
+            const shouldShowActions = isFirstCompletion && !isSoftDQ && !isS3Max;
 
             // isSummary: show lead summary card ONLY on the first completion message
             const isSummary = response.summary_data != null && isFirstCompletion;

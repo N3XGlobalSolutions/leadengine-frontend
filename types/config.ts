@@ -8,7 +8,10 @@ export interface Question {
     isSystemGenerated?: boolean; // True if this is a system question (auto-handled by state machine)
 }
 
+export type TenantPlan = 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING';
+
 export interface TenantConfig {
+    plan?: TenantPlan;
     companyName: string;
     shortName: string;
     botName: string;

@@ -318,15 +318,12 @@ export const ClientLeadsPage = () => {
                                     <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedLead.name}</h3>
                                     <div className="flex items-center gap-2 mt-2">
                                         <span className="text-xs text-gray-500">Status:</span>
-                                        <select
-                                            value={selectedLead.status}
-                                            onChange={(e) => handleStatusChange(selectedLead.id, e.target.value)}
-                                            className="text-xs font-bold bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-indigo-600 uppercase tracking-wide hover:text-indigo-800 transition-colors"
-                                        >
-                                            <option value="new">New</option>
-                                            <option value="qualified">Qualified</option>
-                                            <option value="disqualified">Disqualified</option>
-                                        </select>
+                                        <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full
+                                            ${selectedLead.status === 'qualified' ? 'bg-green-100 text-green-700' :
+                                              selectedLead.status === 'disqualified' ? 'bg-red-100 text-red-700' :
+                                              'bg-blue-100 text-blue-700'}`}>
+                                            {selectedLead.status}
+                                        </span>
                                         {((selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ||
                                             (selectedLead as any).metadata?.s3_lead_output?.lead_priority ||
                                             (selectedLead as any).metadata?.s2_lead_output?.lead_priority ||

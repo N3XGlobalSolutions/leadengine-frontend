@@ -217,7 +217,7 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
 
 export const getClients = async (): Promise<Client[]> => {
     try {
-        const res = await api.get('/tenants');
+        const res = await api.get('/tenants', { params: { limit: 500 } });
 
         if (!Array.isArray(res.data)) {
             console.error('Expected array of tenants, got:', res.data);

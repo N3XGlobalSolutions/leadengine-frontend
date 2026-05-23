@@ -39,7 +39,9 @@ export const AdminClientsPage: React.FC = () => {
         const fetchClients = async () => {
             setLoading(true);
             const data = await getClients();
+            
             setClients(data);
+            console.log(data);
             setLoading(false);
 
             // Fetch conversation counts for all clients after loading clients
@@ -58,7 +60,7 @@ export const AdminClientsPage: React.FC = () => {
         const clientIds = clients.map(c => c.id);
         const intervalId = setInterval(() => {
             fetchConversationCounts(clientIds);
-        }, 30000); // 30 seconds
+        }, 1800000); // 30 minutes
 
         return () => clearInterval(intervalId);
     }, [clients, fetchConversationCounts]);
@@ -99,6 +101,7 @@ export const AdminClientsPage: React.FC = () => {
         const colors: Record<string, { light: string; dark: string }> = {
             S3_MAX: { light: 'bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 shadow-sm border border-amber-300', dark: 'bg-gradient-to-r from-amber-600/50 to-yellow-600/50 text-amber-100 border border-amber-500/50 shadow-[0_0_15px_rgba(251,191,36,0.2)]' },
             S3_MAPPING: { light: 'bg-emerald-100 text-emerald-800', dark: 'bg-emerald-900/50 text-emerald-400' },
+            S3_INTERNATIONAL: { light: 'bg-purple-100 text-purple-800', dark: 'bg-purple-900/50 text-purple-400' },
             S3: { light: 'bg-purple-100 text-purple-800', dark: 'bg-purple-900/50 text-purple-400' },
             S2: { light: 'bg-indigo-100 text-indigo-800', dark: 'bg-indigo-900/50 text-indigo-400' },
             S1: { light: 'bg-gray-100 text-gray-800', dark: 'bg-gray-700 text-gray-400' },
@@ -106,7 +109,7 @@ export const AdminClientsPage: React.FC = () => {
         return colors[plan] || colors.S1;
     };
 
-    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_MAX' || plan === 'S3_MAPPING';
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_INTERNATIONAL' || plan === 'S3_MAX' || plan === 'S3_MAPPING';
 
     return (
         <AdminLayout>
@@ -194,6 +197,7 @@ export const AdminClientsPage: React.FC = () => {
                             <option value="S1">S1</option>
                             <option value="S2">S2</option>
                             <option value="S3">S3</option>
+                            <option value="S3_INTERNATIONAL">S3_INTERNATIONAL</option>
                             <option value="S3_MAX">S3 MAX</option>
                             <option value="S3_MAPPING">S3 MAPPING</option>
                         </select>
@@ -278,7 +282,7 @@ export const AdminClientsPage: React.FC = () => {
                                 </span>
                                 {isS2OrHigher(client.plan) && (
                                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
-                                        <Sparkles size={10} /> {client.plan === 'S3_MAX' ? 'Max Agentic' : client.plan === 'S3_MAPPING' ? 'Mapping Engine' : client.plan === 'S3' ? 'S3 Features' : 'S2 Features'}
+                                        <Sparkles size={10} /> {client.plan === 'S3_MAX' ? 'Max Agentic' : client.plan === 'S3_MAPPING' ? 'Mapping Engine' : client.plan === 'S3' ? 'S3 Features' : client.plan === 'S3_INTERNATIONAL' ? 'S3 Features' : 'S2 Features'}
                                     </span>
                                 )}
                             </div>

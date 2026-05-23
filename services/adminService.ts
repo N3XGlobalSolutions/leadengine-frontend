@@ -83,19 +83,18 @@ const MOCK_LEADS: DashboardLead[] = [
     }
 ];
 
-// Helper to map Backend Tenant -> Frontend Client
+// Helper to map Backend Tenant -> Frontend Client 
 const mapTenantToClient = (tenant: any): Client => {
-    // Backend returns config with flat fields (snake_case)
+    // Backend returns config with flat fields (snake_case) 
     const backendConfig = tenant.config || {};
-
-    const planMap: Record<string, 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING'> = {
-        'S1': 'S1',
-        'S2': 'S2',
-        'S3': 'S3',
-        'S3_MAX': 'S3_MAX',
-        'S3_MAPPING': 'S3_MAPPING'
-    };
-
+    const planMap: Record<string, 'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING'> ={ 
+            'S1': 'S1',
+            'S2': 'S2', 
+            'S3': 'S3', 
+            'S3_INTERNATIONAL': 'S3_INTERNATIONAL', 
+            'S3_MAX': 'S3_MAX', 
+            'S3_MAPPING': 'S3_MAPPING' 
+        };
     // Transform to Frontend TenantConfig (nested, camelCase)
     const frontendConfig: TenantConfig = {
         companyName: backendConfig.company_name || tenant.name,
@@ -108,7 +107,6 @@ const mapTenantToClient = (tenant: any): Client => {
             primary: backendConfig.primary_color || '#4F46E5',
             secondary: backendConfig.secondary_color || '#6366F1'
         },
-
         welcome: {
             headline: backendConfig.headline_prefix || 'Welcome to',
             highlightedHeadline: backendConfig.highlighted_headline || 'QBot',
@@ -116,49 +114,104 @@ const mapTenantToClient = (tenant: any): Client => {
             startBtnText: 'Start Conversation',
             features: backendConfig.key_features || []
         },
-
         leadQualification: {
             options: {},
             questions: backendConfig.qualification_questions?.map((q: any) => ({
-                id: q.id,
+                id: q.id, 
                 label: q.label || q.question,
-                instruction: q.instruction || q.question,
+                instruction: q.instruction || q.question, 
                 collects: q.collects || [],
                 options: q.quick_replies?.map((qr: any) => qr.text) || []
             })) || []
         },
-
         messages: {
             scheduleSuccess: 'Thank you! Our team will be in touch shortly.',
             maybeLater: 'No problem! Feel free to reach out whenever you are ready.'
         },
-
         welcome_message: backendConfig.welcome_message || "Hello! How can I help you today?",
-        language: backendConfig.language || "en",
-        tone: backendConfig.tone || "professional",
+        language: backendConfig.language || "en", tone: backendConfig.tone || "professional",
         company_context: backendConfig.company_context || "",
-        guardrails: backendConfig.guardrails || [],
-        max_conversation_length: backendConfig.max_conversation_length || 50,
-        lead_trigger_count: backendConfig.lead_trigger_count || 5,
-        lead_form_enabled: backendConfig.lead_form_enabled ?? true,
+        guardrails: backendConfig.guardrails || [], max_conversation_length: backendConfig.max_conversation_length || 50, lead_trigger_count: backendConfig.lead_trigger_count || 5, lead_form_enabled: backendConfig.lead_form_enabled ?? true,
         lead_form_fields: backendConfig.lead_form_fields || ["name", "phone"],
-        lead_qualification_criteria: backendConfig.lead_qualification_criteria,
-        question_map: backendConfig.question_map,
+        lead_qualification_criteria: backendConfig.lead_qualification_criteria, question_map: backendConfig.question_map,
     };
-
     return {
-        id: tenant.tenant_id,
-        name: tenant.name,
-        slug: backendConfig.url_slug || tenant.tenant_id,
-        status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), // Use backend status if available
-        onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        totalUsers: 0,
-        plan: (planMap[backendConfig.plan] || 'S1') as 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING',
-        config: frontendConfig,
-        createdBy: tenant.created_by
+        id: tenant.tenant_id, name: tenant.name, slug: backendConfig.url_slug || tenant.tenant_id, status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), //Use backend status if available 
+        onboardedDate: tenant.created_at ? new Date(tenant.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0], totalUsers: 0, plan: (planMap[backendConfig.plan] || 'S1') as 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING', config: frontendConfig, createdBy: tenant.created_by
     };
 };
 
+const mapTenantSummaryToClient = (tenant: any): Client => {
+
+    const frontendConfig: TenantConfig = {
+        companyName: tenant.name,
+        shortName: tenant.name,
+        botName: "QBot",
+        botDisplayName: "Assistant",
+        botAvatar: "",
+
+        colors: {
+            primary: "#4F46E5",
+            secondary: "#6366F1"
+        },
+
+        welcome: {
+            headline: "Welcome to",
+            highlightedHeadline: tenant.name,
+            subheadline: "How can I help you today?",
+            startBtnText: "Start Conversation",
+            features: []
+        },
+
+        leadQualification: {
+            options: {},
+            questions: []
+        },
+
+        messages: {
+            scheduleSuccess: "",
+            maybeLater: ""
+        },
+
+        welcome_message: "",
+        language: "en",
+        tone: "professional",
+        company_context: "",
+        guardrails: [],
+        max_conversation_length: 50,
+        lead_trigger_count: 5,
+        lead_form_enabled: true,
+        lead_form_fields: [],
+        lead_qualification_criteria: "",
+        question_map: null,
+    };
+
+    return {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        status: tenant.status,
+
+        onboardedDate: tenant.onboardedDate
+            ? new Date(tenant.onboardedDate)
+                .toISOString()
+                .split('T')[0]
+            : new Date().toISOString().split('T')[0],
+
+        totalUsers: tenant.totalUsers || 0,
+
+        plan: (tenant.plan || 'S1') as
+            | 'S1'
+            | 'S2'
+            | 'S3'
+            | 'S3_MAX'
+            | 'S3_MAPPING',
+
+        config: frontendConfig,
+
+        createdBy: tenant.createdBy
+    };
+};
 // --- Platform Stats ---
 export const getPlatformStats = async (): Promise<PlatformStats | null> => {
     try {
@@ -214,10 +267,11 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
         growthRate: platformStats.global_conversion_rate // Use conversion rate instead of growth
     };
 };
+//stop
 
 export const getClients = async (): Promise<Client[]> => {
     try {
-        const res = await api.get('/tenants', { params: { limit: 500 } });
+        const res = await api.get('/tenants/tenants/summary', { params: { limit: 500 } });
 
         if (!Array.isArray(res.data)) {
             console.error('Expected array of tenants, got:', res.data);
@@ -226,7 +280,8 @@ export const getClients = async (): Promise<Client[]> => {
 
         return res.data.map((t: any) => {
             try {
-                return mapTenantToClient(t);
+                console.log(t);
+                return mapTenantSummaryToClient(t);
             } catch (err) {
                 console.error('Failed to map tenant:', t, err);
                 return null;
@@ -601,7 +656,7 @@ export const getAuditLogs = async (skip: number = 0, limit: number = 100, startD
         const params: any = { skip, limit };
         if (startDate) params.start_date = startDate;
         if (endDate) params.end_date = endDate;
-        
+
         const res = await api.get('/audit-logs', { params });
         return res.data;
     } catch (e) {

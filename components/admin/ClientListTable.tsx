@@ -53,7 +53,7 @@ export const ClientListTable: React.FC<ClientListTableProps> = ({ onSpotlight })
         const clientIds = clients.map(c => c.id);
         const intervalId = setInterval(() => {
             fetchConversationCounts(clientIds);
-        }, 30000); // 30 seconds
+        }, 1800000); // 30 minutes
 
         return () => clearInterval(intervalId);
     }, [clients, fetchConversationCounts]);

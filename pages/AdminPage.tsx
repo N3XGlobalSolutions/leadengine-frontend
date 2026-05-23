@@ -79,7 +79,9 @@ export const AdminPage = () => {
                     />
                     <StatsCard
                         title="Conversion Rate"
-                        value={`${platformStats?.global_conversion_rate}%` || "..."}
+                        value={platformStats?.global_conversion_rate
+        ? `${platformStats.global_conversion_rate}%`
+        : "..."}
                         icon={TrendingUp}
                         color="orange"
                     />

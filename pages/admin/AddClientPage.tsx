@@ -27,13 +27,13 @@ export const AddClientPage = () => {
     const [error, setError] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
-    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING' | null>(null);
+    const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING' | null>(null);
 
     // Form state initialized with default 5 questions
     const [formData, setFormData] = useState<{
         name: string;
         slug: string;
-        plan: 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING';
+        plan: 'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING';
         config: TenantConfig;
     }>({
         name: '',
@@ -118,11 +118,11 @@ export const AddClientPage = () => {
     };
 
     // --- Plan Change Handler ---
-    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_MAX';
+    const isS2OrHigher = (plan: string) => plan === 'S2' || plan === 'S3' || plan === 'S3_INTERNATIONAL' || plan === 'S3_MAX';
     const MIN_QUESTIONS = 5;
     const MAX_QUESTIONS = 15;
 
-    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING') => {
+    const handlePlanChange = (newPlan: 'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING') => {
         const currentQuestionCount = formData.config.leadQualification.questions.length;
         const isDowngrade = isS2OrHigher(formData.plan) && newPlan === 'S1' && currentQuestionCount > 5;
 
@@ -139,7 +139,7 @@ export const AddClientPage = () => {
         const trimmedQuestions = formData.config.leadQualification.questions.slice(0, 5);
         setFormData(prev => ({
             ...prev,
-            plan: pendingPlan as 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING',
+            plan: pendingPlan as 'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING',
             config: {
                 ...prev.config,
                 leadQualification: {
@@ -155,7 +155,7 @@ export const AddClientPage = () => {
     // --- Add/Remove Question Handlers (S2/S3 only) ---
     const addQuestion = () => {
         const questions = formData.config.leadQualification.questions;
-        const limit = (formData.plan === 'S3' || formData.plan === 'S3_MAX') ? 30 : 15;
+        const limit = (formData.plan === 'S3' || formData.plan === 'S3_INTERNATIONAL' || formData.plan === 'S3_MAX') ? 30 : 15;
         if (questions.length >= limit) return;
         const newQ: Question = {
             id: `q${questions.length + 1}`,
@@ -397,6 +397,7 @@ export const AddClientPage = () => {
                                     <option value="S1">S1 (Starter)</option>
                                     <option value="S2">S2 (Professional)</option>
                                     <option value="S3">S3 (Enterprise)</option>
+                                    <option value="S3_INTERNATIONAL">S3 International (International Clients Support)</option>
                                     <option value="S3_MAX">S3 Max (Agentic AI)</option>
                                     <option value="S3_MAPPING">S3 Mapping (Structured + Claude)</option>
                                 </select>
@@ -563,7 +564,7 @@ export const AddClientPage = () => {
                                     />
                                     <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
                                         Define the criteria and prompts used to validate and qualify leads. This will help identify warm leads vs cold leads.
-                                        {(formData.plan === 'S3' || formData.plan === 'S3_MAX') && <span className="block mt-1 text-indigo-500 font-medium">✨ {formData.plan === 'S3_MAX' ? 'S3 Max Agentic AI active: Questions will be AI-generated from your Knowledge Base and this criteria.' : 'S3 Lead Intelligence active: The AI will use this criteria for deeper analysis.'}</span>}
+                                        {(formData.plan === 'S3' || formData.plan === 'S3_MAX' || formData.plan === 'S3_INTERNATIONAL') && <span className="block mt-1 text-indigo-500 font-medium">✨ {formData.plan === 'S3_MAX' ? 'S3 Max Agentic AI active: Questions will be AI-generated from your Knowledge Base and this criteria.' : formData.plan === 'S3_INTERNATIONAL' ? 'S3 International Lead Intelligence active: The AI will use this criteria for deeper analysis.' : 'S3 Lead Intelligence active: The AI will use this criteria for deeper analysis.'}</span>}
                                         {formData.plan === 'S3_MAX' && !selectedFile && <span className="block mt-1 text-red-400 font-medium">⚠️ Document upload is required for S3 Max to generate questions.</span>}
                                     </p>
                                 </div>
@@ -628,7 +629,7 @@ export const AddClientPage = () => {
                                 <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
                                     The bot will <strong>automatically collect name and phone</strong> before asking these qualification questions.
                                     {isS2OrHigher(formData.plan)
-                                        ? <> You have <strong>{formData.config.leadQualification.questions.length}</strong> of {formData.plan === 'S3' ? 30 : 15} possible questions. Minimum 5 required.</>
+                                        ? <> You have <strong>{formData.config.leadQualification.questions.length}</strong> of {formData.plan === 'S3' || formData.plan === 'S3_INTERNATIONAL' ? 30 : 15} possible questions. Minimum 5 required.</>
                                         : <> Define exactly 5 custom questions below. Adding "Quick Reply Options" helps users answer faster.</>
                                     }
                                 </p>
@@ -697,7 +698,7 @@ export const AddClientPage = () => {
                         ))}
 
                         {/* Add Question Button (S2/S3 only, max 15/30) */}
-                        {(formData.plan === 'S2' || formData.plan === 'S3') && formData.config.leadQualification.questions.length < (formData.plan === 'S3' ? 30 : 15) && (
+                        {(formData.plan === 'S2' || formData.plan === 'S3' || formData.plan === 'S3_INTERNATIONAL') && formData.config.leadQualification.questions.length < (formData.plan === 'S3' || formData.plan === 'S3_INTERNATIONAL' ? 30 : 15) && (
                             <button
                                 onClick={addQuestion}
                                 className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors ${isDark
@@ -706,7 +707,7 @@ export const AddClientPage = () => {
                                     }`}
                             >
                                 <Plus size={18} />
-                                Add Question ({formData.config.leadQualification.questions.length}/{formData.plan === 'S3' ? 30 : 15})
+                                Add Question ({formData.config.leadQualification.questions.length}/{formData.plan === 'S3' || formData.plan === 'S3_INTERNATIONAL' ? 30 : 15})
                             </button>
                         )}
                             </>

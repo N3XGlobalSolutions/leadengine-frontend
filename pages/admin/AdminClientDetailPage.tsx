@@ -1255,23 +1255,25 @@ export const AdminClientDetailPage = () => {
   window.QBotConfig = {
     apiKey: "${generatedKey || 'YOUR_API_KEY'}",
     tenantId: "${client.id}",
+    apiBaseUrl: "https://bxyywscce9.execute-api.us-east-1.amazonaws.com/dev",
     theme: {
         primary: "${client.config?.colors?.primary || '#4F46E5'}"
     }
   };
 </script>
-<script src="https://cdn.qbot.com/widget.js" async></script>`}</pre>
+<script src="https://cdn.qbotglobal.com/widget.js" async></script>`}</pre>
                                     <button
                                         onClick={() => copyToClipboard(`<script>
   window.QBotConfig = {
     apiKey: "${generatedKey || 'YOUR_API_KEY'}",
     tenantId: "${client.id}",
+    apiBaseUrl: "https://bxyywscce9.execute-api.us-east-1.amazonaws.com/dev",
     theme: {
         primary: "${client.config?.colors?.primary || '#4F46E5'}"
     }
   };
 </script>
-<script src="https://cdn.qbot.com/widget.js" async></script>`)}
+<script src="https://cdn.qbotglobal.com/widget.js" async></script>`)}
                                         className="absolute top-2 right-2 p-2 hover:bg-white/10 rounded text-white/70 hover:text-white"
                                         title="Copy Code"
                                     >

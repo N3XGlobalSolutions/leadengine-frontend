@@ -645,6 +645,50 @@ export const getLeadById = async (leadId: string): Promise<any | null> => {
     }
 };
 
+export const exportLeads = async (
+  tenantId: string
+, clientName: string): Promise<void> => {
+
+  try {
+
+    const res = await api.get(
+      `/leads/tenants/${tenantId}/export`,
+      {
+        responseType: "blob",
+      }
+    );
+
+    const downloadUrl =
+      window.URL.createObjectURL(
+        new Blob([res.data])
+      );
+
+    const a =
+      document.createElement("a");
+
+    a.href = downloadUrl;
+
+    a.download = `${clientName}leads.csv`;
+
+    document.body.appendChild(a);
+
+    a.click();
+
+    a.remove();
+
+    window.URL.revokeObjectURL(downloadUrl);
+
+  } catch (error) {
+
+    console.error(
+      "Export failed:",
+      error
+    );
+
+    throw error;
+  }
+};
+
 export const updateLeadStatus = async (leadId: string, status: string): Promise<any> => {
     const res = await api.patch(`/leads/${leadId}/status`, null, {
         params: { new_status: status }

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
-import { getClients, getTenantLeads, updateLeadStatus } from '../../services/adminService';
+import { getClients, getTenantLeads, updateLeadStatus, exportLeads } from '../../services/adminService';
 import { Client, DashboardLead } from '../../types/admin';
 import ConversationViewer from '../../components/admin/ConversationViewer';
 import { PriorityBadge } from '../../components/admin/PriorityBadge';
@@ -79,6 +79,14 @@ export const AdminLeadsPage = () => {
         c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
         c.slug.toLowerCase().includes(clientSearch.toLowerCase())
     );
+    const handleExport = async (leadId: string, clientName: string) => {
+        try {
+            await exportLeads(leadId, clientName);
+        }
+        catch (e) {
+            console.log("Failed to export", e);
+        }
+    }
 
     const filteredLeads = leads
         .filter(l => {
@@ -247,6 +255,31 @@ export const AdminLeadsPage = () => {
                                             <option value="newest">Newest First</option>
                                             <option value="oldest">Oldest First</option>
                                         </select>
+                                        <div>
+                                            <button
+                                                onClick={() => handleExport(selectedClient.id, selectedClient.name)}
+                                                className="flex items-center gap-2 bg-black text-white px-4 py-1.5
+                                                    rounded-lg hover:bg-neutral-800 transition-all duration-200
+                                                    shadow-md active:bg-neutral-500">
+                                                {/* Download Icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    strokeWidth={2}
+                                                    stroke="currentColor"
+                                                    className="w-5 h-5"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M12 16V4m0 12l-4-4m4 4l4-4M4 20h16"
+                                                    />
+                                                </svg>
+
+                                                <span className='text-sm font-bold'>Export CSV</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -326,20 +359,20 @@ export const AdminLeadsPage = () => {
                 {selectedLead && (
                     <>
                         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity" onClick={() => setSelectedLead(null)} />
-                        <div 
+                        <div
                             className={`fixed inset-y-0 right-0 w-full sm:w-auto border-l shadow-2xl z-50 flex flex-col ${bgClass} ${borderClass}`}
                             style={{ width: typeof window !== 'undefined' && window.innerWidth >= 640 ? `${drawerWidth}px` : '100%' }}
                         >
                             {/* Resize Handle */}
-                            <div 
+                            <div
                                 className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-indigo-500/50 active:bg-indigo-500 z-50 transition-colors"
                                 onMouseDown={(e) => {
                                     e.preventDefault();
                                     const startX = e.clientX;
                                     const startWidth = drawerWidth;
-                                    
+
                                     const onMouseMove = (moveEvent: MouseEvent) => {
-                                        const delta = startX - moveEvent.clientX; 
+                                        const delta = startX - moveEvent.clientX;
                                         const newWidth = startWidth + delta;
                                         const maxWidth = window.innerWidth / 2;
                                         const minWidth = 400;

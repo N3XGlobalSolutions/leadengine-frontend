@@ -4,7 +4,7 @@ import {
     Search, User, MessageSquare, Phone, Mail, Calendar,
     ArrowLeft, X, Layout, ChevronRight, CheckCircle, Clock, Filter, RefreshCw
 } from 'lucide-react';
-import { getTenantLeads, getClientById, updateLeadStatus } from '../services/adminService';
+import { getTenantLeads, getClientById, updateLeadStatus, exportLeads } from '../services/adminService';
 import { DashboardLead, Client } from '../types/admin';
 import ConversationViewer from '../components/admin/ConversationViewer';
 import { PriorityBadge } from '../components/admin/PriorityBadge';
@@ -84,7 +84,14 @@ export const ClientLeadsPage = () => {
             console.error("Failed to update status", e);
         }
     };
-
+    const handleExport = async (leadId: string, clientName: string) => {
+        try {
+            await exportLeads(leadId, clientName);
+        }
+        catch (e) {
+            console.log("Failed to export", e);
+        }
+    }
     // Filter Logic
     const filteredLeads = leads
         .filter(l => {
@@ -185,6 +192,31 @@ export const ClientLeadsPage = () => {
                                     <option value="newest">Newest First</option>
                                     <option value="oldest">Oldest First</option>
                                 </select>
+                                <div>
+                                    <button
+                                        onClick={() => handleExport(tenantId, client.name)}
+                                        className="flex items-center gap-2 bg-black text-white px-4 py-1.5
+                                                    rounded-lg hover:bg-neutral-800 transition-all duration-200
+                                                    shadow-md active:bg-neutral-500">
+                                        {/* Download Icon */}
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            strokeWidth={2}
+                                            stroke="currentColor"
+                                            className="w-5 h-5"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M12 16V4m0 12l-4-4m4 4l4-4M4 20h16"
+                                            />
+                                        </svg>
+
+                                        <span className='text-sm font-bold'>Export CSV</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="flex flex-wrap gap-2 items-center">
@@ -281,20 +313,20 @@ export const ClientLeadsPage = () => {
 
                     {/* DETAILS DRAWER / PANEL */}
                     {selectedLead && (
-                        <div 
+                        <div
                             className="fixed inset-0 lg:relative lg:inset-auto bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden z-50 lg:z-auto animate-in slide-in-from-right duration-300"
                             style={typeof window !== 'undefined' && window.innerWidth >= 1024 ? { width: `${drawerWidth}px`, flexShrink: 0 } : {}}
                         >
                             {/* Resize Handle */}
-                            <div 
+                            <div
                                 className="hidden lg:block absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-indigo-500/50 active:bg-indigo-500 z-50 transition-colors"
                                 onMouseDown={(e) => {
                                     e.preventDefault();
                                     const startX = e.clientX;
                                     const startWidth = drawerWidth;
-                                    
+
                                     const onMouseMove = (moveEvent: MouseEvent) => {
-                                        const delta = startX - moveEvent.clientX; 
+                                        const delta = startX - moveEvent.clientX;
                                         const newWidth = startWidth + delta;
                                         const maxWidth = window.innerWidth / 2;
                                         const minWidth = 350;
@@ -312,7 +344,7 @@ export const ClientLeadsPage = () => {
                                     document.addEventListener('mouseup', onMouseUp);
                                 }}
                             />
-                            
+
                             <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
                                 <div className="flex-1 min-w-0">
                                     <h3 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedLead.name}</h3>
@@ -320,8 +352,8 @@ export const ClientLeadsPage = () => {
                                         <span className="text-xs text-gray-500">Status:</span>
                                         <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full
                                             ${selectedLead.status === 'qualified' ? 'bg-green-100 text-green-700' :
-                                              selectedLead.status === 'disqualified' ? 'bg-red-100 text-red-700' :
-                                              'bg-blue-100 text-blue-700'}`}>
+                                                selectedLead.status === 'disqualified' ? 'bg-red-100 text-red-700' :
+                                                    'bg-blue-100 text-blue-700'}`}>
                                             {selectedLead.status}
                                         </span>
                                         {((selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ||

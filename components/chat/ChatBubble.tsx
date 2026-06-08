@@ -18,6 +18,7 @@ interface ChatBubbleProps {
 
 const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedback, botAvatar, botName }) => {
   const isBot = message.role === MessageRole.Bot;
+  console.log(message)
 
   return (
     <div className={`flex w-full mb-4 animate-fade-in-up ${isBot ? 'justify-start' : 'justify-end'}`}>
@@ -159,6 +160,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
 
               {(() => {
                 const sd = message.summaryData || {};
+
 
                 // Helper to find key case-insensitively
                 const findKey = (search: string) => Object.keys(sd).find(k => k.toLowerCase() === search);

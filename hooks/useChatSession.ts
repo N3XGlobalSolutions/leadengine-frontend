@@ -349,7 +349,7 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     const handleStart = async () => {
         if (systemError) return;
         setHasStarted(true);
-        const startMsg = `Hello! I'm interested in ${config.companyName}.`;
+        const startMsg = `Hello! I'm interested.`;
         // Don't add user start message visually if we want bot to welcome first, 
         // but usually handleStart implies user clicked "Start Chat" which sends the message.
         // Actually, previous implementation relied on bot response WITHOUT user message shown for "Hello".

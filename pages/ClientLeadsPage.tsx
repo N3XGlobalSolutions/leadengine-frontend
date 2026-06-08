@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getTenantLeads, getClientById, updateLeadStatus, exportLeads } from '../services/adminService';
 import { DashboardLead, Client } from '../types/admin';
+import { exportLeadsToCSV } from '../utils/csvExport';
 import ConversationViewer from '../components/admin/ConversationViewer';
 import { PriorityBadge } from '../components/admin/PriorityBadge';
 import { S3LeadInsights } from '../components/admin/S3LeadInsights';
@@ -71,6 +72,15 @@ export const ClientLeadsPage = () => {
             setSearchParams({});
         }
     };
+    const cleanDisplayValue = (value: string): string => {
+        return value
+            .replace(/\*\*/g, '')         // Remove markdown bold
+            .replace(/\*/g, '')           // Remove remaining asterisks
+            .replace(/["'`]/g, '')        // Remove quotes
+            .replace(/[.,!?;:]+$/g, '')   // Remove ending punctuation
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
 
     const handleStatusChange = async (leadId: string, newStatus: string) => {
         try {
@@ -84,9 +94,9 @@ export const ClientLeadsPage = () => {
             console.error("Failed to update status", e);
         }
     };
-    const handleExport = async (leadId: string, clientName: string) => {
+    const handleExport = () => {
         try {
-            await exportLeads(leadId, clientName);
+            exportLeadsToCSV(filteredLeads, client.name);
         }
         catch (e) {
             console.log("Failed to export", e);
@@ -194,7 +204,7 @@ export const ClientLeadsPage = () => {
                                 </select>
                                 <div>
                                     <button
-                                        onClick={() => handleExport(tenantId, client.name)}
+                                        onClick={handleExport}
                                         className="flex items-center gap-2 bg-black text-white px-4 py-1.5
                                                     rounded-lg hover:bg-neutral-800 transition-all duration-200
                                                     shadow-md active:bg-neutral-500">
@@ -403,16 +413,43 @@ export const ClientLeadsPage = () => {
                                         <div className="rounded-xl border border-gray-100 overflow-hidden">
                                             {Object.entries((selectedLead as any).metadata)
                                                 .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 's3_max_lead_output' && key !== 'email')
-                                                .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                                                .sort(([, valueA], [, valueB]) => {
+                                                    const orderA =
+                                                        typeof valueA === 'object' &&
+                                                            valueA !== null &&
+                                                            'order' in valueA
+                                                            ? (valueA as any).order
+                                                            : 999;
+
+                                                    const orderB =
+                                                        typeof valueB === 'object' &&
+                                                            valueB !== null &&
+                                                            'order' in valueB
+                                                            ? (valueB as any).order
+                                                            : 999;
+
+                                                    return orderA - orderB;
+                                                })
                                                 .map(([key, value], i) => {
                                                     let displayKey = key.replace(/_/g, ' ');
                                                     let displayValue = '';
-                                                    if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
+                                                    if (
+                                                        typeof value === 'object' &&
+                                                        value !== null &&
+                                                        'label' in value &&
+                                                        'answer' in value
+                                                    ) {
                                                         displayKey = (value as any).label;
-                                                        displayValue = (value as any).answer || 'Not provided';
+                                                        displayValue = (value as any).answer || '—';
                                                     } else {
-                                                        displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
+                                                        displayValue =
+                                                            typeof value === 'string'
+                                                                ? value
+                                                                : String(value || '—');
                                                     }
+
+                                                    // Clean the final value
+                                                    displayValue = cleanDisplayValue(displayValue);
 
                                                     return (
                                                         <div key={key} className={`flex flex-col sm:flex-row text-sm p-3 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>

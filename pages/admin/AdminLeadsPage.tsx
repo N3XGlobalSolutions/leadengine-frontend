@@ -7,6 +7,7 @@ import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { getClients, getTenantLeads, updateLeadStatus, exportLeads } from '../../services/adminService';
 import { Client, DashboardLead } from '../../types/admin';
+import { exportLeadsToCSV } from '../../utils/csvExport';
 import ConversationViewer from '../../components/admin/ConversationViewer';
 import { PriorityBadge } from '../../components/admin/PriorityBadge';
 import { S2LeadInsights } from '../../components/admin/S2LeadInsights';
@@ -79,14 +80,24 @@ export const AdminLeadsPage = () => {
         c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
         c.slug.toLowerCase().includes(clientSearch.toLowerCase())
     );
-    const handleExport = async (leadId: string, clientName: string) => {
+    const handleExport = () => {
+        if (!selectedClient) return;
         try {
-            await exportLeads(leadId, clientName);
+            exportLeadsToCSV(filteredLeads, selectedClient.name);
         }
         catch (e) {
             console.log("Failed to export", e);
         }
     }
+    const cleanDisplayValue = (value: string): string => {
+        return value
+            .replace(/\*\*/g, '')         // Remove markdown bold
+            .replace(/\*/g, '')           // Remove remaining asterisks
+            .replace(/["'`]/g, '')        // Remove quotes
+            .replace(/[.,!?;:]+$/g, '')   // Remove ending punctuation
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
 
     const filteredLeads = leads
         .filter(l => {
@@ -257,7 +268,7 @@ export const AdminLeadsPage = () => {
                                         </select>
                                         <div>
                                             <button
-                                                onClick={() => handleExport(selectedClient.id, selectedClient.name)}
+                                                onClick={handleExport}
                                                 className="flex items-center gap-2 bg-black text-white px-4 py-1.5
                                                     rounded-lg hover:bg-neutral-800 transition-all duration-200
                                                     shadow-md active:bg-neutral-500">
@@ -511,23 +522,70 @@ export const AdminLeadsPage = () => {
                                             if (visibleEntries.length === 0) return null;
                                             return (
                                                 <section>
-                                                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Captured Data</h4>
+                                                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>
+                                                        Captured Data
+                                                    </h4>
+
                                                     <div className="grid grid-cols-1 gap-3">
                                                         {visibleEntries
-                                                            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+                                                            .sort(([, valueA], [, valueB]) => {
+                                                                const orderA =
+                                                                    typeof valueA === 'object' &&
+                                                                        valueA !== null &&
+                                                                        'order' in valueA
+                                                                        ? (valueA as any).order
+                                                                        : 999;
+
+                                                                const orderB =
+                                                                    typeof valueB === 'object' &&
+                                                                        valueB !== null &&
+                                                                        'order' in valueB
+                                                                        ? (valueB as any).order
+                                                                        : 999;
+
+                                                                return orderA - orderB;
+                                                            })
                                                             .map(([key, value]) => {
                                                                 let displayKey = key.replace(/_/g, ' ');
                                                                 let displayValue = '';
-                                                                if (typeof value === 'object' && value !== null && 'label' in value && 'answer' in value) {
+
+                                                                if (
+                                                                    typeof value === 'object' &&
+                                                                    value !== null &&
+                                                                    'label' in value &&
+                                                                    'answer' in value
+                                                                ) {
                                                                     displayKey = (value as any).label;
                                                                     displayValue = (value as any).answer || '—';
                                                                 } else {
-                                                                    displayValue = typeof value === 'string' ? value : String(value || '—');
+                                                                    displayValue =
+                                                                        typeof value === 'string'
+                                                                            ? value
+                                                                            : String(value || '—');
                                                                 }
+
+                                                                // Clean the final value
+                                                                displayValue = cleanDisplayValue(displayValue);
+
                                                                 return (
-                                                                    <div key={key} className={`flex items-start justify-between p-4 rounded-xl border transition-colors hover:border-indigo-200 dark:hover:border-indigo-800 ${isDark ? 'bg-slate-800/30 border-slate-800' : 'bg-white border-gray-100'}`}>
-                                                                        <span className={`text-sm font-medium capitalize ${textSub}`}>{displayKey}</span>
-                                                                        <span className={`text-sm font-semibold text-right max-w-[60%] break-words ${textMain}`}>{displayValue}</span>
+                                                                    <div
+                                                                        key={key}
+                                                                        className={`flex items-start justify-between p-4 rounded-xl border transition-colors hover:border-indigo-200 dark:hover:border-indigo-800 ${isDark
+                                                                            ? 'bg-slate-800/30 border-slate-800'
+                                                                            : 'bg-white border-gray-100'
+                                                                            }`}
+                                                                    >
+                                                                        <span
+                                                                            className={`text-sm font-medium capitalize ${textSub}`}
+                                                                        >
+                                                                            {displayKey}
+                                                                        </span>
+
+                                                                        <span
+                                                                            className={`text-sm font-semibold text-right max-w-[60%] break-words ${textMain}`}
+                                                                        >
+                                                                            {displayValue}
+                                                                        </span>
                                                                     </div>
                                                                 );
                                                             })}

@@ -1166,7 +1166,7 @@ export const AdminClientDetailPage = () => {
                                     >
                                         Website Domain
                                     </label>
-                                    
+
 
                                     <input
                                         type="text"
@@ -1182,15 +1182,15 @@ export const AdminClientDetailPage = () => {
                                             })
                                         }
                                         className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition-all duration-200 ${isDark
-                                                ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
-                                                : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                                            ? 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                                            : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
                                             }`}
                                     />
 
                                     <div
                                         className={`rounded-xl border px-4 py-3 text-sm ${isDark
-                                                ? 'border-slate-700 bg-slate-900 text-slate-300'
-                                                : 'border-gray-200 bg-gray-50 text-gray-700'
+                                            ? 'border-slate-700 bg-slate-900 text-slate-300'
+                                            : 'border-gray-200 bg-gray-50 text-gray-700'
                                             }`}
                                     >
                                         <span className="font-medium">Examples:</span>{" "}
@@ -1255,7 +1255,7 @@ export const AdminClientDetailPage = () => {
   window.QBotConfig = {
     apiKey: "${generatedKey || 'YOUR_API_KEY'}",
     tenantId: "${client.id}",
-    apiBaseUrl: "https://bxyywscce9.execute-api.us-east-1.amazonaws.com/dev",
+    apiBaseUrl: "https://0wryhzy1j5.execute-api.us-east-1.amazonaws.com/prod",
     theme: {
         primary: "${client.config?.colors?.primary || '#4F46E5'}"
     }
@@ -1267,7 +1267,7 @@ export const AdminClientDetailPage = () => {
   window.QBotConfig = {
     apiKey: "${generatedKey || 'YOUR_API_KEY'}",
     tenantId: "${client.id}",
-    apiBaseUrl: "https://bxyywscce9.execute-api.us-east-1.amazonaws.com/dev",
+    apiBaseUrl: "https://0wryhzy1j5.execute-api.us-east-1.amazonaws.com/prod",
     theme: {
         primary: "${client.config?.colors?.primary || '#4F46E5'}"
     }

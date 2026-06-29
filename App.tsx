@@ -18,6 +18,9 @@ import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { AdminThemeProvider } from './contexts/AdminThemeContext';
 import { ProtectedRoute } from './components/admin/ProtectedRoute';
 import { ClientLeadsPage } from './pages/ClientLeadsPage';
+import { OutboundDashboardPage } from './pages/admin/outbound/OutboundDashboardPage';
+import { CampaignCreatePage } from './pages/admin/outbound/CampaignCreatePage';
+import { CampaignDetailPage } from './pages/admin/outbound/CampaignDetailPage';
 export default function App() {
   return (
     <Router>
@@ -58,6 +61,21 @@ export default function App() {
             <Route path="/admin/clients/:clientId" element={
               <ProtectedRoute>
                 <AdminClientDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound" element={
+              <ProtectedRoute>
+                <OutboundDashboardPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/campaigns/new" element={
+              <ProtectedRoute>
+                <CampaignCreatePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/campaigns/:campaignId" element={
+              <ProtectedRoute>
+                <CampaignDetailPage />
               </ProtectedRoute>
             } />
             <Route path="/admin/settings" element={

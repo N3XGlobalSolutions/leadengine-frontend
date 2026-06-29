@@ -135,6 +135,9 @@ const mapTenantToClient = (tenant: any): Client => {
         guardrails: backendConfig.guardrails || [], max_conversation_length: backendConfig.max_conversation_length || 50, lead_trigger_count: backendConfig.lead_trigger_count || 5, lead_form_enabled: backendConfig.lead_form_enabled ?? true,
         lead_form_fields: backendConfig.lead_form_fields || ["name", "phone"],
         lead_qualification_criteria: backendConfig.lead_qualification_criteria, question_map: backendConfig.question_map,
+        whatsapp_enabled: backendConfig.whatsapp_enabled ?? false,
+        whatsapp_access_token: backendConfig.whatsapp_access_token || '',
+        whatsapp_phone_number_id: backendConfig.whatsapp_phone_number_id || '',
     };
     return {
         id: tenant.tenant_id, name: tenant.name, slug: backendConfig.url_slug || tenant.tenant_id, status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), //Use backend status if available 
@@ -388,6 +391,9 @@ export const updateClient = async (client: Client): Promise<Client> => {
         lead_form_fields: client.config?.lead_form_fields,
         lead_qualification_criteria: client.config?.lead_qualification_criteria,
         question_map: client.config?.question_map,
+        whatsapp_enabled: client.config?.whatsapp_enabled,
+        whatsapp_access_token: client.config?.whatsapp_access_token,
+        whatsapp_phone_number_id: client.config?.whatsapp_phone_number_id,
     };
 
     const payload = {
@@ -460,6 +466,9 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
             tone: "professional",
             lead_qualification_criteria: clientData.config.lead_qualification_criteria,
             question_map: clientData.config.question_map,
+            whatsapp_enabled: clientData.config.whatsapp_enabled,
+            whatsapp_access_token: clientData.config.whatsapp_access_token,
+            whatsapp_phone_number_id: clientData.config.whatsapp_phone_number_id,
         }
     };
 
@@ -710,3 +719,57 @@ export const getAuditLogs = async (skip: number = 0, limit: number = 100, startD
         return [];
     }
 };
+
+// --- Draft Autosave ---
+import { DraftResponse, DraftType } from '@/types/draft';
+
+export const getLatestClientDraft = async (draftType: DraftType = 'client_creation'): Promise<DraftResponse | null> => {
+    try {
+        const res = await api.get('/admin/client-drafts/latest', {
+            params: { draft_type: draftType }
+        });
+        return res.data;
+    } catch (e: any) {
+        if (e.response?.status === 404) return null;
+        console.error("Error fetching draft:", e);
+        return null;
+    }
+};
+
+export const createClientDraft = async (draftData: Record<string, any>, draftType: DraftType = 'client_creation'): Promise<DraftResponse | null> => {
+    try {
+        const res = await api.post('/admin/client-drafts', {
+            draft_type: draftType,
+            draft_data: draftData,
+        });
+        return res.data;
+    } catch (e) {
+        console.error("Error creating draft:", e);
+        return null;
+    }
+};
+
+export const updateClientDraft = async (draftData: Record<string, any>, draftType: DraftType = 'client_creation'): Promise<DraftResponse | null> => {
+    try {
+        const res = await api.patch('/admin/client-drafts', {
+            draft_data: draftData,
+        }, {
+            params: { draft_type: draftType }
+        });
+        return res.data;
+    } catch (e) {
+        console.error("Error updating draft:", e);
+        return null;
+    }
+};
+
+export const deleteClientDraft = async (draftType: DraftType = 'client_creation'): Promise<void> => {
+    try {
+        await api.delete('/admin/client-drafts', {
+            params: { draft_type: draftType }
+        });
+    } catch (e) {
+        console.error("Error deleting draft:", e);
+    }
+};
+

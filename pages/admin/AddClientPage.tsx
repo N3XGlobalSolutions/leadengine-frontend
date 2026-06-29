@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, ArrowRight, Check, Building2, Bot, MessageSquare,
-    HelpCircle, ClipboardCheck, Plus, X, Sparkles, Wand2, FileText, Upload, AlertCircle, Trash2, AlertTriangle
+    HelpCircle, ClipboardCheck, Plus, X, Sparkles, Wand2, FileText, Upload, AlertCircle, Trash2, AlertTriangle,
+    Cloud, CloudOff, Loader2
 } from 'lucide-react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { TenantConfig, DEFAULT_TENANT_CONFIG, Question } from '../../types/config';
-import { createClient, ingestDocument } from '../../services/adminService';
+import { createClient, ingestDocument, deleteClientDraft } from '../../services/adminService';
 import QuestionMapEditor, { QuestionMapConfig } from '../../components/admin/QuestionMapEditor';
+import { useDraftAutosave } from '../../hooks/useDraftAutosave';
+import { DraftRecoveryModal } from '../../components/admin/DraftRecoveryModal';
 
 const STEPS = [
     { id: 1, title: 'Basic Info', icon: Building2 },
@@ -28,6 +31,10 @@ export const AddClientPage = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
     const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING' | null>(null);
+
+    // --- Draft Recovery State ---
+    const [showDraftModal, setShowDraftModal] = useState(false);
+    const [draftReady, setDraftReady] = useState(false); // Enables autosave after initial load
 
     // Form state initialized with default 5 questions
     const [formData, setFormData] = useState<{
@@ -51,6 +58,70 @@ export const AddClientPage = () => {
 
     // Lead Qualification Criteria state
     const [leadQualificationCriteria, setLeadQualificationCriteria] = useState('');
+
+    // --- Draft Autosave Hook ---
+    // Combine all saveable form state into a single object for the autosave hook
+    const draftPayload = useMemo(() => ({
+        formData,
+        currentStep,
+        leadQualificationCriteria,
+        questionMapConfig,
+    }), [formData, currentStep, leadQualificationCriteria, questionMapConfig]);
+
+    const {
+        saveStatus,
+        lastSavedAt,
+        loadedDraft,
+        loadDraft,
+        deleteDraft,
+    } = useDraftAutosave(draftPayload, {
+        enabled: draftReady,
+        draftType: 'client_creation',
+    });
+
+    // --- Load Draft on Mount ---
+    useEffect(() => {
+        const checkForDraft = async () => {
+            const draft = await loadDraft();
+            if (draft) {
+                setShowDraftModal(true);
+            } else {
+                // No draft found — enable autosave immediately
+                setDraftReady(true);
+            }
+        };
+        checkForDraft();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // --- Draft Resume / Discard Handlers ---
+    const handleResumeDraft = () => {
+        if (loadedDraft?.draft_data) {
+            const data = loadedDraft.draft_data;
+
+            if (data.formData) {
+                setFormData(data.formData);
+            }
+            if (typeof data.currentStep === 'number') {
+                setCurrentStep(data.currentStep);
+            }
+            if (typeof data.leadQualificationCriteria === 'string') {
+                setLeadQualificationCriteria(data.leadQualificationCriteria);
+            }
+            if (data.questionMapConfig) {
+                setQuestionMapConfig(data.questionMapConfig);
+            }
+        }
+        setShowDraftModal(false);
+        // Delay enabling autosave to avoid saving the just-restored data immediately
+        setTimeout(() => setDraftReady(true), 1000);
+    };
+
+    const handleDiscardDraft = async () => {
+        await deleteDraft();
+        setShowDraftModal(false);
+        setDraftReady(true);
+    };
 
     const generateSlug = (name: string) => {
         return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -252,6 +323,9 @@ export const AddClientPage = () => {
                 }
             });
 
+            // Clean up draft after successful client creation
+            await deleteDraft();
+
             // If a file was selected, upload it now using the new tenant ID
             if (selectedFile) {
                 try {
@@ -298,9 +372,39 @@ export const AddClientPage = () => {
                     <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         Add New Client
                     </h1>
-                    <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'} truncate`}>
-                        Configure a new tenant with 5 qualification questions (name & phone auto-collected)
-                    </p>
+                    <div className="flex items-center gap-3">
+                        <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'} truncate`}>
+                            Configure a new tenant with 5 qualification questions (name & phone auto-collected)
+                        </p>
+                        {/* Draft Autosave Status Indicator */}
+                        {draftReady && (
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {saveStatus === 'saving' && (
+                                    <span className={`inline-flex items-center gap-1 text-xs ${isDark ? 'text-slate-400' : 'text-gray-400'}`}>
+                                        <Loader2 size={12} className="animate-spin" />
+                                        Saving...
+                                    </span>
+                                )}
+                                {saveStatus === 'saved' && (
+                                    <span className="inline-flex items-center gap-1 text-xs text-green-500">
+                                        <Cloud size={12} />
+                                        Draft Saved
+                                        {lastSavedAt && (
+                                            <span className={`${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                                                {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        )}
+                                    </span>
+                                )}
+                                {saveStatus === 'error' && (
+                                    <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+                                        <CloudOff size={12} />
+                                        Save Failed
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -403,7 +507,47 @@ export const AddClientPage = () => {
                                 </select>
                             </div>
                         </div>
+                        {/* WhatsApp Configuration Section */}
+                        <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
+                            <h3 className={`text-md font-semibold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                WhatsApp Configuration
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.config.whatsapp_enabled || false}
+                                            onChange={(e) => updateConfig('whatsapp_enabled', e.target.checked)}
+                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                        />
+                                        <span className={labelClass + " select-none mb-0"}>Enable WhatsApp Outbound Messaging</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>WhatsApp Phone Number ID</label>
+                                    <input
+                                        type="text"
+                                        value={formData.config.whatsapp_phone_number_id || ''}
+                                        onChange={(e) => updateConfig('whatsapp_phone_number_id', e.target.value)}
+                                        className={inputClass}
+                                        placeholder="e.g. 109283746561928"
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>WhatsApp Access Token</label>
+                                    <input
+                                        type="password"
+                                        value={formData.config.whatsapp_access_token || ''}
+                                        onChange={(e) => updateConfig('whatsapp_access_token', e.target.value)}
+                                        className={inputClass}
+                                        placeholder="Enter permanent access token..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
                 )}
 
                 {/* Step 2: Bot Identity */}
@@ -849,6 +993,15 @@ export const AddClientPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Draft Recovery Modal */}
+            <DraftRecoveryModal
+                isOpen={showDraftModal}
+                onResume={handleResumeDraft}
+                onDiscard={handleDiscardDraft}
+                lastSavedAt={loadedDraft?.updated_at || ''}
+                isDark={isDark}
+            />
         </AdminLayout >
     );
 };

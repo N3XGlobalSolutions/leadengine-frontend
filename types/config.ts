@@ -60,10 +60,18 @@ export interface TenantConfig {
 
     // S3 Mapping
     question_map?: any[];
+
+    // WhatsApp Configuration
+    whatsapp_enabled?: boolean;
+    whatsapp_access_token?: string;
+    whatsapp_phone_number_id?: string;
 }
 
 // Default template with placeholder questions
 export const DEFAULT_TENANT_CONFIG: TenantConfig = {
+    whatsapp_enabled: false,
+    whatsapp_access_token: '',
+    whatsapp_phone_number_id: '',
     companyName: '',
     shortName: '',
     botName: 'Q-Bot',

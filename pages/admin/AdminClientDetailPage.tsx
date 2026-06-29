@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Save, Trash2, Pause, Play, Building2, Users, Calendar,
     Globe, Palette, MessageSquare, Bot, AlertTriangle, Check, X, LayoutDashboard,
-    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw, Plus, Sparkles
+    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw, Plus, Sparkles, Megaphone,
+    Cloud, CloudOff, Loader2
 } from 'lucide-react';
 import { Client, TenantDocument } from '../../types/admin';
 import { TenantConfig, Question } from '../../types/config';
@@ -18,6 +19,8 @@ import { AdminLayout } from '../../components/admin/AdminLayout';
 import { ClientConversations } from '../../components/admin/ClientConversations';
 import { SkeletonClientDetail } from '../../components/admin/SkeletonLoader';
 import QuestionMapEditor from '../../components/admin/QuestionMapEditor';
+import { useDraftAutosave } from '../../hooks/useDraftAutosave';
+import { DraftRecoveryModal } from '../../components/admin/DraftRecoveryModal';
 
 // System questions that are auto-handled by the state machine
 // These are displayed as visual placeholders but never saved to the backend
@@ -68,6 +71,11 @@ export const AdminClientDetailPage = () => {
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
     const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING' | null>(null);
 
+    // --- Draft Autosave State ---
+    const [showDraftModal, setShowDraftModal] = useState(false);
+    const [draftReady, setDraftReady] = useState(false);
+    const [originalClient, setOriginalClient] = useState<Client | null>(null); // Track original state for dirty detection
+
     useEffect(() => {
         const fetchClient = async () => {
             if (!clientId) return;
@@ -81,12 +89,79 @@ export const AdminClientDetailPage = () => {
             ]);
             console.log(data)
             setClient(data);
+            setOriginalClient(data); // Store original for reference
             setDocuments(docs);
             setConversationCount(count);
             setLoading(false);
         };
         fetchClient();
     }, [clientId]);
+
+    // --- Draft Autosave Hook for Settings ---
+    const settingsDraftPayload = useMemo(() => {
+        if (!client || !draftReady) return {};
+        return {
+            clientId: client.id,
+            client: {
+                name: client.name,
+                slug: client.slug,
+                plan: client.plan,
+                status: client.status,
+                config: client.config,
+            },
+        };
+    }, [client, draftReady]);
+
+    const {
+        saveStatus: settingsSaveStatus,
+        lastSavedAt: settingsLastSavedAt,
+        loadedDraft: settingsLoadedDraft,
+        loadDraft: loadSettingsDraft,
+        deleteDraft: deleteSettingsDraft,
+    } = useDraftAutosave(settingsDraftPayload, {
+        enabled: draftReady && !isReadOnly && !loading,
+        draftType: 'client_settings',
+    });
+
+    // --- Check for Settings Draft on Mount ---
+    useEffect(() => {
+        if (loading || !client) return;
+
+        const checkForDraft = async () => {
+            const draft = await loadSettingsDraft();
+            // Only show modal if draft belongs to this specific client
+            if (draft && draft.draft_data?.clientId === clientId) {
+                setShowDraftModal(true);
+            } else {
+                setDraftReady(true);
+            }
+        };
+        checkForDraft();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, clientId]);
+
+    // --- Draft Resume / Discard Handlers ---
+    const handleResumeSettingsDraft = () => {
+        if (settingsLoadedDraft?.draft_data?.client && client) {
+            const draftClient = settingsLoadedDraft.draft_data.client;
+            setClient({
+                ...client,
+                name: draftClient.name ?? client.name,
+                slug: draftClient.slug ?? client.slug,
+                plan: draftClient.plan ?? client.plan,
+                status: draftClient.status ?? client.status,
+                config: draftClient.config ? { ...client.config, ...draftClient.config } : client.config,
+            });
+        }
+        setShowDraftModal(false);
+        setTimeout(() => setDraftReady(true), 1000);
+    };
+
+    const handleDiscardSettingsDraft = async () => {
+        await deleteSettingsDraft();
+        setShowDraftModal(false);
+        setDraftReady(true);
+    };
 
     // Real-time update: refresh conversation count every 30 seconds
     useEffect(() => {
@@ -147,6 +222,11 @@ export const AdminClientDetailPage = () => {
             };
 
             await updateClient(clientToSave);
+
+            // Clean up settings draft after successful save
+            await deleteSettingsDraft();
+
+            setOriginalClient(client); // Update original reference
             setSuccessMessage('Changes saved successfully!');
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (e) {
@@ -478,9 +558,39 @@ export const AdminClientDetailPage = () => {
                         <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                             {client.name}
                         </h1>
-                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                            /{client.slug} • Last updated: {client.updatedAt}
-                        </p>
+                        <div className="flex items-center gap-3">
+                            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                /{client.slug} • Last updated: {client.updatedAt}
+                            </p>
+                            {/* Settings Draft Autosave Status Indicator */}
+                            {draftReady && !isReadOnly && (
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    {settingsSaveStatus === 'saving' && (
+                                        <span className={`inline-flex items-center gap-1 text-xs ${isDark ? 'text-slate-400' : 'text-gray-400'}`}>
+                                            <Loader2 size={12} className="animate-spin" />
+                                            Saving draft...
+                                        </span>
+                                    )}
+                                    {settingsSaveStatus === 'saved' && (
+                                        <span className="inline-flex items-center gap-1 text-xs text-green-500">
+                                            <Cloud size={12} />
+                                            Draft Saved
+                                            {settingsLastSavedAt && (
+                                                <span className={`${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                                                    {settingsLastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            )}
+                                        </span>
+                                    )}
+                                    {settingsSaveStatus === 'error' && (
+                                        <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+                                            <CloudOff size={12} />
+                                            Save Failed
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -504,6 +614,12 @@ export const AdminClientDetailPage = () => {
                         title="Refresh Client Data"
                     >
                         <RefreshCw size={20} className={`${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        onClick={() => navigate(`/admin/clients/${clientId}/outbound`)}
+                        className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-sm sm:text-base font-medium transition-all shadow-lg shadow-indigo-500/25"
+                    >
+                        <Megaphone size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Outbound Campaigns
                     </button>
                     <button
                         onClick={handleTogglePause}
@@ -715,6 +831,7 @@ export const AdminClientDetailPage = () => {
                                         >
                                             <option value="en">English</option>
                                             <option value="hi">Hindi</option>
+                                            <option value="ta">Tamil</option>
                                         </select>
 
                                         <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
@@ -816,6 +933,47 @@ export const AdminClientDetailPage = () => {
                                             <p className="text-xs text-gray-400 mt-1">Standard form fields (comma separated)</p>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+
+                            {/* WhatsApp Configuration */}
+                            <div className={cardClass}>
+                                <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                    <MessageSquare size={20} /> WhatsApp Configuration
+                                </h2>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="checkbox"
+                                            id="whatsapp_enabled"
+                                            checked={client.config?.whatsapp_enabled || false}
+                                            onChange={(e) => updateConfig('whatsapp_enabled', e.target.checked)}
+                                            className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <label htmlFor="whatsapp_enabled" className={labelClass + " mb-0 select-none"}>Enable WhatsApp Outbound Messaging</label>
+                                    </div>
+
+                                    <div>
+                                        <label className={labelClass}>WhatsApp Phone Number ID</label>
+                                        <input
+                                            type="text"
+                                            value={client.config?.whatsapp_phone_number_id || ''}
+                                            onChange={(e) => updateConfig('whatsapp_phone_number_id', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. 109283746561928"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className={labelClass}>WhatsApp Access Token</label>
+                                        <input
+                                            type="password"
+                                            value={client.config?.whatsapp_access_token || ''}
+                                            onChange={(e) => updateConfig('whatsapp_access_token', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="Enter permanent access token..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1446,6 +1604,15 @@ export const AdminClientDetailPage = () => {
                     </div>
                 )
             }
+
+            {/* Settings Draft Recovery Modal */}
+            <DraftRecoveryModal
+                isOpen={showDraftModal}
+                onResume={handleResumeSettingsDraft}
+                onDiscard={handleDiscardSettingsDraft}
+                lastSavedAt={settingsLoadedDraft?.updated_at || ''}
+                isDark={isDark}
+            />
         </AdminLayout >
     );
 };

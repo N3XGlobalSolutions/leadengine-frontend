@@ -5,6 +5,7 @@ import {
   Play, Pause, Eye, Archive, Trash2, RefreshCw, Search, Filter, Zap
 } from 'lucide-react';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
+import { OutboundTabs } from '../../../components/admin/outbound/OutboundTabs';
 import { useAdminTheme } from '../../../contexts/AdminThemeContext';
 import {
   Campaign, CampaignStatus, OutboundDashboardStats, CAMPAIGN_STATUS_COLORS
@@ -144,6 +145,9 @@ export const OutboundDashboardPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <OutboundTabs />
 
       {/* Messages */}
       {success && (

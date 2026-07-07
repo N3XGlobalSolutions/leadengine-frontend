@@ -21,6 +21,12 @@ import { ClientLeadsPage } from './pages/ClientLeadsPage';
 import { OutboundDashboardPage } from './pages/admin/outbound/OutboundDashboardPage';
 import { CampaignCreatePage } from './pages/admin/outbound/CampaignCreatePage';
 import { CampaignDetailPage } from './pages/admin/outbound/CampaignDetailPage';
+import { AISettingsPage } from './pages/admin/outbound/AISettingsPage';
+import { ProductsPage } from './pages/admin/outbound/ProductsPage';
+import { CalendarSettingsPage } from './pages/admin/outbound/CalendarSettingsPage';
+import { ConversationsPage } from './pages/admin/outbound/ConversationsPage';
+import { ConversationDetailPage } from './pages/admin/outbound/ConversationDetailPage';
+import { OutboundAnalyticsPage } from './pages/admin/outbound/OutboundAnalyticsPage';
 export default function App() {
   return (
     <Router>
@@ -76,6 +82,36 @@ export default function App() {
             <Route path="/admin/clients/:clientId/outbound/campaigns/:campaignId" element={
               <ProtectedRoute>
                 <CampaignDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/ai-settings" element={
+              <ProtectedRoute>
+                <AISettingsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/products" element={
+              <ProtectedRoute>
+                <ProductsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/calendar" element={
+              <ProtectedRoute>
+                <CalendarSettingsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/conversations" element={
+              <ProtectedRoute>
+                <ConversationsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/conversations/:conversationId" element={
+              <ProtectedRoute>
+                <ConversationDetailPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/clients/:clientId/outbound/analytics" element={
+              <ProtectedRoute>
+                <OutboundAnalyticsPage />
               </ProtectedRoute>
             } />
             <Route path="/admin/settings" element={

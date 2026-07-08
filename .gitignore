@@ -26,3 +26,25 @@ dist-ssr
 # Environment Variables
 .env
 .env.*
+!.env.example
+
+# ─────────────────────────────────────────────────────────────────────────
+# LeadEngine frontend — project-specific
+# ─────────────────────────────────────────────────────────────────────────
+
+# Build output / caches
+build
+.cache
+.vite
+.turbo
+*.tsbuildinfo
+
+# Test / coverage output
+coverage
+playwright-report
+test-results
+
+# Debug / scratch artifacts — never commit
+git_log.txt
+git_log_utf8.txt
+*.tmp

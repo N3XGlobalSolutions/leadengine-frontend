@@ -18,6 +18,9 @@ interface ChatBubbleProps {
 
 const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedback, botAvatar, botName }) => {
   const isBot = message.role === MessageRole.Bot;
+  const hasSummaryCard = !!(message.isSummary && message.summaryData);
+  // Completion message: the Lead Qualification Summary card already shows these details, so hide the text above it
+  const hideMessageText = isBot && message.showActions && hasSummaryCard;
   console.log(message)
 
   return (
@@ -42,44 +45,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
           </span>
 
           {/* Message Content */}
-          {isBot && message.showActions ? (
-            // ⭐ Special rendering for summary message (when action buttons will show)
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 px-5 py-4 rounded-2xl rounded-tl-none shadow-md max-w-xl">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-2xl">📋</span>
-                <h4 className="font-semibold text-blue-900">Your Information Summary</h4>
-              </div>
-              <div className="prose prose-sm max-w-none text-gray-800">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                    li: ({ children }) => <li className="text-gray-700">{children}</li>,
-                    strong: ({ children }) => <strong className="font-semibold text-blue-900">{children}</strong>,
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto my-3 rounded-lg border border-blue-100">
-                        <table className="min-w-full text-sm border-collapse">{children}</table>
-                      </div>
-                    ),
-                    thead: ({ children }) => <thead className="bg-blue-50">{children}</thead>,
-                    tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => <tr className="even:bg-gray-50">{children}</tr>,
-                    th: ({ children }) => (
-                      <th className="px-3 py-2 text-left font-semibold text-blue-800 border border-blue-100 whitespace-nowrap">{children}</th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="px-3 py-2 text-gray-700 border border-gray-100 whitespace-nowrap">{children}</td>
-                    ),
-                  }}
-                >
-                  {message.text}
-                </ReactMarkdown>
-              </div>
-            </div>
-          ) : (
+          {hideMessageText ? null : (
             // Regular message rendering
             <div
               className={`
@@ -151,8 +117,8 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
           )}
 
           {/* Summary Card */}
-          {message.isSummary && message.summaryData && (
-            <div className="mt-3 w-full bg-white rounded-xl p-5 shadow-lg border border-gray-100 animate-fade-in-up">
+          {hasSummaryCard && (
+            <div className={`${hideMessageText ? '' : 'mt-3'} w-full bg-white rounded-xl p-5 shadow-lg border border-gray-100 animate-fade-in-up`}>
               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b pb-2 flex items-center justify-between">
                 <span>Lead Qualification Summary</span>
                 <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full">Completed</span>

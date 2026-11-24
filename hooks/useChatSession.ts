@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, MessageRole, SummaryData } from '../types';
 import { chatService } from '../services/chatService';
+import type { BookSlotResponse } from '../services/bookingService';
+import { formatBookingDateTime } from '../utils/bookingFormat';
 
 import { TenantConfig } from '../types/config';
 import { getCookie, setCookie } from '../utils/cookies';
@@ -101,6 +103,8 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     const [isChatEnded, setIsChatEnded] = useState(persistedState?.isChatEnded || false);
     const [systemError, setSystemError] = useState<string | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(persistedState?.conversationId || null);
+    // Inline call-booking picker (opened by "Yes, schedule a call"). Not persisted.
+    const [isBookingOpen, setIsBookingOpen] = useState(false);
 
     // ⭐ NEW: Question progress tracking
     const [questionProgress, setQuestionProgress] = useState<{
@@ -382,11 +386,33 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         await handleBotResponse(text);
     };
 
-    const handleScheduleCall = async () => {
+    // "Yes, schedule a call" opens the inline date/time picker instead of messaging the bot
+    const handleScheduleCall = () => {
+        setQuickReplies([]);
+        setIsBookingOpen(true);
+    };
+
+    // Picker booked a slot: show the visitor's choice + the backend's confirmation text
+    const handleBookingConfirmed = (result: BookSlotResponse) => {
+        setIsBookingOpen(false);
+        const when = formatBookingDateTime(result.booking.start_time, result.booking.timezone);
+        addMessage(MessageRole.User, `📅 Book a call on ${when}`);
+        addMessage(MessageRole.Bot, result.message);
+        setIsChatEnded(true);
+    };
+
+    // Fallback (no slots / visitor prefers a callback): the original "team will call you" flow
+    const handleBookingSkip = async () => {
+        setIsBookingOpen(false);
         setQuickReplies([]);
         addMessage(MessageRole.User, 'Yes, schedule a call.');
         await handleBotResponse('Yes, schedule a call');
         setIsChatEnded(true);
+    };
+
+    // Close the picker; the Yes / Maybe later buttons show again
+    const handleBookingCancel = () => {
+        setIsBookingOpen(false);
     };
 
     const handleMaybeLater = async () => {
@@ -411,6 +437,7 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         setIsChatEnded(false);
         setLeadData(null);
         setQuickReplies([]);
+        setIsBookingOpen(false);
     };
 
     return {
@@ -423,10 +450,15 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         systemError,
         sessionId,
         questionProgress,  // ⭐ NEW: Export progress for display
+        conversationId,
+        isBookingOpen,
         handleStart,
         handleSendMessage,
         handleScheduleCall,
         handleMaybeLater,
+        handleBookingConfirmed,
+        handleBookingSkip,
+        handleBookingCancel,
         handleFeedback,
         handleNewChat,
     };

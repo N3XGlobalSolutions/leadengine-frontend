@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, CheckCircle, MessageSquare, ArrowUpRight, MoreHorizontal, Clock, ChevronRight, LogOut, TrendingUp, Bot, Megaphone, Lock, Shield, Eye, EyeOff, AlertCircle, Cpu, Sun, Moon } from 'lucide-react';
+import { Users, CheckCircle, MessageSquare, ArrowUpRight, MoreHorizontal, Clock, ChevronRight, LogOut, TrendingUp, Bot, Megaphone, Lock, Shield, Eye, EyeOff, AlertCircle, Cpu, Sun, Moon, CalendarClock, Phone, Video } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDashboardMetrics, getDailyMetrics, getRecentLeads, getClientById, getTenantLeads, resetUserPassword } from '../services/adminService';
 import { DashboardMetrics, DailyMetric, DashboardLead, Client } from '../types/admin';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { useAdminTheme } from '../contexts/AdminThemeContext';
 import { SkeletonDashboard } from '../components/admin/SkeletonLoader';
+import { bookingService, TenantBooking } from '../services/bookingService';
+import { formatBookingDateTime } from '../utils/bookingFormat';
+
+const MAX_UPCOMING_CALLS = 6;
 
 // Branded Header Component
 const DashboardHeader = ({ companyName, dateRange, setDateRange, onLogout, isDark, toggleTheme }: any) => {
@@ -135,6 +139,37 @@ export const DashboardPage = () => {
         };
         fetchData();
     }, [tenantId, dateRange]);
+
+    // Upcoming booked calls (website chat + WhatsApp agent). Fetched separately so a
+    // failure here never blocks or breaks the rest of the dashboard.
+    const [bookings, setBookings] = useState<TenantBooking[]>([]);
+    const [bookingsLoading, setBookingsLoading] = useState(true);
+    const [bookingsError, setBookingsError] = useState(false);
+
+    useEffect(() => {
+        if (!tenantId) return;
+        let cancelled = false;
+        const fetchBookings = async () => {
+            setBookingsLoading(true);
+            setBookingsError(false);
+            try {
+                const data = await bookingService.getTenantBookings(tenantId);
+                if (!cancelled) setBookings(Array.isArray(data) ? data : []);
+            } catch (err) {
+                console.error("Failed to fetch upcoming calls", err);
+                if (!cancelled) {
+                    setBookings([]);
+                    setBookingsError(true);
+                }
+            } finally {
+                if (!cancelled) setBookingsLoading(false);
+            }
+        };
+        fetchBookings();
+        return () => {
+            cancelled = true;
+        };
+    }, [tenantId]);
 
     const handleLogout = () => {
         logout();
@@ -410,6 +445,115 @@ export const DashboardPage = () => {
                             )}
                         </div>
 
+                        {/* Upcoming Calls Card */}
+                        <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
+                            <div className="flex items-center justify-between gap-3 mb-4">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <CalendarClock className="text-indigo-500 shrink-0" size={20} />
+                                    <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Upcoming Calls</h3>
+                                </div>
+                                {!bookingsLoading && !bookingsError && bookings.length > 0 && (
+                                    <span
+                                        className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}
+                                        aria-label={`${bookings.length} upcoming ${bookings.length === 1 ? 'call' : 'calls'}`}
+                                    >
+                                        {bookings.length}
+                                    </span>
+                                )}
+                            </div>
+
+                            {bookingsLoading ? (
+                                <div className="space-y-2.5" aria-busy="true">
+                                    {[0, 1].map((i) => (
+                                        <div key={i} className={`h-[76px] rounded-xl animate-pulse ${isDark ? 'bg-slate-900/60' : 'bg-gray-100'}`} />
+                                    ))}
+                                </div>
+                            ) : bookingsError ? (
+                                <p className={`${isDark ? 'text-slate-400' : 'text-gray-500'} text-sm text-center py-6`}>Couldn't load upcoming calls.</p>
+                            ) : bookings.length === 0 ? (
+                                <p className={`${isDark ? 'text-slate-400' : 'text-gray-500'} text-sm text-center py-6`}>No upcoming calls booked yet.</p>
+                            ) : (
+                                <div className="space-y-2.5">
+                                    {bookings.slice(0, MAX_UPCOMING_CALLS).map((booking) => {
+                                        const openLead = booking.lead_id
+                                            ? () => navigate(`/${tenantId}/leads?leadId=${booking.lead_id}`)
+                                            : undefined;
+                                        return (
+                                            <div
+                                                key={booking.meeting_id}
+                                                onClick={openLead}
+                                                onKeyDown={openLead ? (e) => {
+                                                    if (e.target !== e.currentTarget) return;
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        openLead();
+                                                    }
+                                                } : undefined}
+                                                role={openLead ? 'button' : undefined}
+                                                tabIndex={openLead ? 0 : undefined}
+                                                className={`p-3.5 rounded-xl border border-transparent transition-all ${
+                                                    isDark
+                                                        ? 'bg-gradient-to-r from-slate-900/60 to-slate-900/20 text-slate-200'
+                                                        : 'bg-gradient-to-r from-gray-50 to-indigo-50/30 text-gray-700'
+                                                } ${
+                                                    openLead
+                                                        ? `cursor-pointer hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                                                            isDark
+                                                                ? 'hover:from-slate-900 hover:to-indigo-950/40 hover:border-indigo-500/50'
+                                                                : 'hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-200'
+                                                        }`
+                                                        : ''
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p
+                                                            className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}
+                                                            title={booking.timezone ? `Time shown in ${booking.timezone}` : undefined}
+                                                        >
+                                                            {formatBookingDateTime(booking.start_time, booking.timezone)}
+                                                        </p>
+                                                        <p className={`text-sm font-medium truncate mt-0.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
+                                                            {booking.attendee_name || 'Website visitor'}
+                                                        </p>
+                                                        {booking.attendee_phone && (
+                                                            <p className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                                                <Phone size={12} className="shrink-0" />
+                                                                <span className="truncate">{booking.attendee_phone}</span>
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    {booking.meet_link && (
+                                                        <div className="flex flex-col items-end gap-2 shrink-0">
+                                                            <a
+                                                                href={booking.meet_link}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                                                                    isDark
+                                                                        ? 'text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/20'
+                                                                        : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100'
+                                                                }`}
+                                                            >
+                                                                <Video size={12} />
+                                                                Join
+                                                            </a>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {bookings.length > MAX_UPCOMING_CALLS && (
+                                        <p className={`text-xs font-medium text-center pt-1 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                            +{bookings.length - MAX_UPCOMING_CALLS} more
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Inbound Bot System Card */}
                         <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
                             <h3 className={`font-bold mb-4 text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Inbound Bot System</h3>
@@ -441,6 +585,21 @@ export const DashboardPage = () => {
                                     <div className="flex items-center gap-2">
                                         <Bot size={18} className="text-indigo-500" />
                                         <span className="font-semibold text-sm">Configure Inbound Bot</span>
+                                    </div>
+                                    <ChevronRight size={18} className="text-indigo-500 group-hover:text-indigo-700 group-hover:translate-x-1 transition-transform" />
+                                </button>
+
+                                <button
+                                    onClick={() => navigate(`/admin/clients/${tenantId}?tab=settings`)}
+                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all group shadow-sm hover:shadow-md ${
+                                        isDark
+                                            ? 'border-indigo-900/60 hover:border-indigo-800 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-indigo-300 hover:text-indigo-200'
+                                            : 'border-indigo-200 hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 hover:text-indigo-900'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <CalendarClock size={18} className="text-indigo-500" />
+                                        <span className="font-semibold text-sm">Call Booking Slots</span>
                                     </div>
                                     <ChevronRight size={18} className="text-indigo-500 group-hover:text-indigo-700 group-hover:translate-x-1 transition-transform" />
                                 </button>

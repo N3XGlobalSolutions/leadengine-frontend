@@ -7,6 +7,7 @@ import WelcomeScreen from '../components/chat/WelcomeScreen';
 import ChatBubble from '../components/chat/ChatBubble';
 import ChatInput from '../components/chat/ChatInput';
 import ActionButtons from '../components/chat/ActionButtons';
+import BookingPicker from '../components/chat/BookingPicker';
 import QuickReplies from '../components/chat/QuickReplies';
 import CookieConsent from '../components/chat/CookieConsent';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -108,10 +109,15 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
         systemError,
         sessionId,
         questionProgress,  // ⭐ NEW: Get progress tracking
+        conversationId,
+        isBookingOpen,
         handleStart,
         handleSendMessage,
         handleScheduleCall,
         handleMaybeLater,
+        handleBookingConfirmed,
+        handleBookingSkip,
+        handleBookingCancel,
         handleFeedback,
     } = useChatSession(config, tenantId);
 
@@ -120,10 +126,10 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
         config.colors?.secondary || '#6366F1'
     ), [config.colors?.primary, config.colors?.secondary]);
 
-    // Auto-scroll to bottom when messages change
+    // Auto-scroll to bottom when messages change (or the booking picker opens)
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isLoading]);
+    }, [messages, isLoading, isBookingOpen]);
 
     return (
         <div
@@ -261,11 +267,23 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                                     />
 
                                     {msg.showActions && idx === messages.length - 1 && (
-                                        <div className="mt-3 pl-11">
-                                            <ActionButtons
-                                                onSchedule={handleScheduleCall}
-                                                onLater={handleMaybeLater}
-                                            />
+                                        <div className="mt-3 pl-11 min-w-0">
+                                            {isBookingOpen ? (
+                                                <BookingPicker
+                                                    tenantId={tenantId}
+                                                    apiKey={config.apiKey}
+                                                    conversationId={conversationId}
+                                                    primaryColor={config.colors?.primary || '#4F46E5'}
+                                                    onConfirmed={handleBookingConfirmed}
+                                                    onSkip={handleBookingSkip}
+                                                    onCancel={handleBookingCancel}
+                                                />
+                                            ) : (
+                                                <ActionButtons
+                                                    onSchedule={handleScheduleCall}
+                                                    onLater={handleMaybeLater}
+                                                />
+                                            )}
                                         </div>
                                     )}
                                 </div>

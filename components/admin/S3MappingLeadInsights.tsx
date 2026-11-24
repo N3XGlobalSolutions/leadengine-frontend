@@ -76,7 +76,7 @@ export const S3MappingLeadInsights: React.FC<S3MappingLeadInsightsProps> = ({ da
                     </div>
                     <h4 className={`text-sm font-semibold ${textMain}`}>S3 Mapping Intelligence</h4>
                 </div>
-                <PriorityBadge priority={leadPriority} size="md" />
+                <PriorityBadge isDark={isDark} priority={leadPriority} size="md" />
             </div>
 
             {/* Verdict Banner */}

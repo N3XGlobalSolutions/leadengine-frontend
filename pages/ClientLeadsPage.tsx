@@ -2,16 +2,103 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     Search, User, MessageSquare, Phone, Mail, Calendar,
-    ArrowLeft, X, Layout, ChevronRight, CheckCircle, Clock, Filter, RefreshCw
+    ArrowLeft, X, Layout, ChevronRight, CheckCircle, Clock, Filter, RefreshCw,
+    CalendarCheck, PhoneCall, Video
 } from 'lucide-react';
 import { getTenantLeads, getClientById, updateLeadStatus, exportLeads } from '../services/adminService';
 import { DashboardLead, Client } from '../types/admin';
 import { exportLeadsToCSV } from '../utils/csvExport';
+import { getCallBooking, formatBookingDateTime, formatSlotTime } from '../utils/bookingFormat';
+import type { CallBooking } from '../services/bookingService';
 import ConversationViewer from '../components/admin/ConversationViewer';
 import { PriorityBadge } from '../components/admin/PriorityBadge';
 import { S3LeadInsights } from '../components/admin/S3LeadInsights';
 import { S3MaxLeadInsights } from '../components/admin/S3MaxLeadInsights';
 import { SkeletonLeadsTable } from '../components/admin/SkeletonLoader';
+
+// ── Booked-call display helpers (lead.metadata.call_booking) ──────────────
+// Times are always shown in the booking's own timezone. Formatting is wrapped so a
+// malformed timestamp can never crash the whole leads page.
+const formatCallStart = (booking: CallBooking): string => {
+    try {
+        return formatBookingDateTime(booking.start_time, booking.timezone);
+    } catch {
+        return booking.start_time;
+    }
+};
+
+/** "Tue, 25 Nov · 10:30 AM – 11:00 AM" */
+const formatCallRange = (booking: CallBooking): string => {
+    const start = formatCallStart(booking);
+    if (!booking.end_time) return start;
+    try {
+        return `${start} – ${formatSlotTime(booking.end_time, booking.timezone)}`;
+    } catch {
+        return start;
+    }
+};
+
+/** Only http(s) links are rendered as clickable meeting links. */
+const safeMeetLink = (link?: string | null): string | null =>
+    link && /^https?:\/\//i.test(link) ? link : null;
+
+/** Compact pill shown under the lead's name in the table when a call is booked. */
+const CallBookingPill = ({ lead }: { lead: unknown }) => {
+    const booking = getCallBooking(lead);
+    if (!booking) return null;
+    const when = formatCallStart(booking);
+    return (
+        <div
+            className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium leading-4 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+            title={`Call booked: ${when}${booking.timezone ? ` (${booking.timezone})` : ''}`}
+        >
+            <CalendarCheck size={12} className="shrink-0" aria-hidden="true" />
+            <span className="truncate whitespace-nowrap">Call · {when}</span>
+        </div>
+    );
+};
+
+/** "Call booked" block (or "call requested" note) for the lead detail drawer header. */
+const CallBookingSummary = ({ lead }: { lead: any }) => {
+    const booking = getCallBooking(lead);
+    if (booking) {
+        const meetLink = safeMeetLink(booking.meet_link);
+        return (
+            <div className="mt-3 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <CalendarCheck size={16} aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Call booked</div>
+                    <div className="text-sm font-semibold text-gray-900 break-words">{formatCallRange(booking)}</div>
+                    {booking.timezone && (
+                        <div className="text-xs text-gray-500 break-all">{booking.timezone}</div>
+                    )}
+                    {meetLink && (
+                        <a
+                            href={meetLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                        >
+                            <Video size={14} aria-hidden="true" />
+                            Join meeting
+                        </a>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    if (lead?.metadata?.call_requested === true) {
+        return (
+            <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                <PhoneCall size={14} className="shrink-0 text-gray-400" aria-hidden="true" />
+                <span>Call requested — no time booked yet</span>
+            </div>
+        );
+    }
+    return null;
+};
 
 export const ClientLeadsPage = () => {
     const { tenantId } = useParams<{ tenantId: string }>();
@@ -163,7 +250,7 @@ export const ClientLeadsPage = () => {
 
                         {/* Toolbar */}
                         <div className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 flex-1">
                                 <div className="relative flex-1 sm:flex-initial">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                     <input
@@ -202,10 +289,10 @@ export const ClientLeadsPage = () => {
                                     <option value="newest">Newest First</option>
                                     <option value="oldest">Oldest First</option>
                                 </select>
-                                <div>
+                                <div className="flex-shrink-0">
                                     <button
                                         onClick={handleExport}
-                                        className="flex items-center gap-2 bg-black text-white px-4 py-1.5
+                                        className="flex w-full sm:w-auto items-center justify-center gap-2 whitespace-nowrap bg-black text-white px-4 py-2
                                                     rounded-lg hover:bg-neutral-800 transition-all duration-200
                                                     shadow-md active:bg-neutral-500">
                                         {/* Download Icon */}
@@ -215,7 +302,7 @@ export const ClientLeadsPage = () => {
                                             viewBox="0 0 24 24"
                                             strokeWidth={2}
                                             stroke="currentColor"
-                                            className="w-5 h-5"
+                                            className="w-4 h-4 flex-shrink-0"
                                         >
                                             <path
                                                 strokeLinecap="round"
@@ -284,6 +371,7 @@ export const ClientLeadsPage = () => {
                                             >
                                                 <td className="px-3 sm:px-6 py-4 font-medium">
                                                     <div className="text-gray-900">{lead.name}</div>
+                                                    <CallBookingPill lead={lead} />
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4">
                                                     <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
@@ -380,6 +468,7 @@ export const ClientLeadsPage = () => {
                                                 } />
                                             )}
                                     </div>
+                                    <CallBookingSummary lead={selectedLead} />
                                 </div>
                                 <button onClick={() => handleSelectLead(null)} className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 ml-2">
                                     <X size={24} />
@@ -412,7 +501,9 @@ export const ClientLeadsPage = () => {
                                         <h4 className="text-sm font-semibold text-gray-900 mb-3">Collected Data</h4>
                                         <div className="rounded-xl border border-gray-100 overflow-hidden">
                                             {Object.entries((selectedLead as any).metadata)
-                                                .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 's3_max_lead_output' && key !== 'email')
+                                                .filter(([key]) => key !== 's2_lead_output' && key !== 's3_lead_output' && key !== 's3_max_lead_output' && key !== 'email' &&
+                                                    // shown in the "Call booked" block in the header instead
+                                                    key !== 'call_booking' && key !== 'call_requested')
                                                 .sort(([, valueA], [, valueB]) => {
                                                     const orderA =
                                                         typeof valueA === 'object' &&

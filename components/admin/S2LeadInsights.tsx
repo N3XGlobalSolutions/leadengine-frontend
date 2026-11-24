@@ -31,7 +31,7 @@ export const S2LeadInsights: React.FC<S2LeadInsightsProps> = ({ data, isDark = f
                     </div>
                     <h4 className={`text-sm font-semibold ${textMain}`}>S2 Lead Intelligence</h4>
                 </div>
-                <PriorityBadge priority={data.lead_priority} size="md" />
+                <PriorityBadge isDark={isDark} priority={data.lead_priority} size="md" />
             </div>
 
             {/* Reasoning */}

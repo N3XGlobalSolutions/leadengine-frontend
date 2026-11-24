@@ -50,7 +50,7 @@ export const S3MaxLeadInsights: React.FC<S3MaxLeadInsightsProps> = ({ data, isDa
                     </div>
                     <h4 className={`text-sm font-semibold ${textMain}`}>S3 Max AI Intelligence</h4>
                 </div>
-                <PriorityBadge priority={data.lead_priority} size="md" />
+                <PriorityBadge isDark={isDark} priority={data.lead_priority} size="md" />
             </div>
 
             {/* Verdict Banner */}

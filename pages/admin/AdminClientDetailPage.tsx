@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
     ArrowLeft, Save, Trash2, Pause, Play, Building2, Users, Calendar,
     Globe, Palette, MessageSquare, Bot, AlertTriangle, Check, X, LayoutDashboard,
@@ -21,6 +21,13 @@ import { SkeletonClientDetail } from '../../components/admin/SkeletonLoader';
 import QuestionMapEditor from '../../components/admin/QuestionMapEditor';
 import { useDraftAutosave } from '../../hooks/useDraftAutosave';
 import { DraftRecoveryModal } from '../../components/admin/DraftRecoveryModal';
+import { InboundBookingSettingsCard } from '../../components/admin/InboundBookingSettingsCard';
+import { ClientBookingsList } from '../../components/admin/ClientBookingsList';
+
+type ClientDetailTab = 'general' | 'branding' | 'settings' | 'qualifications' | 'question_map' | 'knowledge' | 'integration' | 'conversations';
+const CLIENT_DETAIL_TABS: ClientDetailTab[] = ['general', 'branding', 'settings', 'qualifications', 'question_map', 'knowledge', 'integration', 'conversations'];
+const isClientDetailTab = (value: string | null): value is ClientDetailTab =>
+    value !== null && (CLIENT_DETAIL_TABS as string[]).includes(value);
 
 // System questions that are auto-handled by the state machine
 // These are displayed as visual placeholders but never saved to the backend
@@ -54,7 +61,17 @@ export const AdminClientDetailPage = () => {
 
     const [client, setClient] = useState<Client | null>(null);
     const [documents, setDocuments] = useState<TenantDocument[]>([]);
-    const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'settings' | 'qualifications' | 'question_map' | 'knowledge' | 'integration' | 'conversations'>('general');
+    // Initial tab can come from the URL, e.g. /admin/clients/:clientId?tab=settings
+    const [searchParams] = useSearchParams();
+    const tabParam = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState<ClientDetailTab>(() => (isClientDetailTab(tabParam) ? tabParam : 'general'));
+    useEffect(() => {
+        if (isClientDetailTab(tabParam)) setActiveTab(tabParam);
+    }, [tabParam]);
+    // Question Map only exists for S3_MAPPING clients (e.g. ?tab=question_map on another plan)
+    useEffect(() => {
+        if (activeTab === 'question_map' && client && client.plan !== 'S3_MAPPING') setActiveTab('general');
+    }, [activeTab, client?.plan]);
     const [generatedKey, setGeneratedKey] = useState<string>('');
     const [conversationCount, setConversationCount] = useState<number>(0);
     const [countLoading, setCountLoading] = useState(false);
@@ -826,6 +843,7 @@ export const AdminClientDetailPage = () => {
                 <div className={activeTab === 'conversations' ? "lg:col-span-3 space-y-6" : "lg:col-span-2 space-y-6"}>
                     {/* GENERAL TAB */}
                     {activeTab === 'general' && (
+                        <>
                         <div className={cardClass}>
                             <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                 <Building2 size={20} /> Basic Information
@@ -861,6 +879,10 @@ export const AdminClientDetailPage = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Website-chat call bookings */}
+                        <ClientBookingsList tenantId={clientId ?? client.id} isDark={isDark} />
+                        </>
                     )}
 
                     {/* BRANDING TAB */}
@@ -1113,6 +1135,9 @@ export const AdminClientDetailPage = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Inbound call booking (saved separately via its own API) */}
+                            <InboundBookingSettingsCard tenantId={clientId ?? client.id} isDark={isDark} />
 
                             {/* Danger Zone: Delete Client */}
                             {!isOperator && user?.role !== 'client_admin' && (

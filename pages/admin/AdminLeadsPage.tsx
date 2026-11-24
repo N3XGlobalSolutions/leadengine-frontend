@@ -1,19 +1,118 @@
 import React, { useState, useEffect } from 'react';
 import {
     Search, Filter, User, MessageSquare, Phone, Mail, Calendar,
-    ArrowRight, X, Layout, ChevronRight, CheckCircle, Clock, AlertTriangle, RefreshCw
+    ArrowRight, X, Layout, ChevronRight, CheckCircle, Clock, AlertTriangle, RefreshCw,
+    CalendarCheck, PhoneCall, Video
 } from 'lucide-react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { getClients, getTenantLeads, updateLeadStatus, exportLeads } from '../../services/adminService';
 import { Client, DashboardLead } from '../../types/admin';
 import { exportLeadsToCSV } from '../../utils/csvExport';
+import { getCallBooking, formatBookingDateTime, formatSlotTime } from '../../utils/bookingFormat';
+import type { CallBooking } from '../../services/bookingService';
 import ConversationViewer from '../../components/admin/ConversationViewer';
 import { PriorityBadge } from '../../components/admin/PriorityBadge';
 import { S2LeadInsights } from '../../components/admin/S2LeadInsights';
 import { S3LeadInsights } from '../../components/admin/S3LeadInsights';
 import { S3MaxLeadInsights } from '../../components/admin/S3MaxLeadInsights';
 import { S3MappingLeadInsights } from '../../components/admin/S3MappingLeadInsights';
+
+// ── Booked-call display helpers (lead.metadata.call_booking) ──────────────
+// Times are always shown in the booking's own timezone. Formatting is wrapped so a
+// malformed timestamp can never crash the whole leads page.
+const formatCallStart = (booking: CallBooking): string => {
+    try {
+        return formatBookingDateTime(booking.start_time, booking.timezone);
+    } catch {
+        return booking.start_time;
+    }
+};
+
+/** "Tue, 25 Nov · 10:30 AM – 11:00 AM" */
+const formatCallRange = (booking: CallBooking): string => {
+    const start = formatCallStart(booking);
+    if (!booking.end_time) return start;
+    try {
+        return `${start} – ${formatSlotTime(booking.end_time, booking.timezone)}`;
+    } catch {
+        return start;
+    }
+};
+
+/** Only http(s) links are rendered as clickable meeting links. */
+const safeMeetLink = (link?: string | null): string | null =>
+    link && /^https?:\/\//i.test(link) ? link : null;
+
+/** Compact pill shown under the lead's name in the table when a call is booked. */
+const CallBookingPill = ({ lead, isDark }: { lead: unknown; isDark: boolean }) => {
+    const booking = getCallBooking(lead);
+    if (!booking) return null;
+    const when = formatCallStart(booking);
+    return (
+        <div
+            className={`mt-1 inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-4 ${
+                isDark
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+            }`}
+            title={`Call booked: ${when}${booking.timezone ? ` (${booking.timezone})` : ''}`}
+        >
+            <CalendarCheck size={12} className="shrink-0" aria-hidden="true" />
+            <span className="truncate whitespace-nowrap">Call · {when}</span>
+        </div>
+    );
+};
+
+/** "Call booked" block (or "call requested" note) for the lead detail drawer header. */
+const CallBookingSummary = ({ lead, isDark, textMain, textSub }: { lead: any; isDark: boolean; textMain: string; textSub: string }) => {
+    const booking = getCallBooking(lead);
+    if (booking) {
+        const meetLink = safeMeetLink(booking.meet_link);
+        return (
+            <div className={`mb-5 p-4 rounded-2xl border flex items-start gap-3 ${
+                isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50/80 border-emerald-200/80'
+            }`}>
+                <div className={`h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 ${
+                    isDark ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+                }`}>
+                    <CalendarCheck size={17} aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider block ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        Call booked
+                    </span>
+                    <span className={`text-sm font-extrabold block break-words ${textMain}`}>{formatCallRange(booking)}</span>
+                    {booking.timezone && (
+                        <span className={`text-xs block break-all ${textSub}`}>{booking.timezone}</span>
+                    )}
+                    {meetLink && (
+                        <a
+                            href={meetLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                                isDark ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                            }`}
+                        >
+                            <Video size={14} aria-hidden="true" />
+                            Join meeting
+                        </a>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    if (lead?.metadata?.call_requested === true) {
+        return (
+            <div className={`mb-5 flex items-center gap-2 text-xs font-medium ${textSub}`}>
+                <PhoneCall size={14} className="shrink-0" aria-hidden="true" />
+                <span>Call requested — no time booked yet</span>
+            </div>
+        );
+    }
+    return null;
+};
 
 export const AdminLeadsPage = () => {
     const { isDark } = useAdminTheme();
@@ -365,6 +464,7 @@ export const AdminLeadsPage = () => {
                                             <tr key={lead.id} className={`group transition-colors ${hoverClass} ${selectedLead?.id === lead.id ? (isDark ? 'bg-indigo-900/20' : 'bg-indigo-50') : ''}`}>
                                                 <td className="px-3 sm:px-6 py-4 font-medium">
                                                     <div className={`text-sm sm:text-base ${textMain}`}>{lead.name}</div>
+                                                    <CallBookingPill lead={lead} isDark={isDark} />
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4">
                                                     <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium capitalize 
@@ -377,13 +477,13 @@ export const AdminLeadsPage = () => {
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell">
                                                     {(lead as any).metadata?.s3_mapping_lead_output?.lead_priority ? (
-                                                        <PriorityBadge priority={(lead as any).metadata.s3_mapping_lead_output.lead_priority} />
+                                                        <PriorityBadge isDark={isDark} priority={(lead as any).metadata.s3_mapping_lead_output.lead_priority} />
                                                     ) : (lead as any).metadata?.s3_max_lead_output?.lead_priority ? (
-                                                        <PriorityBadge priority={(lead as any).metadata.s3_max_lead_output.lead_priority} />
+                                                        <PriorityBadge isDark={isDark} priority={(lead as any).metadata.s3_max_lead_output.lead_priority} />
                                                     ) : (lead as any).metadata?.s3_lead_output?.lead_priority ? (
-                                                        <PriorityBadge priority={(lead as any).metadata.s3_lead_output.lead_priority} />
+                                                        <PriorityBadge isDark={isDark} priority={(lead as any).metadata.s3_lead_output.lead_priority} />
                                                     ) : (lead as any).metadata?.s2_lead_output?.lead_priority ? (
-                                                        <PriorityBadge priority={(lead as any).metadata.s2_lead_output.lead_priority} />
+                                                        <PriorityBadge isDark={isDark} priority={(lead as any).metadata.s2_lead_output.lead_priority} />
                                                     ) : (
                                                         <span className={`text-xs ${textSub}`}>—</span>
                                                     )}
@@ -484,13 +584,13 @@ export const AdminLeadsPage = () => {
                                                 </div>
 
                                                 {(selectedLead as any).metadata?.s3_mapping_lead_output?.lead_priority ? (
-                                                    <PriorityBadge priority={(selectedLead as any).metadata.s3_mapping_lead_output.lead_priority} />
+                                                    <PriorityBadge isDark={isDark} priority={(selectedLead as any).metadata.s3_mapping_lead_output.lead_priority} />
                                                 ) : (selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ? (
-                                                    <PriorityBadge priority={(selectedLead as any).metadata.s3_max_lead_output.lead_priority} />
+                                                    <PriorityBadge isDark={isDark} priority={(selectedLead as any).metadata.s3_max_lead_output.lead_priority} />
                                                 ) : (selectedLead as any).metadata?.s3_lead_output?.lead_priority ? (
-                                                    <PriorityBadge priority={(selectedLead as any).metadata.s3_lead_output.lead_priority} />
+                                                    <PriorityBadge isDark={isDark} priority={(selectedLead as any).metadata.s3_lead_output.lead_priority} />
                                                 ) : (selectedLead as any).metadata?.s2_lead_output?.lead_priority && (
-                                                    <PriorityBadge priority={(selectedLead as any).metadata.s2_lead_output.lead_priority} />
+                                                    <PriorityBadge isDark={isDark} priority={(selectedLead as any).metadata.s2_lead_output.lead_priority} />
                                                 )}
                                             </div>
                                         </div>
@@ -502,6 +602,9 @@ export const AdminLeadsPage = () => {
                                         <X size={20} />
                                     </button>
                                 </div>
+
+                                {/* Booked call (website chat) */}
+                                <CallBookingSummary lead={selectedLead} isDark={isDark} textMain={textMain} textSub={textSub} />
 
                                 {/* Tabs Switcher */}
                                 <div className={`p-1 rounded-2xl flex items-center gap-1 border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
@@ -608,6 +711,8 @@ export const AdminLeadsPage = () => {
                                             const isS3Mapping = !!(selectedLead as any).metadata?.s3_mapping_lead_output;
                                             const hiddenKeys = new Set([
                                                 's3_mapping_lead_output', 's2_lead_output', 's3_lead_output', 's3_max_lead_output', 'email',
+                                                // shown in the "Call booked" block in the drawer header instead
+                                                'call_booking', 'call_requested',
                                                 ...(isS3Mapping ? ['lead_priority', 'source'] : []),
                                             ]);
                                             const visibleEntries = Object.entries((selectedLead as any).metadata)

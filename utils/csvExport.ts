@@ -1,4 +1,8 @@
 import { DashboardLead } from '../types/admin';
+import { formatBookingDateTime, getCallBooking } from './bookingFormat';
+
+// Metadata keys exported with a readable value/label instead of raw JSON
+const CALL_BOOKING_KEY = 'call_booking';
 
 export const exportLeadsToCSV = (leads: DashboardLead[], clientName: string) => {
     // 1. Gather all unique metadata/captured data keys to create separate columns
@@ -15,8 +19,10 @@ export const exportLeadsToCSV = (leads: DashboardLead[], clientName: string) => 
             
             Object.entries(lead.metadata).forEach(([key, value]) => {
                 if (hiddenKeys.has(key)) return;
-                
-                if (typeof value === 'object' && value !== null && 'label' in value) {
+
+                if (key === CALL_BOOKING_KEY) {
+                    metaKeysMap.set(key, 'Call Booked');
+                } else if (typeof value === 'object' && value !== null && 'label' in value) {
                     const label = (value as any).label || key;
                     metaKeysMap.set(key, label);
                 } else {
@@ -88,6 +94,13 @@ const dynamicMetaKeys = Array.from(metaKeysMap.keys()).sort((a, b) => {
 
         // Add values for dynamic metadata keys
         dynamicMetaKeys.forEach(key => {
+            if (key === CALL_BOOKING_KEY) {
+                const booking = getCallBooking(lead);
+                rowData.push(escapeCSVValue(
+                    booking ? `${formatBookingDateTime(booking.start_time, booking.timezone)} (${booking.timezone})` : ''
+                ));
+                return;
+            }
             const val = lead.metadata ? lead.metadata[key] : undefined;
             rowData.push(escapeCSVValue(val));
         });

@@ -31,6 +31,13 @@ export const chatService = {
         return res.data.count;
     },
 
+    getBulkTenantConversationCounts: async (tenantIds: string[]): Promise<Record<string, number>> => {
+        const res = await api.post<{ counts: Record<string, number> }>('/chat/tenants/conversations/counts/bulk', {
+            tenant_ids: tenantIds
+        });
+        return res.data.counts;
+    },
+
     getConversation: async (conversationId: string): Promise<Conversation> => {
         const res = await api.get<Conversation>(`/chat/conversations/${conversationId}`);
         return res.data;

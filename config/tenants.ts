@@ -4,7 +4,7 @@ const skyHabitatConfig: TenantConfig = {
     companyName: "Sky Habitat Homes",
     shortName: "Sky Habitat",
     botName: "Q-Lead",
-    botDisplayName: "Q-BOT",
+    botDisplayName: "LeadEngine",
     botAvatar: "https://cdn-icons-png.flaticon.com/32/4712/4712109.png",
 
     colors: {

@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Sparkles, Bot, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Save, Bot, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { OutboundTabs } from '../../../components/admin/outbound/OutboundTabs';
 import { useAdminTheme } from '../../../contexts/AdminThemeContext';
+import { useAdminAuth } from '../../../contexts/AdminAuthContext';
 import { getAISettings, updateAISettings, OutboundAISettings } from '../../../services/outboundAIService';
 
 export const AISettingsPage: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { isDark } = useAdminTheme();
+  const { user } = useAdminAuth();
 
   const [settings, setSettings] = useState<OutboundAISettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,13 @@ export const AISettingsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate(`/admin/clients/${clientId}`)}
+            onClick={() => {
+              if (user?.role === 'client_admin') {
+                navigate(`/${clientId}/dashboard`);
+              } else {
+                navigate(`/admin/clients/${clientId}`);
+              }
+            }}
             className={`p-2 rounded-lg transition-colors ${
               isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'
             }`}
@@ -217,7 +225,7 @@ export const AISettingsPage: React.FC = () => {
               {/* Toggles */}
               <div className={cardClass}>
                 <div className="flex items-center gap-2 border-b pb-4 mb-6 border-slate-700/50">
-                  <Sparkles className="text-indigo-500" size={20} />
+                  <Bot className="text-indigo-500" size={20} />
                   <h2 className="text-lg font-bold">Capabilities & Limits</h2>
                 </div>
 

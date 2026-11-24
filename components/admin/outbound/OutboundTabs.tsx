@@ -50,8 +50,12 @@ export const OutboundTabs: React.FC = () => {
   };
 
   return (
-    <div className={`mb-6 border-b transition-colors duration-200 ${isDark ? 'border-slate-700/50 bg-slate-800/40 rounded-xl p-1' : 'border-gray-200 bg-white rounded-xl shadow-sm p-1'}`}>
-      <nav className="flex flex-wrap gap-1" aria-label="Tabs">
+    <div className={`mb-6 p-1.5 rounded-2xl border overflow-x-auto scrollbar-none transition-colors duration-200 ${
+      isDark
+        ? 'bg-slate-900/90 border-slate-800'
+        : 'bg-slate-100/80 border-slate-200/80'
+    }`}>
+      <nav className="flex items-center gap-1.5 min-w-max" aria-label="Outbound Tabs">
         {tabs.map((tab) => {
           const active = isActive(tab.path, tab.exact);
           const Icon = tab.icon;
@@ -60,17 +64,15 @@ export const OutboundTabs: React.FC = () => {
             <Link
               key={tab.name}
               to={tab.path}
-              className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm transition-all duration-200 whitespace-nowrap ${
                 active
-                  ? isDark
-                    ? 'text-indigo-400 bg-slate-700/70 shadow-sm'
-                    : 'text-indigo-600 bg-indigo-50/70 shadow-sm'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/25'
                   : isDark
-                  ? 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'text-slate-400 hover:text-white hover:bg-slate-800/80 font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold'
               }`}
             >
-              <Icon size={16} />
+              <Icon size={18} className={active ? 'text-white' : isDark ? 'text-slate-400' : 'text-slate-500'} />
               <span>{tab.name}</span>
             </Link>
           );

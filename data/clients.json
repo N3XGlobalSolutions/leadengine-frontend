@@ -11,7 +11,7 @@
       "companyName": "Sky Habitat Homes",
       "shortName": "Sky Habitat",
       "botName": "Q-Lead",
-      "botDisplayName": "Q-BOT",
+      "botDisplayName": "LeadEngine",
       "botAvatar": "https://cdn-icons-png.flaticon.com/32/4712/4712109.png",
       "colors": {
         "primary": "blue",
@@ -131,7 +131,7 @@
     "config": {
       "companyName": "Test Corp",
       "shortName": "Testcorp",
-      "botName": "Q-Bot",
+      "botName": "LeadEngine",
       "botDisplayName": "Assistant",
       "botAvatar": "https://cdn-icons-png.flaticon.com/512/4712/4712109.png",
       "colors": {

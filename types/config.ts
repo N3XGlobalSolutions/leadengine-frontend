@@ -74,7 +74,7 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
     whatsapp_phone_number_id: '',
     companyName: '',
     shortName: '',
-    botName: 'Q-Bot',
+    botName: 'LeadEngine',
     botDisplayName: 'Assistant',
     botAvatar: 'https://cdn-icons-png.flaticon.com/512/4712/4712109.png',
 

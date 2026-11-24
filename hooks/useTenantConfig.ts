@@ -30,8 +30,8 @@ export const useTenantConfig = (tenantId?: string) => {
 
                 const transformedConfig: TenantConfig = {
                     plan: branding.plan,
-                    companyName: branding.company_name || data.tenant_name || 'QBot Client',
-                    shortName: branding.company_name || data.tenant_name || branding.bot_name || 'QBot',
+                    companyName: branding.company_name || data.tenant_name || 'LeadEngine Client',
+                    shortName: branding.company_name || data.tenant_name || branding.bot_name || 'LeadEngine',
                     botName: branding.bot_name || 'AI Assistant',
                     botDisplayName: branding.bot_name || 'AI Assistant',
                     botAvatar: branding.avatar_url,
@@ -43,7 +43,7 @@ export const useTenantConfig = (tenantId?: string) => {
 
                     welcome: {
                         headline: branding.headline_prefix || 'Welcome to',
-                        highlightedHeadline: branding.highlighted_headline || 'QBot',
+                        highlightedHeadline: branding.highlighted_headline || 'LeadEngine',
                         subheadline: branding.sub_headline || 'How can I help you today?',
                         startBtnText: 'Start Conversation',
                         features: branding.key_features || []

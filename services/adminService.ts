@@ -99,7 +99,7 @@ const mapTenantToClient = (tenant: any): Client => {
     const frontendConfig: TenantConfig = {
         companyName: backendConfig.company_name || tenant.name,
         shortName: backendConfig.bot_name || tenant.name,
-        botName: backendConfig.bot_name || 'QBot',
+        botName: backendConfig.bot_name || 'LeadEngine',
         botDisplayName: backendConfig.bot_displayName || backendConfig.bot_name || 'Assistant',
         botAvatar: backendConfig.avatar_url || '',
 
@@ -109,7 +109,7 @@ const mapTenantToClient = (tenant: any): Client => {
         },
         welcome: {
             headline: backendConfig.headline_prefix || 'Welcome to',
-            highlightedHeadline: backendConfig.highlighted_headline || 'QBot',
+            highlightedHeadline: backendConfig.highlighted_headline || 'LeadEngine',
             subheadline: backendConfig.sub_headline || 'How can I help you today?',
             startBtnText: 'Start Conversation',
             features: backendConfig.key_features || []
@@ -150,7 +150,7 @@ const mapTenantSummaryToClient = (tenant: any): Client => {
     const frontendConfig: TenantConfig = {
         companyName: tenant.name,
         shortName: tenant.name,
-        botName: "QBot",
+        botName: "LeadEngine",
         botDisplayName: "Assistant",
         botAvatar: "",
 
@@ -273,29 +273,78 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
 };
 //stop
 
-export const getClients = async (): Promise<Client[]> => {
-    try {
-        const res = await api.get('/tenants/tenants/summary', { params: { limit: 500 } });
+export interface PaginatedClientsParams {
+    limit?: number;
+    cursor?: string | null;
+    search?: string;
+    status?: string;
+    plan?: string;
+    sort?: string;
+}
 
-        if (!Array.isArray(res.data)) {
-            console.error('Expected array of tenants, got:', res.data);
-            return [];
+export interface PaginatedClientsResponse {
+    clients: Client[];
+    nextCursor: string | null;
+    total: number;
+    planCounts?: Record<string, number>;
+}
+
+export const getClientsPaginated = async (params: PaginatedClientsParams = {}): Promise<PaginatedClientsResponse> => {
+    try {
+        const { limit = 24, cursor, search, status, plan, sort } = params;
+        const queryParams: Record<string, any> = { limit };
+        if (cursor) queryParams.cursor = cursor;
+        if (search && search.trim()) queryParams.search = search.trim();
+        if (status && status !== 'all') queryParams.status = status;
+        if (plan && plan !== 'all') queryParams.plan = plan;
+        if (sort) queryParams.sort = sort;
+
+        const res = await api.get('/tenants/tenants/summary', { params: queryParams });
+        const data = res.data;
+
+        let rawItems: any[] = [];
+        let nextCursor: string | null = null;
+        let total = 0;
+        let planCounts: Record<string, number> | undefined = undefined;
+
+        if (Array.isArray(data)) {
+            rawItems = data;
+            total = data.length;
+        } else if (data && typeof data === 'object') {
+            rawItems = data.items || [];
+            nextCursor = data.nextCursor || null;
+            total = data.total ?? rawItems.length;
+            planCounts = data.planCounts;
         }
 
-        return res.data.map((t: any) => {
+        const clients = rawItems.map((t: any) => {
             try {
-                console.log(t);
                 return mapTenantSummaryToClient(t);
             } catch (err) {
                 console.error('Failed to map tenant:', t, err);
                 return null;
             }
-        }).filter((c): c is Client => c !== null); // Filter out failed mappings
+        }).filter((c): c is Client => c !== null);
 
+        return {
+            clients,
+            nextCursor,
+            total,
+            planCounts,
+        };
     } catch (e) {
-        console.error("Error fetching clients:", e);
-        return [];
+        console.error("Error fetching paginated clients:", e);
+        return {
+            clients: [],
+            nextCursor: null,
+            total: 0,
+        };
     }
+};
+
+export const getClients = async (): Promise<Client[]> => {
+    const response = await getClientsPaginated({ limit: 100 });
+    return response.clients;
 };
 
 export const getClientById = async (id: string): Promise<Client | null> => {
@@ -322,20 +371,36 @@ export const getClientConversationCount = async (clientId: string): Promise<numb
     }
 };
 
-/**
- * Get conversation counts for all provided clients.
- * Returns a map of clientId -> conversation count.
- */
 export const getAllClientConversationCounts = async (clientIds: string[]): Promise<Record<string, number>> => {
-    const counts: Record<string, number> = {};
+    if (!clientIds || clientIds.length === 0) return {};
 
-    // Fetch counts in parallel for better performance
-    const promises = clientIds.map(async (id) => {
-        const count = await getClientConversationCount(id);
-        counts[id] = count;
+    // 1. Try single bulk call first for maximum performance
+    try {
+        const bulkCounts = await chatService.getBulkTenantConversationCounts(clientIds);
+        if (bulkCounts && Object.keys(bulkCounts).length > 0) {
+            return bulkCounts;
+        }
+    } catch (e) {
+        console.warn('Bulk conversation count fetch failed, falling back to parallel requests:', e);
+    }
+
+    // 2. Parallel fallback with 2-second timeout per item so UI never hangs
+    const counts: Record<string, number> = {};
+    const fetchWithTimeout = async (id: string) => {
+        try {
+            const countPromise = getClientConversationCount(id);
+            const timeoutPromise = new Promise<number>((res) => setTimeout(() => res(0), 2000));
+            return await Promise.race([countPromise, timeoutPromise]);
+        } catch {
+            return 0;
+        }
+    };
+
+    const results = await Promise.all(clientIds.map(id => fetchWithTimeout(id)));
+    clientIds.forEach((id, index) => {
+        counts[id] = results[index] || 0;
     });
 
-    await Promise.all(promises);
     return counts;
 };
 

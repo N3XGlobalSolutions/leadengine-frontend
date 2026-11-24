@@ -32,7 +32,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
         id: '3',
         type: 'info',
         title: 'System Update',
-        message: 'Q-Bot system maintenance scheduled for tonight.',
+        message: 'LeadEngine system maintenance scheduled for tonight.',
         time: '5 hours ago',
         read: true
     },

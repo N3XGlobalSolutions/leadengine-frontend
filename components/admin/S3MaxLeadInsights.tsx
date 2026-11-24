@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, AlertTriangle, ArrowRight, Sparkles, Target, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
+import { Brain, AlertTriangle, ArrowRight, Target, BarChart3, CheckCircle2, XCircle } from 'lucide-react';
 import { PriorityBadge } from './PriorityBadge';
 
 interface DimensionScore {
@@ -80,7 +80,6 @@ export const S3MaxLeadInsights: React.FC<S3MaxLeadInsightsProps> = ({ data, isDa
             {/* Reasoning */}
             <div className={`rounded-lg ${sectionBg} p-3`}>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                    <Sparkles size={12} className="text-cyan-500" />
                     <span className={`text-xs font-medium uppercase tracking-wider ${textSub}`}>AI Reasoning</span>
                 </div>
                 <p className={`text-sm leading-relaxed ${textMain}`}>

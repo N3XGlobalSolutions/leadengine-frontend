@@ -5,7 +5,7 @@ import { useAdminAuth } from '../../contexts/AdminAuthContext';
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user, isAuthenticated, isLoading } = useAdminAuth();
     const location = useLocation();
-    const { tenantId } = useParams<{ tenantId: string }>();
+    const { tenantId, clientId } = useParams<{ tenantId: string; clientId: string }>();
 
     if (isLoading) {
         return (
@@ -38,12 +38,17 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     // 2. If accessing generic admin routes (like /admin)
     if (location.pathname.startsWith('/admin') && location.pathname !== '/admin/login') {
         if (isClientUser) {
-            // Client users shouldn't be in generic admin, send them home
-            return <Navigate to={`/${user.tenant_id}/dashboard`} replace />;
-        }
-
-        // Block Sales Team from accessing User Management
-        if (isSalesTeam && location.pathname === '/admin/users') {
+            // Client users shouldn't be in generic admin, except for their own settings or outbound routes
+            const isOwnClientRoute = clientId && clientId === user.tenant_id && (
+                location.pathname === `/admin/clients/${clientId}` ||
+                location.pathname.startsWith(`/admin/clients/${clientId}/`)
+            );
+            if (!isOwnClientRoute) {
+                // Client users shouldn't be in generic admin, send them home
+                return <Navigate to={`/${user.tenant_id}/dashboard`} replace />;
+            }
+        } else if (isSalesTeam && location.pathname === '/admin/users') {
+            // Block Sales Team from accessing User Management
             return <Navigate to="/admin" replace />;
         }
     }

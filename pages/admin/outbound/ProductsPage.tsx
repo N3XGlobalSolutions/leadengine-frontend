@@ -4,12 +4,14 @@ import { ArrowLeft, Plus, Search, Edit2, Trash2, CheckCircle2, ShieldAlert, Tag,
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { OutboundTabs } from '../../../components/admin/outbound/OutboundTabs';
 import { useAdminTheme } from '../../../contexts/AdminThemeContext';
+import { useAdminAuth } from '../../../contexts/AdminAuthContext';
 import { listProducts, createProduct, updateProduct, deleteProduct, OutboundProduct } from '../../../services/outboundAIService';
 
 export const ProductsPage: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { isDark } = useAdminTheme();
+  const { user } = useAdminAuth();
 
   const [products, setProducts] = useState<OutboundProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +166,13 @@ export const ProductsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate(`/admin/clients/${clientId}`)}
+            onClick={() => {
+              if (user?.role === 'client_admin') {
+                navigate(`/${clientId}/dashboard`);
+              } else {
+                navigate(`/admin/clients/${clientId}`);
+              }
+            }}
             className={`p-2 rounded-lg transition-colors ${
               isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'
             }`}
@@ -260,8 +268,8 @@ export const ProductsPage: React.FC = () => {
                   {p.currency} {Number(p.price).toLocaleString()}
                 </span>
                 <div className="flex gap-1">
-                  {p.brochure_pdf && <LinkIcon size={14} className="text-indigo-500" title="Brochure PDF linked" />}
-                  {p.images.length > 0 && <Image size={14} className="text-purple-500" title="Images configured" />}
+                  {p.brochure_pdf && <LinkIcon size={14} className="text-indigo-500" />}
+                  {p.images.length > 0 && <Image size={14} className="text-purple-500" />}
                 </div>
               </div>
             </div>

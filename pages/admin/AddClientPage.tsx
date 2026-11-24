@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, ArrowRight, Check, Building2, Bot, MessageSquare,
-    HelpCircle, ClipboardCheck, Plus, X, Sparkles, Wand2, FileText, Upload, AlertCircle, Trash2, AlertTriangle,
-    Cloud, CloudOff, Loader2
+    HelpCircle, ClipboardCheck, Plus, X, Wand2, FileText, Upload, AlertCircle, Trash2, AlertTriangle,
+    Cloud, CloudOff, Loader2, Brain, RefreshCw
 } from 'lucide-react';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -68,6 +68,19 @@ export const AddClientPage = () => {
         questionMapConfig,
     }), [formData, currentStep, leadQualificationCriteria, questionMapConfig]);
 
+    const initialDraftPayload = useMemo(() => ({
+        formData: {
+            name: '',
+            slug: '',
+            plan: 'S1' as const,
+            config: DEFAULT_TENANT_CONFIG,
+        },
+        leadQualificationCriteria: '',
+        questionMapConfig: {
+            question_map: [],
+        },
+    }), []);
+
     const {
         saveStatus,
         lastSavedAt,
@@ -77,6 +90,7 @@ export const AddClientPage = () => {
     } = useDraftAutosave(draftPayload, {
         enabled: draftReady,
         draftType: 'client_creation',
+        initialValue: initialDraftPayload,
     });
 
     // --- Load Draft on Mount ---
@@ -724,7 +738,7 @@ export const AddClientPage = () => {
                                 <div className={`p-6 rounded-xl border-2 ${isDark ? 'bg-emerald-900/20 border-emerald-700' : 'bg-emerald-50 border-emerald-200'}`}>
                                     <div className="flex items-start gap-4">
                                         <div className={`p-3 rounded-full ${isDark ? 'bg-emerald-800' : 'bg-emerald-100'}`}>
-                                            <Sparkles size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                                            <Brain size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
                                         </div>
                                         <div>
                                             <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>AI-Generated Questions</h3>
@@ -956,7 +970,7 @@ export const AddClientPage = () => {
                         disabled={saving}
                         className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-lg shadow-green-200 dark:shadow-green-900/20 order-1 sm:order-2"
                     >
-                        {saving ? <Sparkles className="animate-spin" size={18} /> : <Check size={18} />}
+                        {saving ? <RefreshCw className="animate-spin" size={18} /> : <Check size={18} />}
                         {saving ? 'Creating...' : 'Create Client'}
                     </button>
                 )}

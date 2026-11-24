@@ -1,8 +1,8 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams, Navigate, useNavigate } from 'react-router-dom';
 import { useTenantConfig } from '../hooks/useTenantConfig';
 import { useChatSession } from '../hooks/useChatSession';
-import { MessageCircle, Send } from 'lucide-react';
+import { MessageCircle, Send, Bot } from 'lucide-react';
 import WelcomeScreen from '../components/chat/WelcomeScreen';
 import ChatBubble from '../components/chat/ChatBubble';
 import ChatInput from '../components/chat/ChatInput';
@@ -96,10 +96,7 @@ const getThemeStyles = (primaryColor: string, secondaryColor: string) => {
 };
 
 const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) => {
-    // Config is now passed down.
-
-    // ... existing ChatInterface logic ...
-
+    const navigate = useNavigate();
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const {
@@ -130,62 +127,70 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
 
     return (
         <div
-            className={`min-h-[100dvh] font-sans flex flex-col ${!themeStyles.isCustom ? `bg-gradient-to-br ${themeStyles.bgGradient}` : ''}`}
-            style={themeStyles.isCustom ? themeStyles.bgGradientStyle : undefined}
+            className={`min-h-[100dvh] font-sans flex flex-col bg-white`}
         >
-            {/* Header */}
-            <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-gray-100 shadow-sm relative">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-                        {/* Left: Company Branding */}
-                        <div className="flex items-center gap-3">
+            {/* Ultra-Elegant Floating Glassmorphic Navbar (Matching Landing Page style) */}
+            <div className="sticky top-3 sm:top-5 z-50 px-4 max-w-5xl mx-auto w-full">
+                <header className="bg-white/80 backdrop-blur-2xl border border-zinc-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-full px-5 sm:px-6 py-2.5 sm:py-3 transition-all duration-300">
+                    <div className="flex justify-between items-center">
+                        {/* Logo / Tenant Branding */}
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
                             <div
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm ${!themeStyles.isCustom ? themeStyles.iconBg : ''}`}
+                                className={`p-2 rounded-xl text-white shadow-md shadow-black/10 transition-transform hover:scale-105 flex items-center justify-center ${!themeStyles.isCustom ? themeStyles.iconBg : 'bg-black'}`}
                                 style={themeStyles.isCustom ? themeStyles.iconBgStyle : undefined}
                             >
-                                <MessageCircle size={20} strokeWidth={2.5} />
+                                <Bot className="w-4.5 h-4.5" />
                             </div>
-                            <span className="font-bold text-gray-800 text-lg tracking-tight">
-                                {config.shortName}
-                            </span>
+                            <div className="flex flex-col">
+                                <span className="text-base sm:text-lg font-black tracking-wider text-black leading-tight">
+                                    {config.shortName || 'LeadEngine'}
+                                </span>
+                                <span className="text-[9px] font-mono text-amber-600 font-bold tracking-widest uppercase leading-none mt-0.5">
+                                    AI AGENT
+                                </span>
+                            </div>
                         </div>
 
                         {/* Right: AI Assistant Badge */}
                         <div className="flex items-center gap-3">
                             <div className="text-right hidden sm:block">
-                                <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">AI Assistant</p>
+                                <p className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest font-bold">AI Assistant</p>
                                 <p
-                                    className={`text-sm font-bold ${!themeStyles.isCustom ? themeStyles.accent : ''}`}
+                                    className={`text-xs sm:text-sm font-bold ${!themeStyles.isCustom ? themeStyles.accent : 'text-black'}`}
                                     style={themeStyles.isCustom ? themeStyles.accentStyle : undefined}
-                                >{config.botDisplayName}</p>
+                                >
+                                    {config.botDisplayName}
+                                </p>
                             </div>
-                            <div className="w-10 h-10 rounded-full bg-slate-50 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-50 border-2 border-white shadow-md flex items-center justify-center overflow-hidden transition-transform hover:scale-105">
                                 <img
                                     src={config.botAvatar || "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"}
                                     alt={config.botDisplayName}
-                                    className="w-6 h-6 object-contain"
+                                    className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
                                 />
                             </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Main Chat Area */}
-            <main className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-4 sm:px-6 overflow-hidden">
-                {systemError ? (
-                    <div className="flex-1 flex items-center justify-center">
-                        <div className="p-6 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center max-w-md">
-                            <p className="font-medium mb-1">Connection Error</p>
-                            <p className="text-red-500">{systemError}</p>
                         </div>
                     </div>
-                ) : !hasStarted ? (
-                    <div className="flex-1 flex items-center justify-center py-8">
-                        <WelcomeScreen
-                            onStart={handleStart}
-                            config={config.welcome}
-                        />
+                </header>
+            </div>
+
+            {/* Main Chat Area */}
+            {systemError ? (
+                <main className="flex-1 flex items-center justify-center max-w-5xl w-full mx-auto px-4 sm:px-6">
+                    <div className="p-6 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center max-w-md">
+                        <p className="font-medium mb-1">Connection Error</p>
+                        <p className="text-red-500">{systemError}</p>
                     </div>
-                ) : (
+                </main>
+            ) : !hasStarted ? (
+                <main className="flex-1 flex flex-col w-full overflow-hidden">
+                    <WelcomeScreen
+                        onStart={handleStart}
+                        config={config.welcome}
+                    />
+                </main>
+            ) : (
+                <main className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-4 sm:px-6 overflow-hidden">
                     <div className="flex-1 flex flex-col overflow-hidden py-6">
                         {/* Session ID Badge */}
                         <div className="text-center mb-6">
@@ -296,9 +301,8 @@ const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) 
                             <div ref={messagesEndRef} className="h-1" />
                         </div>
                     </div>
-                )
-                }
-            </main >
+                </main>
+            )}
 
             {/* Fixed Bottom Input Area */}
             {

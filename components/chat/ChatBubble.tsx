@@ -44,7 +44,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
           {/* Message Content */}
           {isBot && message.showActions ? (
             // ⭐ Special rendering for summary message (when action buttons will show)
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 px-5 py-4 rounded-2xl rounded-bl-none shadow-md max-w-xl">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 px-5 py-4 rounded-2xl rounded-tl-none shadow-md max-w-xl">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-2xl">📋</span>
                 <h4 className="font-semibold text-blue-900">Your Information Summary</h4>
@@ -86,9 +86,9 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedb
                 px-4 py-3 sm:px-5 sm:py-3.5 text-[15px] leading-relaxed break-words relative w-fit
                 ${isBot
                   ? message.isSoftDQ
-                    ? 'bg-amber-50/90 backdrop-blur-md text-gray-800 rounded-3xl rounded-bl-md border border-amber-200/50 shadow-sm'
-                    : 'bg-white text-gray-800 rounded-3xl rounded-bl-md shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)] border border-gray-100'
-                  : 'bg-slate-800 text-white rounded-3xl rounded-br-md shadow-[0_4px_14px_rgba(0,0,0,0.08)]'
+                    ? 'bg-amber-50/90 backdrop-blur-md text-gray-800 rounded-2xl rounded-tl-none border border-amber-200/50 shadow-sm'
+                    : 'bg-white text-gray-800 rounded-2xl rounded-tl-none shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)] border border-gray-100'
+                  : 'bg-slate-800 text-white rounded-2xl rounded-tr-none shadow-[0_4px_14px_rgba(0,0,0,0.08)]'
                 }
               `}
             >

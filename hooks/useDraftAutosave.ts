@@ -20,8 +20,77 @@ import {
     deleteClientDraft,
 } from '../services/adminService';
 import { DraftResponse, DraftSaveStatus, DraftType } from '../types/draft';
+import { DEFAULT_TENANT_CONFIG } from '../types/config';
 
-const DEBOUNCE_MS = 5000; // 5 seconds after last change
+const DEBOUNCE_MS = 2000; // 2 seconds after last change
+
+const DEFAULT_CLIENT_CREATION_PAYLOAD = {
+    formData: {
+        name: '',
+        slug: '',
+        plan: 'S1',
+        config: DEFAULT_TENANT_CONFIG
+    },
+    leadQualificationCriteria: '',
+    questionMapConfig: {
+        question_map: []
+    }
+};
+
+/**
+ * Checks if a value is empty (null, undefined, "", empty array, or empty object).
+ */
+function isEmpty(v: any): boolean {
+    if (v === null || v === undefined || v === '') return true;
+    if (Array.isArray(v) && v.length === 0) return true;
+    if (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) return true;
+    return false;
+}
+
+/**
+ * Checks if value has meaningful difference from defaultValue.
+ * Ignores keys: 'currentStep', 'activeTab', 'clientId'.
+ */
+function isMeaningfulValue(value: any, defaultValue: any): boolean {
+    if (value === defaultValue) {
+        return false;
+    }
+
+    if (isEmpty(value) && isEmpty(defaultValue)) {
+        return false;
+    }
+
+    if (isEmpty(value) !== isEmpty(defaultValue)) {
+        return true;
+    }
+
+    if (Array.isArray(value) && Array.isArray(defaultValue)) {
+        if (value.length !== defaultValue.length) {
+            return true;
+        }
+        for (let i = 0; i < value.length; i++) {
+            if (isMeaningfulValue(value[i], defaultValue[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    if (typeof value === 'object' && value !== null && typeof defaultValue === 'object' && defaultValue !== null) {
+        const allKeys = new Set([...Object.keys(value), ...Object.keys(defaultValue)]);
+        for (const key of allKeys) {
+            if (key === 'currentStep' || key === 'activeTab' || key === 'clientId') {
+                continue;
+            }
+            if (isMeaningfulValue(value[key], defaultValue[key])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    return true;
+}
 
 /** Fields to strip from draft data before sending to the API */
 const SENSITIVE_KEYS = new Set(['whatsapp_access_token']);
@@ -50,8 +119,10 @@ interface UseDraftAutosaveOptions {
     enabled?: boolean;
     /** Draft type identifier */
     draftType?: DraftType;
-    /** Debounce delay in ms (default 5000) */
+    /** Debounce delay in ms (default 2000) */
     debounceMs?: number;
+    /** The initial value of the payload to detect dirty state */
+    initialValue?: Record<string, any>;
 }
 
 interface UseDraftAutosaveReturn {
@@ -69,6 +140,8 @@ interface UseDraftAutosaveReturn {
     deleteDraft: () => Promise<void>;
     /** Force an immediate save (e.g. before navigation) */
     forceSave: (data: Record<string, any>) => Promise<void>;
+    /** Whether the local form is dirty compared to baseline */
+    isDirty: boolean;
 }
 
 export function useDraftAutosave(
@@ -79,19 +152,22 @@ export function useDraftAutosave(
         enabled = true,
         draftType = 'client_creation',
         debounceMs = DEBOUNCE_MS,
+        initialValue,
     } = options;
 
     const [saveStatus, setSaveStatus] = useState<DraftSaveStatus>('idle');
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const [draftLoaded, setDraftLoaded] = useState(false);
     const [loadedDraft, setLoadedDraft] = useState<DraftResponse | null>(null);
+    const [isDirty, setIsDirty] = useState(false);
 
     // Refs for tracking state without re-renders
     const draftExistsOnServer = useRef(false);
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isFirstRender = useRef(true);
     const isMounted = useRef(true);
-    const lastSavedDataRef = useRef<string>('');
+    const initialDataRef = useRef<Record<string, any> | null>(null);
+    const lastSavedDataRef = useRef<Record<string, any> | null>(null);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -113,13 +189,16 @@ export function useDraftAutosave(
         async (data: Record<string, any>) => {
             if (!isMounted.current) return;
 
-            const cleanData = stripSensitive(data);
-            const serialized = JSON.stringify(cleanData);
+            const baseline = draftExistsOnServer.current
+                ? (lastSavedDataRef.current || initialValue || initialDataRef.current)
+                : (initialValue || initialDataRef.current);
 
-            // Skip save if data hasn't actually changed since last save
-            if (serialized === lastSavedDataRef.current) {
+            // Skip save if data hasn't actually changed in a meaningful way
+            if (!isMeaningfulValue(data, baseline)) {
                 return;
             }
+
+            const cleanData = stripSensitive(data);
 
             setSaveStatus('saving');
 
@@ -139,7 +218,8 @@ export function useDraftAutosave(
                 if (isMounted.current) {
                     if (result) {
                         draftExistsOnServer.current = true;
-                        lastSavedDataRef.current = serialized;
+                        lastSavedDataRef.current = data;
+                        setIsDirty(false);
                         setSaveStatus('saved');
                         setLastSavedAt(new Date());
                     } else {
@@ -153,45 +233,58 @@ export function useDraftAutosave(
                 }
             }
         },
-        [draftType]
+        [draftType, initialValue]
     );
 
     /**
      * Watch formData for changes and debounce saves.
-     * Skips the first data snapshot after enabled=true to avoid saving the
-     * initial/default form state. Only subsequent user-driven changes trigger saves.
+     * Only subsequent user-driven changes trigger saves when isDirty is true.
      */
     useEffect(() => {
         // Gate: don't do anything while autosave is disabled.
-        // Crucially, this runs BEFORE consuming isFirstRender so the guard
-        // survives the disabled→enabled transition.
         if (!enabled) return;
 
         // Skip the first render after enabled becomes true.
         // This prevents saving the initial/restored form state.
         if (isFirstRender.current) {
             isFirstRender.current = false;
-            // Snapshot the current data so the next change can be compared
-            lastSavedDataRef.current = JSON.stringify(formData);
+            initialDataRef.current = formData;
+            if (draftExistsOnServer.current) {
+                lastSavedDataRef.current = formData;
+            }
             return;
         }
 
-        // Cancel any pending debounce
-        if (debounceTimerRef.current) {
-            clearTimeout(debounceTimerRef.current);
-        }
+        const baseline = draftExistsOnServer.current
+            ? (lastSavedDataRef.current || initialValue || initialDataRef.current)
+            : (initialValue || initialDataRef.current);
 
-        // Start new debounce timer
-        debounceTimerRef.current = setTimeout(() => {
-            saveDraft(formData);
-        }, debounceMs);
+        const dirty = isMeaningfulValue(formData, baseline);
+
+        if (dirty) {
+            setIsDirty(true);
+            // Cancel any pending debounce
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+            // Start new debounce timer
+            debounceTimerRef.current = setTimeout(() => {
+                saveDraft(formData);
+            }, debounceMs);
+        } else {
+            setIsDirty(false);
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+                debounceTimerRef.current = null;
+            }
+        }
 
         return () => {
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);
             }
         };
-    }, [formData, enabled, debounceMs, saveDraft]);
+    }, [formData, enabled, debounceMs, saveDraft, initialValue]);
 
     /**
      * Load the latest draft from the server.
@@ -200,10 +293,28 @@ export function useDraftAutosave(
         try {
             const draft = await getLatestClientDraft(draftType);
             if (draft) {
+                const baseline = initialValue || (draftType === 'client_creation' ? DEFAULT_CLIENT_CREATION_PAYLOAD : null);
+
+                // If the draft on server is an empty/placeholder draft, automatically discard it
+                if (baseline && !isMeaningfulValue(draft.draft_data, baseline)) {
+                    console.log('Discarding empty/placeholder draft found on server');
+                    try {
+                        await deleteClientDraft(draftType);
+                    } catch (e) {
+                        console.error('Failed to auto-delete empty draft:', e);
+                    }
+                    draftExistsOnServer.current = false;
+                    setDraftLoaded(false);
+                    setLoadedDraft(null);
+                    return null;
+                }
+
                 draftExistsOnServer.current = true;
                 setDraftLoaded(true);
                 setLoadedDraft(draft);
+                lastSavedDataRef.current = draft.draft_data;
             } else {
+                draftExistsOnServer.current = false;
                 setDraftLoaded(false);
                 setLoadedDraft(null);
             }
@@ -212,7 +323,7 @@ export function useDraftAutosave(
             console.error('Failed to load draft:', err);
             return null;
         }
-    }, [draftType]);
+    }, [draftType, initialValue]);
 
     /**
      * Delete the draft on the server and reset local state.
@@ -231,7 +342,8 @@ export function useDraftAutosave(
         }
 
         draftExistsOnServer.current = false;
-        lastSavedDataRef.current = '';
+        lastSavedDataRef.current = null;
+        setIsDirty(false);
         setDraftLoaded(false);
         setLoadedDraft(null);
         setSaveStatus('idle');
@@ -249,9 +361,14 @@ export function useDraftAutosave(
                 clearTimeout(debounceTimerRef.current);
                 debounceTimerRef.current = null;
             }
-            await saveDraft(data);
+            const baseline = draftExistsOnServer.current
+                ? (lastSavedDataRef.current || initialValue || initialDataRef.current)
+                : (initialValue || initialDataRef.current);
+            if (isMeaningfulValue(data, baseline)) {
+                await saveDraft(data);
+            }
         },
-        [saveDraft]
+        [saveDraft, initialValue]
     );
 
     return {
@@ -262,5 +379,6 @@ export function useDraftAutosave(
         loadDraft,
         deleteDraft,
         forceSave,
+        isDirty,
     };
 }

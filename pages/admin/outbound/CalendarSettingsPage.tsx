@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Calendar, CheckCircle2, ShieldAlert, Sparkles, KeyRound } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, CheckCircle2, ShieldAlert, KeyRound } from 'lucide-react';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { OutboundTabs } from '../../../components/admin/outbound/OutboundTabs';
 import { useAdminTheme } from '../../../contexts/AdminThemeContext';
+import { useAdminAuth } from '../../../contexts/AdminAuthContext';
 import { getCalendarSettings, updateCalendarSettings, testCalendarConnection, OutboundCalendarSettings } from '../../../services/outboundAIService';
 
 export const CalendarSettingsPage: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const { isDark } = useAdminTheme();
+  const { user } = useAdminAuth();
 
   const [settings, setSettings] = useState<OutboundCalendarSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,7 +115,13 @@ export const CalendarSettingsPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate(`/admin/clients/${clientId}`)}
+            onClick={() => {
+              if (user?.role === 'client_admin') {
+                navigate(`/${clientId}/dashboard`);
+              } else {
+                navigate(`/admin/clients/${clientId}`);
+              }
+            }}
             className={`p-2 rounded-lg transition-colors ${
               isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'
             }`}
@@ -310,18 +318,14 @@ export const CalendarSettingsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleTestConnection}
-                  disabled={testing || saving}
-                  className={`w-full py-3 border font-medium rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${
-                    testResult === 'success'
-                      ? 'border-green-500/30 text-green-400 bg-green-500/5'
-                      : testResult === 'failed'
-                      ? 'border-red-500/30 text-red-400 bg-red-500/5'
-                      : isDark
+                  disabled={saving || testing}
+                  className={`flex items-center gap-2 w-full justify-center px-4 py-3 rounded-xl border text-sm font-semibold transition-all ${
+                    isDark
                       ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
                       : 'border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm bg-white'
                   }`}
                 >
-                  <Sparkles size={16} />
+                  <KeyRound size={16} />
                   {testing ? 'Testing connection...' : 'Test OAuth Connection'}
                 </button>
 

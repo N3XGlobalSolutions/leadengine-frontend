@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Layers, Clock, Timer, Eye, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Layers, Clock, Timer, Eye, Megaphone } from 'lucide-react';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { useAdminTheme } from '../../../contexts/AdminThemeContext';
 import { CampaignCreate } from '../../../types/outbound';
@@ -81,7 +81,7 @@ export const CampaignCreatePage: React.FC = () => {
           {/* Campaign Name */}
           <div className={`${cardClass} p-6`}>
             <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              <Sparkles size={20} className="text-indigo-500" /> Campaign Details
+              <Megaphone size={20} className="text-indigo-500" /> Campaign Details
             </h2>
             <div>
               <label className={labelClass}>Campaign Name *</label>

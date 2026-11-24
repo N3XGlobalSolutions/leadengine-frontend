@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, AlertTriangle, ArrowRight, Sparkles } from 'lucide-react';
+import { Brain, AlertTriangle, ArrowRight } from 'lucide-react';
 import { PriorityBadge } from './PriorityBadge';
 
 interface S3LeadOutput {
@@ -37,7 +37,6 @@ export const S3LeadInsights: React.FC<S3LeadInsightsProps> = ({ data, isDark = f
             {/* Reasoning */}
             <div className={`rounded-lg ${sectionBg} p-3`}>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                    <Sparkles size={12} className="text-indigo-500" />
                     <span className={`text-xs font-medium uppercase tracking-wider ${textSub}`}>Reasoning</span>
                 </div>
                 <p className={`text-sm leading-relaxed ${textMain}`}>

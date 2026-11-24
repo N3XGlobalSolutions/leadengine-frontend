@@ -1,224 +1,271 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Zap, BarChart3, ArrowRight, MessageSquare } from 'lucide-react';
+import { Bot, ArrowRight, Check, ChevronRight } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Card } from '../components/ui/card';
+import { SpotlightBackground } from '../components/landing/SpotlightBackground';
+import { HeroChatSimulator } from '../components/landing/HeroChatSimulator';
+import { BentoGrid } from '../components/landing/BentoGrid';
+import { RoiCalculator } from '../components/landing/RoiCalculator';
+import { LogoMarquee } from '../components/landing/LogoMarquee';
+import { FaqSection } from '../components/landing/FaqSection';
+import { PricingSection } from '../components/landing/PricingSection';
+import { BorderBeam } from '../components/landing/BorderBeam';
 
-export const LandingPage = () => {
+const HERO_PHRASES = [
+    "Automating WhatsApp Sales",
+    "Qualifying Prospects 24/7",
+    "Auto-Booking Sales Demos",
+    "Syncing HubSpot CRM Data"
+];
+
+export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
+    const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+
+    // Cycling Hero Phrases for Live Animation
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentPhraseIndex((prev) => (prev + 1) % HERO_PHRASES.length);
+        }, 3200);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleGetStarted = () => {
+        navigate('/admin/login');
+    };
+
+    const scrollToSection = (id: string) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    const currentPhrase = HERO_PHRASES[currentPhraseIndex];
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900 overflow-x-hidden">
-            {/* Navbar */}
-            <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-20">
-                        <div className="flex items-center gap-3 group cursor-default">
-                            <div className="bg-gradient-to-tr from-indigo-600 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200 group-hover:shadow-indigo-300 transition-all duration-300 group-hover:rotate-3">
-                                <Bot className="w-6 h-6 text-white" />
+        <div className="min-h-screen bg-white text-black font-sans selection:bg-black selection:text-white overflow-x-hidden">
+            {/* Ambient Background Spotlight & Grid */}
+            <SpotlightBackground />
+
+            {/* Ultra-Elegant Floating Glassmorphic Navbar */}
+            <div className="sticky top-5 z-50 px-4 max-w-5xl mx-auto">
+                <header className="bg-white/80 backdrop-blur-2xl border border-zinc-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-full px-6 py-3 transition-all duration-300">
+                    <div className="flex justify-between items-center">
+                        {/* Logo */}
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+                            <div className="bg-black text-white p-2 rounded-xl shadow-md shadow-black/10 transition-transform hover:scale-105">
+                                <Bot className="w-4 h-4" />
                             </div>
-                            <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
-                                QBOT
-                            </span>
+                            <div className="flex flex-col">
+                                <span className="text-lg font-black tracking-wider text-black">LeadEngine</span>
+                                <span className="text-[9px] font-mono text-amber-600 font-bold tracking-widest uppercase">AI AGENT</span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-4">
+
+                        {/* Center Navigation Links */}
+                        <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-zinc-600">
                             <button
-                                onClick={() => navigate('/admin/login')}
-                                className="hidden md:block px-6 py-2.5 rounded-full text-gray-600 font-medium hover:text-indigo-600 transition-colors"
+                                onClick={() => scrollToSection('features')}
+                                className="relative py-1 hover:text-black transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-amber-500 after:transition-all"
+                            >
+                                Features
+                            </button>
+                            <button
+                                onClick={() => scrollToSection('simulator')}
+                                className="relative py-1 hover:text-black transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-amber-500 after:transition-all"
+                            >
+                                Live Simulator
+                            </button>
+                            <button
+                                onClick={() => scrollToSection('calculator')}
+                                className="relative py-1 hover:text-black transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-amber-500 after:transition-all"
+                            >
+                                ROI Calculator
+                            </button>
+                            <button
+                                onClick={() => scrollToSection('pricing')}
+                                className="relative py-1 hover:text-black transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-amber-500 after:transition-all"
+                            >
+                                Pricing
+                            </button>
+                            <button
+                                onClick={() => scrollToSection('faq')}
+                                className="relative py-1 hover:text-black transition-colors after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 hover:after:w-full after:bg-amber-500 after:transition-all"
+                            >
+                                FAQ
+                            </button>
+                        </nav>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-3">
+                            <Button
+                                variant="ghost"
+                                onClick={handleGetStarted}
+                                size="sm"
+                                className="hidden sm:inline-flex text-xs text-zinc-700 hover:text-black"
                             >
                                 Sign In
-                            </button>
-                            <button
-                                onClick={() => navigate('/admin/login')}
-                                className="px-6 py-2.5 rounded-full bg-gray-900 text-white font-medium hover:bg-gray-800 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                            </Button>
+                            <Button
+                                variant="glow"
+                                onClick={handleGetStarted}
+                                size="sm"
+                                className="text-xs bg-black text-white hover:bg-zinc-900 border-black"
                             >
-                                Get Started
-                            </button>
+                                Get Started <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                            </Button>
                         </div>
                     </div>
-                </div>
-            </nav>
-
-            {/* Hero Section */}
-            <main className="flex-grow">
-                <div className="relative pt-20 pb-32 lg:pt-32 lg:pb-48">
-                    {/* Background Blobs */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full z-0 pointer-events-none overflow-hidden">
-                        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-200/40 rounded-full mix-blend-multiply filter blur-[100px] animate-blob"></div>
-                        <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-200/40 rounded-full mix-blend-multiply filter blur-[100px] animate-blob animation-delay-2000"></div>
-                        <div className="absolute bottom-[-20%] left-[20%] w-[60%] h-[60%] bg-pink-200/40 rounded-full mix-blend-multiply filter blur-[100px] animate-blob animation-delay-4000"></div>
-                    </div>
-
-                    <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/50 border border-indigo-100 text-indigo-700 font-medium text-sm mb-8 backdrop-blur-sm shadow-sm animate-fade-in-up">
-                            <span className="relative flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
-                            </span>
-                            Waitlist 2.0 is now open
-                        </div>
-
-                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-gray-900 mb-8 leading-[1.1]">
-                            Automate Your Sales <br />
-                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 animate-gradient-x">
-                                With Intelligent AI
-                            </span>
-                        </h1>
-
-                        <p className="mt-6 max-w-2xl mx-auto text-xl md:text-2xl text-gray-600 mb-12 leading-relaxed font-light">
-                            Engage leads 24/7, qualify prospects instantly, and schedule meetings automatically.
-                            <span className="block mt-2 font-normal text-gray-900">The future of sales automation is here.</span>
-                        </p>
-
-                        <div className="flex flex-col sm:flex-row gap-5 justify-center items-center">
-                            <button
-                                onClick={() => navigate('/admin/login')}
-                                className="group px-8 py-4 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg shadow-xl shadow-indigo-500/30 hover:shadow-2xl hover:shadow-indigo-500/40 hover:-translate-y-1 transition-all duration-300 flex items-center gap-2"
-                            >
-                                Start Your Free Trial
-                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                            </button>
-                            <button
-                                onClick={() => window.open('#', '_blank')} // Placeholder demo link
-                                className="px-8 py-4 rounded-full bg-white text-gray-700 font-semibold text-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-md hover:shadow-lg hover:-translate-y-1"
-                            >
-                                Watch Demo
-                            </button>
-                        </div>
-
-                        {/* Social Proof / Trust Badges (Placeholder) */}
-                        <div className="mt-16 pt-8 border-t border-gray-200/60 max-w-4xl mx-auto">
-                            <p className="text-sm font-medium text-gray-500 mb-6 uppercase tracking-wider">Trusted by forward-thinking companies</p>
-                            <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-                                <div className="text-xl font-bold font-serif flex items-center gap-1"><div className="w-6 h-6 bg-gray-800 rounded-full"></div>ACME Corp</div>
-                                <div className="text-xl font-bold font-mono flex items-center gap-1"><div className="w-6 h-6 bg-gray-800 rotate-45"></div>TechFlow</div>
-                                <div className="text-xl font-bold font-sans italic flex items-center gap-1"><div className="w-6 h-6 bg-gray-800 rounded-md"></div>GlobalSoft</div>
-                                <div className="text-xl font-bold font-serif flex items-center gap-1"><div className="w-6 h-6 bg-gray-800 rounded-sm"></div>Nexus</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Features Grid */}
-                <div className="py-32 bg-white relative">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="text-center mb-20">
-                            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 tracking-tight">Everything you need to scale</h2>
-                            <p className="text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">Powerful features built to help you capture, qualify, and convert more leads without lifting a finger.</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
-                            {[
-                                {
-                                    icon: <MessageSquare className="w-7 h-7 text-white" />,
-                                    title: "24/7 Engagement",
-                                    desc: "Never miss a lead. Our AI responds instantly to every inquiry, day or night, ensuring 100% response rate.",
-                                    color: "from-blue-500 to-cyan-500",
-                                    delay: "0"
-                                },
-                                {
-                                    icon: <Zap className="w-7 h-7 text-white" />,
-                                    title: "Instant Qualification",
-                                    desc: "Automatically filter leads based on budget, timeline, and needs. Only talk to prospects who are ready to buy.",
-                                    color: "from-purple-500 to-pink-500",
-                                    delay: "100"
-                                },
-                                {
-                                    icon: <BarChart3 className="w-7 h-7 text-white" />,
-                                    title: "Real-time Analytics",
-                                    desc: "Track conversion rates, conversation quality, and pipeline growth with our beautiful, real-time dashboard.",
-                                    color: "from-orange-500 to-red-500",
-                                    delay: "200"
-                                }
-                            ].map((feature, idx) => (
-                                <div key={idx} className="group p-10 rounded-3xl bg-gray-50 border border-gray-100/50 hover:bg-white hover:shadow-2xl hover:shadow-indigo-100 hover:-translate-y-2 transition-all duration-300">
-                                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-8 shadow-xl shadow-gray-200 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                                        {feature.icon}
-                                    </div>
-                                    <h3 className="text-2xl font-bold text-gray-900 mb-4">{feature.title}</h3>
-                                    <p className="text-gray-600 leading-relaxed text-lg">{feature.desc}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            {/* CTA Section */}
-            <div className="bg-gray-900 py-24 relative overflow-hidden">
-                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-indigo-600/30 rounded-full blur-3xl opacity-50"></div>
-                <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-purple-600/30 rounded-full blur-3xl opacity-50"></div>
-
-                <div className="relative max-w-4xl mx-auto px-4 text-center">
-                    <h2 className="text-4xl md:text-5xl font-bold text-white mb-8">Ready to transform your sales?</h2>
-                    <p className="text-xl text-gray-400 mb-12">Join hundreds of companies using QBOT to automate their lead generation and qualification.</p>
-                    <button
-                        onClick={() => navigate('/admin/login')}
-                        className="px-10 py-5 rounded-full bg-white text-gray-900 font-bold text-xl hover:bg-indigo-50 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
-                    >
-                        Get Started for Free
-                    </button>
-                    <p className="mt-6 text-sm text-gray-500">No credit card required • 14-day free trial</p>
-                </div>
+                </header>
             </div>
 
-            {/* Footer */}
-            <footer className="bg-gray-950 text-white py-16 border-t border-gray-900">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-12">
-                    <div className="col-span-1 md:col-span-2">
-                        <div className="flex items-center gap-2 mb-6">
-                            <div className="bg-indigo-600 p-2 rounded-lg">
-                                <Bot className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="text-xl font-bold">QBOT</span>
+            <main className="relative z-10">
+                {/* Hero Section */}
+                <section className="pt-16 pb-20 md:pt-24 md:pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
+
+                    {/* Tight & Cohesive 3-Line Dynamic Hero Title */}
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-zinc-950 mb-6 leading-[1.08] max-w-5xl mx-auto">
+                        <div>Welcome to LeadEngine AI</div>
+                        <div className="h-[1.18em] flex items-center justify-center">
+                            <span className="shimmer-ray-box rounded-lg">
+                                <span key={currentPhraseIndex} className="text-gold-gradient font-extrabold animate-fade-in inline-block pb-1.5">
+                                    {HERO_PHRASES[currentPhraseIndex]}
+                                </span>
+                            </span>
                         </div>
-                        <p className="text-gray-400 max-w-xs leading-relaxed">
-                            Empowering businesses with intelligent conversational AI to capture, qualify, and convert more leads effectively.
+                        <div>
+                            With <span className="shimmer-ray-box rounded-lg"><span className="text-gold-gradient font-extrabold pb-1 inline-block">Intelligent AI</span></span>
+                        </div>
+                    </h1>
+
+                    {/* Hero Subtitle */}
+                    <p className="mt-6 max-w-2xl mx-auto text-lg md:text-xl text-zinc-600 mb-10 leading-relaxed font-normal">
+                        Engage 100% of WhatsApp inquiries in under 3 seconds. Qualify prospects, answer questions with custom RAG, and auto-book sales calls.
+                    </p>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+                        <Button
+                            variant="glow"
+                            size="lg"
+                            onClick={handleGetStarted}
+                            className="w-full sm:w-auto font-bold text-base bg-black text-white hover:bg-zinc-900 shadow-xl shadow-amber-500/10"
+                        >
+                            Start 14-Day Free Trial <ArrowRight className="w-5 h-5 ml-1" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="lg"
+                            onClick={() => scrollToSection('simulator')}
+                            className="w-full sm:w-auto font-semibold hover:border-amber-400"
+                        >
+                            Test Live Simulator <ChevronRight className="w-4 h-4 ml-1 text-amber-500" />
+                        </Button>
+                    </div>
+
+                    {/* Key Value Checklist */}
+                    <div className="flex flex-wrap justify-center items-center gap-6 text-xs text-zinc-600 font-mono mb-16">
+                        <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-emerald-600" /> 5-Min Meta API Setup</span>
+                        <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-amber-500" /> HubSpot & Salesforce Sync</span>
+                        <span className="flex items-center gap-1.5"><Check className="w-4 h-4 text-orange-500" /> No Credit Card Required</span>
+                    </div>
+
+                    {/* Animated Hero Component: Live Chat Simulator Container */}
+                    <div id="simulator" className="mt-8 animate-fade-in-up scroll-mt-28">
+                        <HeroChatSimulator />
+                    </div>
+                </section>
+
+                {/* Logo Marquee */}
+                <LogoMarquee />
+
+                {/* Bento Grid Feature Showcase */}
+                <BentoGrid />
+
+                {/* Interactive ROI Calculator */}
+                <RoiCalculator onCtaClick={handleGetStarted} />
+
+                {/* FAQ Section */}
+                <FaqSection />
+
+                {/* Pricing Cards Section */}
+                <PricingSection onSelectPlan={handleGetStarted} />
+
+                {/* Final Call To Action */}
+                <section className="py-24 bg-white relative border-t border-zinc-200">
+                    <div className="max-w-4xl mx-auto px-4 text-center">
+                        <Card className="bg-gradient-to-b from-amber-50/40 via-white to-white border-zinc-200 p-12 relative overflow-hidden shadow-xl">
+                            <BorderBeam size={250} duration={8} delay={0} colorFrom="#f59e0b" colorTo="#000000" />
+                            <div className="relative z-10 space-y-6">
+                                <Badge variant="dot" className="bg-amber-100 text-amber-900 border-amber-200">READY TO SCALE?</Badge>
+                                <h2 className="text-4xl md:text-5xl font-extrabold text-black tracking-tight">
+                                    Transform Your WhatsApp Pipeline Today
+                                </h2>
+                                <p className="text-zinc-600 text-lg max-w-xl mx-auto">
+                                    Join forward-thinking companies using LeadEngine to capture, qualify, and convert more leads effectively.
+                                </p>
+                                <div className="pt-4">
+                                    <Button
+                                        variant="glow"
+                                        size="lg"
+                                        onClick={handleGetStarted}
+                                        className="font-bold text-lg px-9 py-4 bg-black text-white hover:bg-zinc-900"
+                                    >
+                                        Get Started Free <ArrowRight className="w-5 h-5 ml-2" />
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-zinc-500 font-mono">14-day free trial • Cancel anytime • Zero credit card required</p>
+                            </div>
+                        </Card>
+                    </div>
+                </section>
+            </main>
+
+            {/* Footer */}
+            <footer className="bg-zinc-50 text-zinc-600 py-16 border-t border-zinc-200 text-sm">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-10">
+                    <div className="col-span-1 md:col-span-2 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-black text-white p-2 rounded-lg">
+                                <Bot className="w-4 h-4" />
+                            </div>
+                            <span className="text-lg font-bold text-black tracking-wider">LeadEngine AI</span>
+                        </div>
+                        <p className="text-zinc-500 max-w-xs leading-relaxed text-xs">
+                            Empowering enterprise sales teams with intelligent conversational WhatsApp AI automation.
                         </p>
                     </div>
                     <div>
-                        <h4 className="font-bold text-lg mb-6">Product</h4>
-                        <ul className="space-y-4 text-gray-400">
-                            <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                            <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                            <li><a href="#" className="hover:text-white transition-colors">Integration</a></li>
-                            <li><a href="#" className="hover:text-white transition-colors">Changelog</a></li>
+                        <h4 className="font-bold text-black mb-4 text-xs font-mono uppercase tracking-wider">Platform</h4>
+                        <ul className="space-y-2.5 text-xs text-zinc-600">
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-amber-600 transition-colors">WhatsApp Automation</button></li>
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-amber-600 transition-colors">CRM Integrations</button></li>
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-amber-600 transition-colors">Knowledge Base (RAG)</button></li>
+                            <li><button onClick={() => scrollToSection('features')} className="hover:text-amber-600 transition-colors">Enterprise Security</button></li>
                         </ul>
                     </div>
                     <div>
-                        <h4 className="font-bold text-lg mb-6">Company</h4>
-                        <ul className="space-y-4 text-gray-400">
-                            <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                            <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                            <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                            <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+                        <h4 className="font-bold text-black mb-4 text-xs font-mono uppercase tracking-wider">Company</h4>
+                        <ul className="space-y-2.5 text-xs text-zinc-600">
+                            <li><button onClick={() => scrollToSection('faq')} className="hover:text-amber-600 transition-colors">About Us</button></li>
+                            <li><button onClick={() => scrollToSection('faq')} className="hover:text-amber-600 transition-colors">Documentation</button></li>
+                            <li><button onClick={() => scrollToSection('faq')} className="hover:text-amber-600 transition-colors">Privacy Policy</button></li>
+                            <li><button onClick={() => scrollToSection('faq')} className="hover:text-amber-600 transition-colors">Terms of Service</button></li>
                         </ul>
                     </div>
                 </div>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 pt-8 border-t border-gray-900 flex flex-col md:flex-row justify-between items-center gap-4 text-gray-500 text-sm">
-                    <div>© {new Date().getFullYear()} QBOT AI. All rights reserved.</div>
-                    <div className="flex gap-8">
-                        <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-                        <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-zinc-200 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-zinc-500 font-mono">
+                    <div>© {new Date().getFullYear()} LeadEngine AI. All rights reserved.</div>
+                    <div className="flex gap-6">
+                        <a href="#" className="hover:text-amber-600 transition-colors">Privacy</a>
+                        <a href="#" className="hover:text-amber-600 transition-colors">Terms</a>
+                        <a href="#" className="hover:text-amber-600 transition-colors">Security</a>
                     </div>
                 </div>
             </footer>
-
-            <style>{`
-                @keyframes blob {
-                    0% { transform: translate(0px, 0px) scale(1); }
-                    33% { transform: translate(30px, -50px) scale(1.1); }
-                    66% { transform: translate(-20px, 20px) scale(0.9); }
-                    100% { transform: translate(0px, 0px) scale(1); }
-                }
-                .animate-blob {
-                    animation: blob 7s infinite;
-                }
-                .animation-delay-2000 {
-                    animation-delay: 2s;
-                }
-                .animation-delay-4000 {
-                    animation-delay: 4s;
-                }
-            `}</style>
         </div>
     );
 };

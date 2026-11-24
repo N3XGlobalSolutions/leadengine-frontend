@@ -41,7 +41,7 @@ export const AdminGuidePage = () => {
                     <BookOpen size={36} className="mx-auto mb-3 sm:mb-4 opacity-80 sm:w-12 sm:h-12" />
                     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-3 sm:mb-4 tracking-tight">Platform Admin Documentation</h1>
                     <p className="text-base sm:text-lg lg:text-xl text-indigo-100 max-w-2xl mx-auto px-2">
-                        Your comprehensive guide to mastering the Q-Bot Administration Platform.
+                        Your comprehensive guide to mastering the LeadEngine Administration Platform.
                         Learn how to onboard clients, manage AI configurations, and drive platform growth.
                     </p>
                 </div>
@@ -51,7 +51,7 @@ export const AdminGuidePage = () => {
                     {/* Introduction */}
                     <SectionTitle icon={Zap} title="Getting Started" />
                     <Paragraph>
-                        Welcome to the Q-Bot Admin Dashboard. This platform is designed to give you complete control over your AI chatbot fleet.
+                        Welcome to the LeadEngine Admin Dashboard. This platform is designed to give you complete control over your AI chatbot fleet.
                         As an administrator, you act as the architect for all client interactions, managing everything from basic branding
                         to complex AI behavioral instructions.
                     </Paragraph>
@@ -111,7 +111,7 @@ export const AdminGuidePage = () => {
                     {/* AI & RAG */}
                     <SectionTitle icon={FileText} title="AI Configuration & Knowledge Base" />
                     <Paragraph>
-                        This is the core differentiator of Q-Bot. You are not just selling a chat widget; you are selling an intelligent agent.
+                        This is the core differentiator of LeadEngine. You are not just selling a chat widget; you are selling an intelligent agent.
                     </Paragraph>
 
                     <SubHeading title="Knowledge Base Setup (RAG)" />

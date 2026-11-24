@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Pause, Archive, Upload, Users, Send, AlertTriangle,
   CheckCircle2, Clock, FileText, Edit3, Trash2, Download, RefreshCw,
-  Eye, Sparkles, History, XCircle, BarChart3
+  Eye, History, XCircle, BarChart3
 } from 'lucide-react';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { useAdminTheme } from '../../../contexts/AdminThemeContext';
@@ -260,7 +260,7 @@ export const CampaignDetailPage: React.FC = () => {
             { label: 'Delivered', value: stats.delivered, icon: CheckCircle2, color: 'text-indigo-500' },
             { label: 'Failed', value: stats.failed, icon: XCircle, color: 'text-red-500' },
             { label: 'Responses', value: stats.response_count, icon: BarChart3, color: 'text-purple-500' },
-            { label: 'Progress', value: `${stats.progress_percent}%`, icon: Sparkles, color: 'text-amber-500' },
+            { label: 'Progress', value: `${stats.progress_percent}%`, icon: Clock, color: 'text-amber-500' },
           ].map(s => (
             <div key={s.label} className={`${cardClass} p-3`}>
               <div className="flex items-center gap-2 mb-1">

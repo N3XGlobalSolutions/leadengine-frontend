@@ -136,48 +136,96 @@ export const AdminLeadsPage = () => {
     const textSub = isDark ? 'text-slate-400' : 'text-gray-500';
     const hoverClass = isDark ? 'hover:bg-slate-700' : 'hover:bg-gray-50';
 
+    // Dynamic Avatar Accent Color based on company initial
+    const getAvatarColor = (name: string) => {
+        const charCode = name.charCodeAt(0) || 0;
+        const colors = [
+            'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+            'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30',
+            'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
+            'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30',
+            'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30',
+            'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+            'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
+        ];
+        return colors[charCode % colors.length];
+    };
+
     return (
         <AdminLayout>
-            <div className={`flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-8rem)] rounded-xl border overflow-hidden ${borderClass} ${bgClass}`}>
+            <div className={`flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-8rem)] rounded-3xl border overflow-hidden ${borderClass} ${bgClass}`}>
 
-                {/* --- LEFT SIDEBAR: CLIENTS --- */}
-                <div className={`w-full lg:w-80 border-b lg:border-b-0 lg:border-r flex flex-col ${borderClass} ${isDark ? 'bg-slate-900/50' : 'bg-gray-50/50'}`}>
-                    <div className={`p-3 sm:p-4 border-b ${borderClass}`}>
-                        <h2 className={`font-semibold text-sm sm:text-base mb-2 sm:mb-3 ${textMain}`}>Select Client</h2>
+                {/* --- LEFT SIDEBAR: SELECT CLIENT --- */}
+                <div className={`w-full lg:w-80 border-b lg:border-b-0 lg:border-r flex flex-col ${borderClass} ${isDark ? 'bg-slate-900/60' : 'bg-slate-50/70'}`}>
+                    <div className={`p-4 sm:p-5 border-b ${borderClass}`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="font-bold text-base tracking-tight text-slate-900 dark:text-white">Select Client</h2>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+                            }`}>
+                                {filteredClients.length}
+                            </span>
+                        </div>
                         <div className="relative">
-                            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${textSub}`} size={16} />
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                             <input
                                 type="text"
                                 placeholder="Search clients..."
-                                className={`w-full pl-9 pr-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-200'}`}
+                                className={`w-full pl-10 pr-4 py-2.5 rounded-full text-xs font-normal border focus:outline-none focus:ring-2 transition-all ${
+                                    isDark
+                                        ? 'bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:ring-slate-700'
+                                        : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-slate-300'
+                                }`}
                                 value={clientSearch}
                                 onChange={(e) => setClientSearch(e.target.value)}
                             />
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto max-h-48 lg:max-h-none">
+                    <div className="flex-1 overflow-y-auto max-h-56 lg:max-h-none p-2 sm:p-3 space-y-1.5 custom-scrollbar">
                         {loading ? (
-                            <div className={`p-6 sm:p-8 text-center text-xs sm:text-sm ${textSub}`}>Loading...</div>
-                        ) : filteredClients.map(client => (
-                            <button
-                                key={client.id}
-                                onClick={() => setSelectedClient(client)}
-                                className={`w-full text-left p-2 sm:p-3 flex items-center gap-2 sm:gap-3 transition-colors border-l-2 ${selectedClient?.id === client.id
-                                    ? `bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500`
-                                    : `border-transparent ${hoverClass}`
+                            <div className="p-8 text-center text-xs font-medium text-slate-400">Loading clients...</div>
+                        ) : filteredClients.length === 0 ? (
+                            <div className="p-8 text-center text-xs font-medium text-slate-400">No clients match search.</div>
+                        ) : filteredClients.map(client => {
+                            const isSelected = selectedClient?.id === client.id;
+                            return (
+                                <button
+                                    key={client.id}
+                                    onClick={() => setSelectedClient(client)}
+                                    className={`w-full text-left p-3 rounded-2xl flex items-center gap-3 transition-all border group ${
+                                        isSelected
+                                            ? (isDark ? 'bg-slate-800 border-slate-700 text-white shadow-md' : 'bg-slate-950 border-slate-900 text-white shadow-md')
+                                            : (isDark ? 'border-transparent hover:bg-slate-800/50 text-slate-200' : 'border-transparent hover:bg-white hover:border-slate-200/80 text-slate-900 hover:shadow-sm')
                                     }`}
-                            >
-                                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center font-bold text-xs ${isDark ? 'bg-slate-700 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
-                                    {client.name.charAt(0)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className={`font-medium text-xs sm:text-sm truncate ${textMain}`}>{client.name}</div>
-                                    <div className={`text-xs ${textSub} truncate`}>/{client.slug}</div>
-                                </div>
-                                {selectedClient?.id === client.id && <ChevronRight size={16} className="ml-auto text-indigo-500 flex-shrink-0" />}
-                            </button>
-                        ))}
+                                >
+                                    {/* Company Avatar Badge */}
+                                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-sm border shadow-sm shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                                        isSelected
+                                            ? 'bg-white/20 text-white border-white/30'
+                                            : getAvatarColor(client.name)
+                                    }`}>
+                                        {client.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className={`font-medium text-sm tracking-tight truncate ${
+                                            isSelected ? 'text-white' : (isDark ? 'text-white' : 'text-slate-900')
+                                        }`}>
+                                            {client.name}
+                                        </div>
+                                        <div className={`text-xs font-normal tracking-tight truncate mt-0.5 ${
+                                            isSelected ? 'text-slate-300' : (isDark ? 'text-slate-400' : 'text-slate-500')
+                                        }`}>
+                                            /{client.slug}
+                                        </div>
+                                    </div>
+                                    <ChevronRight size={16} className={`flex-shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 ${
+                                        isSelected ? 'text-white' : (isDark ? 'text-slate-500' : 'text-slate-400')
+                                    }`} />
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -403,63 +451,79 @@ export const AdminLeadsPage = () => {
                             />
 
                             {/* Header */}
-                            <div className={`flex-shrink-0 p-6 border-b ${borderClass} bg-white/50 dark:bg-slate-900/50 backdrop-blur-md sticky top-0 z-10`}>
+                            <div className={`flex-shrink-0 p-6 border-b ${isDark ? 'border-slate-800 bg-slate-900/90' : 'border-slate-200/80 bg-white/90'} backdrop-blur-xl sticky top-0 z-10`}>
                                 <div className="flex justify-between items-start mb-6">
-                                    <div className="flex-1 min-w-0 pr-4">
-                                        <h3 className={`text-2xl font-bold ${textMain} truncate mb-2`}>{selectedLead.name}</h3>
-                                        <div className="flex items-center gap-3">
-                                            <select
-                                                value={selectedLead.status}
-                                                onChange={(e) => handleStatusChange(selectedLead.id, e.target.value)}
-                                                className={`text-sm font-semibold bg-transparent border-none p-0 focus:ring-0 cursor-pointer 
-                                                    ${selectedLead.status === 'qualified' ? 'text-emerald-600' :
-                                                        selectedLead.status === 'disqualified' ? 'text-red-600' : 'text-blue-600'} 
-                                                    uppercase tracking-wide`}
-                                            >
-                                                <option value="new">New</option>
-                                                <option value="qualified">Qualified</option>
-                                                <option value="disqualified">Disqualified</option>
-                                            </select>
-                                            {(selectedLead as any).metadata?.s3_mapping_lead_output?.lead_priority ? (
-                                                <PriorityBadge priority={(selectedLead as any).metadata.s3_mapping_lead_output.lead_priority} />
-                                            ) : (selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ? (
-                                                <PriorityBadge priority={(selectedLead as any).metadata.s3_max_lead_output.lead_priority} />
-                                            ) : (selectedLead as any).metadata?.s3_lead_output?.lead_priority ? (
-                                                <PriorityBadge priority={(selectedLead as any).metadata.s3_lead_output.lead_priority} />
-                                            ) : (selectedLead as any).metadata?.s2_lead_output?.lead_priority && (
-                                                <PriorityBadge priority={(selectedLead as any).metadata.s2_lead_output.lead_priority} />
-                                            )}
+                                    <div className="flex items-center gap-4 flex-1 min-w-0 pr-4">
+                                        {/* Avatar Box for Lead */}
+                                        <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-black text-xl border shadow-md shrink-0 ${
+                                            isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-950 border-slate-900 text-white'
+                                        }`}>
+                                            {selectedLead.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className={`text-2xl font-extrabold tracking-tight ${textMain} truncate`}>{selectedLead.name}</h3>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <div className={`px-2.5 py-0.5 rounded-full text-xs font-bold border flex items-center gap-1 ${
+                                                    selectedLead.status === 'qualified' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
+                                                    selectedLead.status === 'disqualified' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' :
+                                                    'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                                                }`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                                        selectedLead.status === 'qualified' ? 'bg-emerald-500' :
+                                                        selectedLead.status === 'disqualified' ? 'bg-rose-500' : 'bg-blue-500'
+                                                    }`} />
+                                                    <select
+                                                        value={selectedLead.status}
+                                                        onChange={(e) => handleStatusChange(selectedLead.id, e.target.value)}
+                                                        className="bg-transparent border-none p-0 focus:ring-0 cursor-pointer text-xs font-bold uppercase tracking-wider"
+                                                    >
+                                                        <option value="new" className="text-slate-900 bg-white">New</option>
+                                                        <option value="qualified" className="text-slate-900 bg-white">Qualified</option>
+                                                        <option value="disqualified" className="text-slate-900 bg-white">Disqualified</option>
+                                                    </select>
+                                                </div>
+
+                                                {(selectedLead as any).metadata?.s3_mapping_lead_output?.lead_priority ? (
+                                                    <PriorityBadge priority={(selectedLead as any).metadata.s3_mapping_lead_output.lead_priority} />
+                                                ) : (selectedLead as any).metadata?.s3_max_lead_output?.lead_priority ? (
+                                                    <PriorityBadge priority={(selectedLead as any).metadata.s3_max_lead_output.lead_priority} />
+                                                ) : (selectedLead as any).metadata?.s3_lead_output?.lead_priority ? (
+                                                    <PriorityBadge priority={(selectedLead as any).metadata.s3_lead_output.lead_priority} />
+                                                ) : (selectedLead as any).metadata?.s2_lead_output?.lead_priority && (
+                                                    <PriorityBadge priority={(selectedLead as any).metadata.s2_lead_output.lead_priority} />
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <button
                                         onClick={() => setSelectedLead(null)}
-                                        className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${textSub}`}
+                                        className={`p-2 rounded-xl border transition-all ${isDark ? 'border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900'}`}
                                     >
-                                        <X size={24} />
+                                        <X size={20} />
                                     </button>
                                 </div>
 
-                                {/* Tabs */}
-                                <div className="flex space-x-1 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+                                {/* Tabs Switcher */}
+                                <div className={`p-1 rounded-2xl flex items-center gap-1 border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                                     <button
                                         onClick={() => setActiveTab('overview')}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all
                                             ${activeTab === 'overview'
-                                                ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
-                                                : `${textSub} hover:text-gray-900 dark:hover:text-gray-300`}`}
+                                                ? (isDark ? 'bg-slate-800 text-white shadow-sm border border-slate-700' : 'bg-white text-slate-900 shadow-sm border border-slate-200/80')
+                                                : `${textSub} hover:text-slate-900 dark:hover:text-white`}`}
                                     >
-                                        <Layout size={16} />
-                                        Overview
+                                        <Layout size={15} />
+                                        <span>Overview</span>
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('chat')}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all
+                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all
                                             ${activeTab === 'chat'
-                                                ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400'
-                                                : `${textSub} hover:text-gray-900 dark:hover:text-gray-300`}`}
+                                                ? (isDark ? 'bg-slate-800 text-white shadow-sm border border-slate-700' : 'bg-white text-slate-900 shadow-sm border border-slate-200/80')
+                                                : `${textSub} hover:text-slate-900 dark:hover:text-white`}`}
                                     >
-                                        <MessageSquare size={16} />
-                                        Conversation
+                                        <MessageSquare size={15} />
+                                        <span>Conversation</span>
                                     </button>
                                 </div>
                             </div>
@@ -467,7 +531,7 @@ export const AdminLeadsPage = () => {
                             {/* Content */}
                             <div className="flex-1 overflow-y-auto">
                                 {activeTab === 'overview' ? (
-                                    <div className="p-6 space-y-8">
+                                    <div className="p-6 space-y-6">
 
                                         {/* 1. Lead Intelligence */}
                                         {(selectedLead as any).metadata?.s3_mapping_lead_output && (
@@ -486,47 +550,79 @@ export const AdminLeadsPage = () => {
                                             </section>
                                         )}
 
-                                        {/* 2. Contact Grid */}
-                                        <section>
-                                            <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>Contact Details</h4>
+                                        {/* 2. Executive Contact Details Grid */}
+                                        <section className={`p-5 rounded-3xl border shadow-sm transition-all ${
+                                            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+                                        }`}>
+                                            <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                                                <User size={14} className="text-slate-500" />
+                                                <span>Contact Details</span>
+                                            </h4>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <Phone size={16} className="text-gray-400" />
-                                                        <span className={`text-xs ${textSub}`}>Phone</span>
+                                                <div className={`p-4 rounded-2xl border transition-all ${
+                                                    isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50/80 border-slate-100'
+                                                }`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+                                                            <Phone size={17} />
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Phone Number</span>
+                                                            <span className={`text-sm font-extrabold ${textMain}`}>{(selectedLead as any).phone || '—'}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className={`text-sm font-medium ${textMain}`}>{(selectedLead as any).phone || '—'}</div>
                                                 </div>
-                                                <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <Calendar size={16} className="text-gray-400" />
-                                                        <span className={`text-xs ${textSub}`}>Captured</span>
+
+                                                <div className={`p-4 rounded-2xl border transition-all ${
+                                                    isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50/80 border-slate-100'
+                                                }`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 flex items-center justify-center shrink-0">
+                                                            <Mail size={17} />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Email Address</span>
+                                                            <span className={`text-sm font-extrabold truncate block ${textMain}`}>{(selectedLead as any).email || '—'}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className={`text-sm font-medium ${textMain}`}>{new Date(selectedLead.created_at).toLocaleDateString()}</div>
+                                                </div>
+
+                                                <div className={`p-4 rounded-2xl border sm:col-span-2 transition-all ${
+                                                    isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50/80 border-slate-100'
+                                                }`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                                                            <Calendar size={17} />
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Lead Captured On</span>
+                                                            <span className={`text-sm font-extrabold ${textMain}`}>{new Date(selectedLead.created_at).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </section>
 
-                                        {/* 3. Collected Data Grid */}
-                                        {/* 3. Collected Data Grid - hide entirely for S3 mapping (data shown in insight panel above) */}
+                                        {/* 3. Executive Captured Data Cards */}
                                         {(selectedLead as any).metadata && (() => {
                                             const isS3Mapping = !!(selectedLead as any).metadata?.s3_mapping_lead_output;
-                                            // Keys that are always internal/redundant and should never show in captured data
                                             const hiddenKeys = new Set([
                                                 's3_mapping_lead_output', 's2_lead_output', 's3_lead_output', 's3_max_lead_output', 'email',
-                                                // S3 mapping top-level meta — shown in the insight panel
                                                 ...(isS3Mapping ? ['lead_priority', 'source'] : []),
                                             ]);
                                             const visibleEntries = Object.entries((selectedLead as any).metadata)
                                                 .filter(([key]) => !hiddenKeys.has(key));
                                             if (visibleEntries.length === 0) return null;
                                             return (
-                                                <section>
-                                                    <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${textSub}`}>
-                                                        Captured Data
+                                                <section className={`p-5 rounded-3xl border shadow-sm transition-all ${
+                                                    isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+                                                }`}>
+                                                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                                                        <CheckCircle size={14} className="text-emerald-500" />
+                                                        <span>Captured Requirements & Responses</span>
                                                     </h4>
 
-                                                    <div className="grid grid-cols-1 gap-3">
+                                                    <div className="space-y-3">
                                                         {visibleEntries
                                                             .sort(([, valueA], [, valueB]) => {
                                                                 const orderA =
@@ -564,26 +660,26 @@ export const AdminLeadsPage = () => {
                                                                             : String(value || '—');
                                                                 }
 
-                                                                // Clean the final value
                                                                 displayValue = cleanDisplayValue(displayValue);
 
                                                                 return (
                                                                     <div
                                                                         key={key}
-                                                                        className={`flex items-start justify-between p-4 rounded-xl border transition-colors hover:border-indigo-200 dark:hover:border-indigo-800 ${isDark
-                                                                            ? 'bg-slate-800/30 border-slate-800'
-                                                                            : 'bg-white border-gray-100'
-                                                                            }`}
+                                                                        className={`flex items-start justify-between p-4 rounded-2xl border transition-all ${
+                                                                            isDark
+                                                                                ? 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                                                                                : 'bg-slate-50/70 border-slate-100 hover:border-slate-200'
+                                                                        }`}
                                                                     >
-                                                                        <span
-                                                                            className={`text-sm font-medium capitalize ${textSub}`}
-                                                                        >
+                                                                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pt-1">
                                                                             {displayKey}
                                                                         </span>
 
-                                                                        <span
-                                                                            className={`text-sm font-semibold text-right max-w-[60%] break-words ${textMain}`}
-                                                                        >
+                                                                        <span className={`text-sm font-extrabold text-right max-w-[65%] break-words px-3 py-1.5 rounded-xl border ${
+                                                                            isDark 
+                                                                                ? 'bg-slate-800/80 border-slate-700 text-white' 
+                                                                                : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                                                                        }`}>
                                                                             {displayValue}
                                                                         </span>
                                                                     </div>

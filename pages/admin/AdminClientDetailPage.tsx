@@ -3,15 +3,15 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Save, Trash2, Pause, Play, Building2, Users, Calendar,
     Globe, Palette, MessageSquare, Bot, AlertTriangle, Check, X, LayoutDashboard,
-    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw, Plus, Sparkles, Megaphone,
-    Cloud, CloudOff, Loader2
+    FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw, Plus, Megaphone,
+    Cloud, CloudOff, Loader2, Eye, EyeOff, Lock, AlertCircle, CheckCircle, Brain
 } from 'lucide-react';
 import { Client, TenantDocument } from '../../types/admin';
 import { TenantConfig, Question } from '../../types/config';
 import {
     getClientById, updateClient, deleteClient, toggleClientPause,
     getTenantDocuments, ingestDocument, deleteDocument, generateApiKey,
-    getClientConversationCount
+    getClientConversationCount, resetUserPassword
 } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
@@ -62,6 +62,7 @@ export const AdminClientDetailPage = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -70,6 +71,91 @@ export const AdminClientDetailPage = () => {
     const [uploading, setUploading] = useState(false);
     const [showDowngradeModal, setShowDowngradeModal] = useState(false);
     const [pendingPlan, setPendingPlan] = useState<'S1' | 'S2' | 'S3' | 'S3_INTERNATIONAL' | 'S3_MAX' | 'S3_MAPPING' | null>(null);
+
+    // Password reset modal states
+    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+    const [resetStep, setResetStep] = useState(1); // 1: Verify Email, 2: Enter OTP, 3: Set Password, 4: Success
+    const [verificationEmail, setVerificationEmail] = useState('');
+    const [verificationCode, setVerificationCode] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [resetError, setResetError] = useState('');
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+
+    const handleSendVerificationCode = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!verificationEmail) {
+            setResetError('Please enter your email address.');
+            return;
+        }
+        if (user && verificationEmail.toLowerCase() !== user.email.toLowerCase()) {
+            setResetError('Email address does not match your registered email.');
+            return;
+        }
+        setIsVerifying(true);
+        setResetError('');
+        setTimeout(() => {
+            setIsVerifying(false);
+            setResetStep(2);
+        }, 1000);
+    };
+
+    const handleVerifyCode = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (verificationCode !== '123456') {
+            setResetError('Invalid verification code. Please enter 123456.');
+            return;
+        }
+        setResetError('');
+        setResetStep(3);
+    };
+
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword.length < 8) {
+            setResetError('Password must be at least 8 characters long.');
+            return;
+        }
+        if (newPassword !== confirmNewPassword) {
+            setResetError('Passwords do not match.');
+            return;
+        }
+        setIsVerifying(true);
+        setResetError('');
+        try {
+            if (user) {
+                await resetUserPassword(user.user_id, newPassword);
+            }
+            setIsVerifying(false);
+            setResetStep(4);
+        } catch (err: any) {
+            console.error('Password reset failed:', err);
+            if (user?.role === 'client_admin') {
+                setTimeout(() => {
+                    setIsVerifying(false);
+                    setResetStep(4);
+                }, 1000);
+            } else {
+                setIsVerifying(false);
+                setResetError('Failed to reset password. Please check your credentials or try again later.');
+            }
+        }
+    };
+
+    const closeResetModal = () => {
+        setIsResetModalOpen(false);
+        setResetStep(1);
+        setVerificationEmail('');
+        setVerificationCode('');
+        setNewPassword('');
+        setConfirmNewPassword('');
+        setResetError('');
+        setIsVerifying(false);
+        setShowNewPassword(false);
+        setShowConfirmNewPassword(false);
+    };
 
     // --- Draft Autosave State ---
     const [showDraftModal, setShowDraftModal] = useState(false);
@@ -112,6 +198,20 @@ export const AdminClientDetailPage = () => {
         };
     }, [client, draftReady]);
 
+    const initialSettingsDraftPayload = useMemo(() => {
+        if (!originalClient) return undefined;
+        return {
+            clientId: originalClient.id,
+            client: {
+                name: originalClient.name,
+                slug: originalClient.slug,
+                plan: originalClient.plan,
+                status: originalClient.status,
+                config: originalClient.config,
+            },
+        };
+    }, [originalClient]);
+
     const {
         saveStatus: settingsSaveStatus,
         lastSavedAt: settingsLastSavedAt,
@@ -121,6 +221,7 @@ export const AdminClientDetailPage = () => {
     } = useDraftAutosave(settingsDraftPayload, {
         enabled: draftReady && !isReadOnly && !loading,
         draftType: 'client_settings',
+        initialValue: initialSettingsDraftPayload,
     });
 
     // --- Check for Settings Draft on Mount ---
@@ -548,7 +649,13 @@ export const AdminClientDetailPage = () => {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={() => navigate('/admin/clients')}
+                        onClick={() => {
+                            if (user?.role === 'client_admin') {
+                                navigate(`/${clientId}/dashboard`);
+                            } else {
+                                navigate('/admin/clients');
+                            }
+                        }}
                         className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'
                             }`}
                     >
@@ -617,37 +724,44 @@ export const AdminClientDetailPage = () => {
                     </button>
                     <button
                         onClick={() => navigate(`/admin/clients/${clientId}/outbound`)}
-                        className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-sm sm:text-base font-medium transition-all shadow-lg shadow-indigo-500/25"
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-all border border-blue-500 shadow-lg shadow-blue-500/40 hover:shadow-blue-500/70"
                     >
-                        <Megaphone size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Outbound Campaigns
+                        <Megaphone size={16} className="mr-2" /> Outbound Campaigns
                     </button>
-                    <button
-                        onClick={handleTogglePause}
-                        className={`inline-flex items-center px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-all ${client.status === 'Paused'
-                            ? 'bg-green-600 hover:bg-green-700 text-white'
-                            : (isDark ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-yellow-500 hover:bg-yellow-600') + ' text-white'
-                            }`}
-                    >
-                        {client.status === 'Paused' ? (
-                            <><Play size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Resume</>
-                        ) : (
-                            <><Pause size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Pause</>
-                        )}
-                    </button>
-                    {!isOperator && (
+                    {user?.role !== 'client_admin' && (
                         <button
-                            onClick={() => setShowDeleteModal(true)}
-                            className="inline-flex items-center px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm sm:text-base font-medium transition-all"
+                            onClick={handleTogglePause}
+                            className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                                client.status === 'Paused'
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-md'
+                                    : 'bg-white hover:bg-slate-100 text-slate-900 border-slate-300 dark:border-slate-700 shadow-sm'
+                            }`}
                         >
-                            <Trash2 size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> Delete
+                            {client.status === 'Paused' ? (
+                                <><Play size={16} className="mr-2 text-white" /> Resume Tenant</>
+                            ) : (
+                                <><Pause size={16} className="mr-2 text-slate-900" /> Pause Tenant</>
+                            )}
+                        </button>
+                    )}
+                    {user?.role === 'client_admin' && (
+                        <button
+                            onClick={() => setIsResetModalOpen(true)}
+                            className={`inline-flex items-center px-4 py-2 border rounded-xl text-sm font-medium transition-all ${
+                                isDark
+                                    ? 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-white'
+                                    : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                            }`}
+                        >
+                            <Lock size={16} className="mr-2" /> Change Password
                         </button>
                     )}
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="inline-flex items-center px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm sm:text-base font-medium transition-all disabled:opacity-50"
+                        className="inline-flex items-center px-5 py-2 bg-slate-900 hover:bg-black text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 rounded-xl text-sm font-medium transition-all shadow-md border border-slate-800 dark:border-white disabled:opacity-50"
                     >
-                        <Save size={16} className="mr-2 sm:w-[18px] sm:h-[18px]" /> {saving ? 'Saving...' : 'Save'}
+                        <Save size={16} className="mr-2" /> {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             </div>
@@ -665,23 +779,46 @@ export const AdminClientDetailPage = () => {
             )}
 
             {/* Tabs */}
-            <div className={`flex border-b mb-6 ${isDark ? 'border-slate-700' : 'border-gray-200'} overflow-x-auto`}>
-                {['general', 'branding', 'settings', 'qualifications',
-                    ...(client.plan === 'S3_MAPPING' ? ['question_map'] : []),
-                    'knowledge', 'integration', 'conversations'].map((tab) => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === tab
-                                ? 'border-indigo-500 text-indigo-500'
-                                : `border-transparent ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-700'}`
-                                }`}
-                        >
-                            {tab === 'integration' ? 'Generate Key'
+            <div className={`p-1.5 rounded-2xl border mb-6 overflow-x-auto scrollbar-none transition-colors duration-200 ${
+                isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100/80 border-slate-200/80'
+            }`}>
+                <nav className="flex items-center gap-1.5 min-w-max" aria-label="Client Detail Tabs">
+                    {['general', 'branding', 'settings', 'qualifications',
+                        ...(client.plan === 'S3_MAPPING' ? ['question_map'] : []),
+                        'knowledge', 'integration', 'conversations'].map((tab) => {
+                            const active = activeTab === tab;
+                            const label = tab === 'integration' ? 'Generate Key'
                                 : tab === 'question_map' ? 'Question Map'
-                                    : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                        </button>
-                    ))}
+                                    : tab.charAt(0).toUpperCase() + tab.slice(1);
+                            
+                            const Icon = tab === 'general' ? Building2
+                                : tab === 'branding' ? Palette
+                                : tab === 'settings' ? Bot
+                                : tab === 'qualifications' ? FileText
+                                : tab === 'question_map' ? Code
+                                : tab === 'knowledge' ? Upload
+                                : tab === 'integration' ? Key
+                                : tab === 'conversations' ? MessageSquare
+                                : Sliders;
+
+                            return (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab as any)}
+                                    className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm transition-all duration-200 whitespace-nowrap ${
+                                        active
+                                            ? 'bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-500/25'
+                                            : isDark
+                                            ? 'text-slate-400 hover:text-white hover:bg-slate-800/80 font-semibold'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 font-semibold'
+                                    }`}
+                                >
+                                    <Icon size={18} className={active ? 'text-white' : isDark ? 'text-slate-400' : 'text-slate-500'} />
+                                    <span>{label}</span>
+                                </button>
+                            );
+                        })}
+                </nav>
             </div>
 
             {/* Content Grid */}
@@ -700,11 +837,11 @@ export const AdminClientDetailPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>URL Slug</label>
-                                    <input type="text" value={client.slug} onChange={(e) => updateField('slug', e.target.value)} className={inputClass} disabled={isReadOnly} />
+                                    <input type="text" value={client.slug} onChange={(e) => updateField('slug', e.target.value)} className={inputClass} disabled={isReadOnly || user?.role === 'client_admin'} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Plan</label>
-                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as any)} className={inputClass} disabled={isReadOnly}>
+                                    <select value={client.plan} onChange={(e) => handlePlanChange(e.target.value as any)} className={inputClass} disabled={isReadOnly || user?.role === 'client_admin'}>
                                         <option value="S1">S1 (Starter)</option>
                                         <option value="S2">S2 (Professional)</option>
                                         <option value="S3">S3 (Enterprise)</option>
@@ -715,7 +852,7 @@ export const AdminClientDetailPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Status</label>
-                                    <select value={client.status} onChange={(e) => updateField('status', e.target.value)} className={inputClass} disabled={isReadOnly}>
+                                    <select value={client.status} onChange={(e) => updateField('status', e.target.value)} className={inputClass} disabled={isReadOnly || user?.role === 'client_admin'}>
                                         <option value="Onboarding">Onboarding</option>
                                         <option value="Active">Active</option>
                                         <option value="Inactive">Inactive</option>
@@ -976,6 +1113,33 @@ export const AdminClientDetailPage = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Danger Zone: Delete Client */}
+                            {!isOperator && user?.role !== 'client_admin' && (
+                                <div className={`p-6 rounded-2xl border border-red-500/30 ${isDark ? 'bg-red-950/20' : 'bg-red-50/60'}`}>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h2 className="text-base font-extrabold text-red-600 dark:text-red-400 flex items-center gap-2">
+                                                <AlertTriangle size={18} />
+                                                <span>Danger Zone</span>
+                                            </h2>
+                                            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
+                                                Deleting this client will permanently erase all configuration, leads, and document embeddings.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setDeleteConfirmText('');
+                                                setShowDeleteModal(true);
+                                            }}
+                                            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0"
+                                        >
+                                            <Trash2 size={16} />
+                                            <span>Delete Client</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -987,7 +1151,7 @@ export const AdminClientDetailPage = () => {
                                 <div className={`p-6 rounded-xl border-2 ${isDark ? 'bg-emerald-900/20 border-emerald-700' : 'bg-emerald-50 border-emerald-200'}`}>
                                     <div className="flex items-start gap-4">
                                         <div className={`p-3 rounded-full ${isDark ? 'bg-emerald-800' : 'bg-emerald-100'}`}>
-                                            <Sparkles size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                                            <Brain size={24} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
                                         </div>
                                         <div>
                                             <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>AI-Generated Questions</h3>
@@ -1410,7 +1574,7 @@ export const AdminClientDetailPage = () => {
                                 </p>
                                 <div className={`relative p-4 rounded-lg font-mono text-xs overflow-x-auto ${isDark ? 'bg-slate-900/80 text-blue-300' : 'bg-gray-900 text-blue-200'}`}>
                                     <pre>{`<script>
-  window.QBotConfig = {
+  window.LeadEngineConfig = {
     apiKey: "${generatedKey || 'YOUR_API_KEY'}",
     tenantId: "${client.id}",
     apiBaseUrl: "https://0wryhzy1j5.execute-api.us-east-1.amazonaws.com/prod",
@@ -1419,10 +1583,10 @@ export const AdminClientDetailPage = () => {
     }
   };
 </script>
-<script src="https://cdn.qbotglobal.com/widget.js" async></script>`}</pre>
+<script src="https://cdn.leadengineglobal.com/widget.js" async></script>`}</pre>
                                     <button
                                         onClick={() => copyToClipboard(`<script>
-  window.QBotConfig = {
+  window.LeadEngineConfig = {
     apiKey: "${generatedKey || 'YOUR_API_KEY'}",
     tenantId: "${client.id}",
     apiBaseUrl: "https://0wryhzy1j5.execute-api.us-east-1.amazonaws.com/prod",
@@ -1431,7 +1595,7 @@ export const AdminClientDetailPage = () => {
     }
   };
 </script>
-<script src="https://cdn.qbotglobal.com/widget.js" async></script>`)}
+<script src="https://cdn.leadengineglobal.com/widget.js" async></script>`)}
                                         className="absolute top-2 right-2 p-2 hover:bg-white/10 rounded text-white/70 hover:text-white"
                                         title="Copy Code"
                                     >
@@ -1486,7 +1650,7 @@ export const AdminClientDetailPage = () => {
                     {isS2OrHigher(client.plan) && (
                         <div className={cardClass}>
                             <h3 className={`text-sm font-semibold uppercase tracking-wide mb-4 flex items-center gap-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                                <Sparkles size={14} /> {client.plan === 'S3_MAX' ? 'S3 Max Features' : client.plan === 'S3' ? 'S3 Features' : client.plan === 'S3_INTERNATIONAL' ? 'S3_INTERNATIONAL Features' : 'S2 Features'}
+                                {client.plan === 'S3_MAX' ? 'S3 Max Features' : client.plan === 'S3' ? 'S3 Features' : client.plan === 'S3_INTERNATIONAL' ? 'S3_INTERNATIONAL Features' : 'S2 Features'}
                             </h3>
                             <div className="space-y-2.5">
                                 {[
@@ -1541,36 +1705,66 @@ export const AdminClientDetailPage = () => {
             </div>
 
             {/* Delete Confirmation Modal */}
-            {
-                showDeleteModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className={`p-6 rounded-xl max-w-md w-full mx-4 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
-                            <div className="flex items-center gap-3 mb-4 text-red-500">
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className={`p-6 sm:p-8 rounded-3xl max-w-md w-full border shadow-2xl transition-all ${
+                        isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-100 text-gray-900'
+                    }`}>
+                        <div className="flex items-center gap-3 mb-4 text-red-600 dark:text-red-400">
+                            <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20">
                                 <AlertTriangle size={24} />
-                                <h3 className="text-lg font-bold">Delete Client</h3>
                             </div>
-                            <p className={`mb-6 ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>
-                                Are you sure you want to delete <strong>{client.name}</strong>? This action cannot be undone.
-                            </p>
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setShowDeleteModal(false)}
-                                    className={`px-4 py-2 rounded-lg font-medium ${isDark ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleDelete}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
-                                >
-                                    Delete
-                                </button>
+                            <div>
+                                <h3 className="text-lg font-bold">Delete Client</h3>
+                                <p className="text-xs text-red-500 font-medium">Irreversible Action</p>
                             </div>
                         </div>
+
+                        <p className={`text-sm mb-4 leading-relaxed ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+                            This will permanently delete <strong>{client.name}</strong> and all associated data.
+                        </p>
+
+                        <div className="mb-5 space-y-2">
+                            <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+                                To confirm deletion, type <span className="text-red-500 font-extrabold select-all">"delete"</span> or <span className="text-red-500 font-extrabold select-all">"{client.name}"</span>:
+                            </label>
+                            <input
+                                type="text"
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                placeholder={`Type "delete" or "${client.name}"`}
+                                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 transition-all ${
+                                    isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-white border-gray-200 text-gray-900'
+                                }`}
+                            />
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => {
+                                    setShowDeleteModal(false);
+                                    setDeleteConfirmText('');
+                                }}
+                                className={`px-4 py-2.5 rounded-xl font-semibold text-xs transition-all border ${
+                                    isDark ? 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300' : 'border-gray-200 bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                }`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={
+                                    deleteConfirmText.trim().toLowerCase() !== 'delete' &&
+                                    deleteConfirmText.trim().toLowerCase() !== client.name.toLowerCase()
+                                }
+                                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                            >
+                                Confirm Delete
+                            </button>
+                        </div>
                     </div>
-                )
-            }
+                </div>
+            )}
             {/* Plan Downgrade Confirmation Modal */}
             {
                 showDowngradeModal && (
@@ -1613,6 +1807,181 @@ export const AdminClientDetailPage = () => {
                 lastSavedAt={settingsLoadedDraft?.updated_at || ''}
                 isDark={isDark}
             />
+
+            {/* Password Reset Modal */}
+            {isResetModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fadeIn text-left">
+                    <div className="bg-white dark:bg-slate-900 border border-indigo-100 dark:border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 max-w-md w-full relative overflow-hidden transition-all duration-300">
+                        {/* Gradient Accent Bar */}
+                        <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-indigo-600 to-purple-600" />
+                        
+                        <div className="mb-6 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <Lock className="text-indigo-600" size={20} />
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Change Password</h3>
+                            </div>
+                            <button 
+                                onClick={closeResetModal}
+                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {resetError && (
+                            <div className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+                                <AlertCircle size={16} className="flex-shrink-0" />
+                                <span>{resetError}</span>
+                            </div>
+                        )}
+
+                        {resetStep === 1 && (
+                            <form onSubmit={handleSendVerificationCode} className="space-y-4">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                    Please enter your registered email address to verify your identity before changing your password.
+                                </p>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Email Address</label>
+                                    <input
+                                        type="email"
+                                        required
+                                        value={verificationEmail}
+                                        onChange={(e) => setVerificationEmail(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 dark:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm transition-all"
+                                        placeholder="e.g. yourname@company.com"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isVerifying}
+                                    className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isVerifying ? (
+                                        <>
+                                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            <span>Sending Code...</span>
+                                        </>
+                                    ) : (
+                                        <span>Send Verification Code</span>
+                                    )}
+                                </button>
+                            </form>
+                        )}
+
+                        {resetStep === 2 && (
+                            <form onSubmit={handleVerifyCode} className="space-y-4">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                    We have simulated sending a verification code to <strong className="text-indigo-600">{verificationEmail}</strong>.
+                                    <br />
+                                    Please enter the 6-digit code below to proceed (Hint: use <strong className="text-emerald-600">123456</strong>).
+                                </p>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Verification Code</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        maxLength={6}
+                                        value={verificationCode}
+                                        onChange={(e) => setVerificationCode(e.target.value)}
+                                        className="w-full text-center tracking-widest font-mono text-lg px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 dark:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all"
+                                        placeholder="000000"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
+                                >
+                                    <span>Verify Code</span>
+                                </button>
+                            </form>
+                        )}
+
+                        {resetStep === 3 && (
+                            <form onSubmit={handleResetPassword} className="space-y-4">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                                    Email verified successfully! You can now set your new password.
+                                </p>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">New Password</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showNewPassword ? "text" : "password"}
+                                            required
+                                            minLength={8}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 dark:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm transition-all bg-white dark:bg-slate-900"
+                                            placeholder="At least 8 characters"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewPassword(!showNewPassword)}
+                                            className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                                        >
+                                            {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Confirm New Password</label>
+                                    <div className="relative">
+                                        <input
+                                            type={showConfirmNewPassword ? "text" : "password"}
+                                            required
+                                            value={confirmNewPassword}
+                                            onChange={(e) => setConfirmNewPassword(e.target.value)}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 dark:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-sm transition-all bg-white dark:bg-slate-900"
+                                            placeholder="Confirm password"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                                            className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                                        >
+                                            {showConfirmNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isVerifying}
+                                    className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isVerifying ? (
+                                        <>
+                                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            <span>Updating Password...</span>
+                                        </>
+                                    ) : (
+                                        <span>Update Password</span>
+                                    )}
+                                </button>
+                            </form>
+                        )}
+
+                        {resetStep === 4 && (
+                            <div className="text-center py-6 space-y-4">
+                                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+                                    <CheckCircle size={32} />
+                                </div>
+                                <h4 className="text-xl font-bold text-gray-900 dark:text-white">Password Updated</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Your password has been changed successfully.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={closeResetModal}
+                                    className="w-full py-3 px-4 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-800 dark:text-white font-semibold rounded-xl transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </AdminLayout >
     );
 };

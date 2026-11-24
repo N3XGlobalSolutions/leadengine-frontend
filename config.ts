@@ -4,8 +4,8 @@ export const brandConfig = {
   companyName: "Sky Habitat Homes",
   shortName: "Sky Habitat",
   botName: "Q-Lead",
-  botDisplayName: "Q-BOT", // Displayed in Navbar
-  botAvatar: "https://cdn-icons-png.flaticon.com/512/4712/4712109.png", // Q-Bot image
+  botDisplayName: "LeadEngine", // Displayed in Navbar
+  botAvatar: "https://cdn-icons-png.flaticon.com/512/4712/4712109.png", // LeadEngine image
 
   // Theme (For Tailwind classes - conceptually)
   colors: {

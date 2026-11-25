@@ -3,6 +3,7 @@ import { chatService } from '../../services/chatService';
 import { Message, MessageRole } from '../../types';
 import { TenantConfig } from '../../types/config';
 import ChatBubble from '../chat/ChatBubble';
+import { getThemeStyle } from '../../utils/theme/cssVars';
 
 interface ConversationViewerProps {
     conversationId: string;
@@ -45,18 +46,16 @@ const ConversationViewer: React.FC<ConversationViewerProps> = ({ conversationId,
     }
 
     return (
-        <div className="h-full bg-gray-50 overflow-y-auto p-4 space-y-4">
+        // Theme vars give ChatBubble the client's brand colors (it is styled with the chat brand tokens)
+        <div
+            className="h-full bg-gray-50 overflow-y-auto p-4 space-y-4"
+            style={getThemeStyle(config?.colors?.primary, config?.colors?.secondary)}
+        >
             {messages.length === 0 ? (
                 <p className="text-center text-gray-400 my-8">No messages in this conversation.</p>
             ) : (
                 messages.map((msg) => (
-                    <ChatBubble
-                        key={msg.id}
-                        message={msg}
-                        botAvatar={config?.botAvatar}
-                        botName={config?.botDisplayName || 'Assistant'}
-                        allowFeedback={false}
-                    />
+                    <ChatBubble key={msg.id} message={msg} />
                 ))
             )}
             <div ref={bottomRef} />

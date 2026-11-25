@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
     ArrowLeft, Save, Trash2, Pause, Play, Building2, Users, Calendar,
     Globe, Palette, MessageSquare, Bot, AlertTriangle, Check, X, LayoutDashboard,
     FileText, Upload, Wand2, HelpCircle, Key, Code, Copy, Sliders, Shield, RefreshCw, Plus, Megaphone,
-    Cloud, CloudOff, Loader2, Eye, EyeOff, Lock, AlertCircle, CheckCircle, Brain
+    Cloud, CloudOff, Loader2, Eye, EyeOff, Lock, AlertCircle, CheckCircle, Brain,
+    Package, ImagePlus, ImageOff
 } from 'lucide-react';
 import { Client, TenantDocument } from '../../types/admin';
-import { TenantConfig, Question } from '../../types/config';
+import {
+    TenantConfig, Question, ChatProduct,
+    MAX_CHAT_PRODUCTS, CHAT_PRODUCT_TITLE_MAX, CHAT_PRODUCT_DESCRIPTION_MAX
+} from '../../types/config';
 import {
     getClientById, updateClient, deleteClient, toggleClientPause,
     getTenantDocuments, ingestDocument, deleteDocument, generateApiKey,
     getClientConversationCount, resetUserPassword
 } from '../../services/adminService';
+import { uploadChatProductImage, getChatProductImageUrl } from '../../services/chatProductService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
@@ -24,8 +29,8 @@ import { DraftRecoveryModal } from '../../components/admin/DraftRecoveryModal';
 import { InboundBookingSettingsCard } from '../../components/admin/InboundBookingSettingsCard';
 import { ClientBookingsList } from '../../components/admin/ClientBookingsList';
 
-type ClientDetailTab = 'general' | 'branding' | 'settings' | 'qualifications' | 'question_map' | 'knowledge' | 'integration' | 'conversations';
-const CLIENT_DETAIL_TABS: ClientDetailTab[] = ['general', 'branding', 'settings', 'qualifications', 'question_map', 'knowledge', 'integration', 'conversations'];
+type ClientDetailTab = 'general' | 'branding' | 'products' | 'settings' | 'qualifications' | 'question_map' | 'knowledge' | 'integration' | 'conversations';
+const CLIENT_DETAIL_TABS: ClientDetailTab[] = ['general', 'branding', 'products', 'settings', 'qualifications', 'question_map', 'knowledge', 'integration', 'conversations'];
 const isClientDetailTab = (value: string | null): value is ClientDetailTab =>
     value !== null && (CLIENT_DETAIL_TABS as string[]).includes(value);
 
@@ -50,6 +55,412 @@ const SYSTEM_QUESTIONS: Question[] = [
     }
 ];
 
+// --- Products tab: website-chat product cards ---
+const CHAT_PRODUCT_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const CHAT_PRODUCT_IMAGE_TYPE_BY_EXT: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+const CHAT_PRODUCT_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/** 32 lowercase hex chars. crypto.randomUUID needs a secure context, so fall back to getRandomValues on plain http. */
+const newChatProductId = (): string => {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID().replace(/-/g, '').toLowerCase();
+    return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+};
+
+/** Client-side check (the backend re-validates): PNG/JPG/WebP only, ≤ 2 MB. */
+const prepareChatProductImage = (file: File): { file: File } | { error: string } => {
+    const type = file.type || CHAT_PRODUCT_IMAGE_TYPE_BY_EXT[file.name.split('.').pop()?.toLowerCase() ?? ''] || '';
+    if (!CHAT_PRODUCT_IMAGE_TYPES.includes(type)) {
+        return { error: `"${file.name}" isn't a supported image. Please choose a PNG, JPG or WebP file.` };
+    }
+    if (file.size > CHAT_PRODUCT_IMAGE_MAX_BYTES) {
+        return { error: `"${file.name}" is ${(file.size / (1024 * 1024)).toFixed(2)} MB. Images must be 2 MB or smaller.` };
+    }
+    if (file.size === 0) return { error: `"${file.name}" is empty.` };
+    // Some OSes report no MIME type; send the one implied by the extension so the backend accepts it.
+    return { file: type === file.type ? file : new File([file], file.name, { type }) };
+};
+
+const getChatProductUploadError = (err: unknown): string => {
+    const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+    return typeof detail === 'string' && detail.trim() ? detail : 'Image upload failed. Please try again.';
+};
+
+/** Resolves once the browser has fetched the image (or failed / timed out), so a preview can be swapped without a blank flash. */
+const preloadImage = (src: string, timeoutMs = 8000): Promise<void> =>
+    new Promise(resolve => {
+        const img = new Image();
+        const timer = setTimeout(resolve, timeoutMs);
+        const done = () => {
+            clearTimeout(timer);
+            resolve();
+        };
+        img.onload = done;
+        img.onerror = done;
+        img.src = src;
+    });
+
+type ChatProductImageState = { uploading: boolean; previewUrl?: string; error?: string };
+
+interface ChatProductsEditorProps {
+    tenantId: string;
+    products: ChatProduct[];
+    onChange: (products: ChatProduct[]) => void;
+    onImageUploaded: (productId: string, imageId: string) => void;
+    readOnly: boolean;
+    isDark: boolean;
+    cardClass: string;
+    inputClass: string;
+    labelClass: string;
+}
+
+const ChatProductsEditor = ({
+    tenantId, products, onChange, onImageUploaded, readOnly, isDark, cardClass, inputClass, labelClass,
+}: ChatProductsEditorProps) => {
+    // Per-product upload UI state (keyed by productId); not part of the saved config
+    const [imageState, setImageState] = useState<Record<string, ChatProductImageState>>({});
+    const [brokenImageIds, setBrokenImageIds] = useState<Record<string, true>>({});
+    const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+    const titleInputs = useRef<Record<string, HTMLInputElement | null>>({});
+    const addButtonRef = useRef<HTMLButtonElement>(null);
+    const pendingFocus = useRef<string | null>(null); // productId (focus its title) or 'add'
+    const objectUrls = useRef<Set<string>>(new Set());
+
+    // Revoke local previews that are still alive when the tab unmounts
+    useEffect(() => {
+        const urls = objectUrls.current;
+        return () => {
+            urls.forEach(url => URL.revokeObjectURL(url));
+            urls.clear();
+        };
+    }, []);
+
+    // Keyboard flow: focus the new product's title after "Add", the Add button after "Remove"
+    useEffect(() => {
+        const target = pendingFocus.current;
+        if (!target) return;
+        pendingFocus.current = null;
+        if (target === 'add') addButtonRef.current?.focus();
+        else titleInputs.current[target]?.focus();
+    }, [products]);
+
+    const atLimit = products.length >= MAX_CHAT_PRODUCTS;
+    const muted = isDark ? 'text-slate-400' : 'text-gray-500';
+    const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500';
+    const smallBtn = `inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing} ${isDark ? 'border-slate-600' : 'border-gray-200'}`;
+
+    const releasePreview = (url?: string) => {
+        if (!url) return;
+        URL.revokeObjectURL(url);
+        objectUrls.current.delete(url);
+    };
+
+    const setProductImageState = (productId: string, next: ChatProductImageState | null) =>
+        setImageState(prev => {
+            const copy = { ...prev };
+            if (next) copy[productId] = next;
+            else delete copy[productId];
+            return copy;
+        });
+
+    /** Like setProductImageState, but only if this upload (identified by its preview URL) is still the current one. */
+    const setUploadStateIfCurrent = (productId: string, previewUrl: string, next: ChatProductImageState | null) =>
+        setImageState(prev => {
+            if (prev[productId]?.previewUrl !== previewUrl) return prev;
+            const copy = { ...prev };
+            if (next) copy[productId] = next;
+            else delete copy[productId];
+            return copy;
+        });
+
+    const updateProduct = (productId: string, patch: Partial<ChatProduct>) =>
+        onChange(products.map(p => (p.productId === productId ? { ...p, ...patch } : p)));
+
+    const addProduct = () => {
+        if (readOnly || atLimit) return;
+        const productId = newChatProductId();
+        pendingFocus.current = productId;
+        onChange([...products, { productId, title: '', description: '', imageId: null }]);
+    };
+
+    const removeProduct = (productId: string) => {
+        releasePreview(imageState[productId]?.previewUrl);
+        setProductImageState(productId, null);
+        pendingFocus.current = 'add';
+        onChange(products.filter(p => p.productId !== productId));
+    };
+
+    const removeImage = (productId: string) => {
+        releasePreview(imageState[productId]?.previewUrl);
+        setProductImageState(productId, null);
+        updateProduct(productId, { imageId: null });
+    };
+
+    const handleFileChosen = async (productId: string, chosen: File | undefined) => {
+        if (!chosen || readOnly) return;
+        const prepared = prepareChatProductImage(chosen);
+        releasePreview(imageState[productId]?.previewUrl);
+        if ('error' in prepared) {
+            setProductImageState(productId, { uploading: false, error: prepared.error });
+            return;
+        }
+
+        // Show the local file immediately while it uploads
+        const previewUrl = URL.createObjectURL(prepared.file);
+        objectUrls.current.add(previewUrl);
+        setProductImageState(productId, { uploading: true, previewUrl });
+
+        try {
+            const { imageId } = await uploadChatProductImage(tenantId, prepared.file);
+            onImageUploaded(productId, imageId);
+            setUploadStateIfCurrent(productId, previewUrl, { uploading: false, previewUrl });
+            await preloadImage(getChatProductImageUrl(tenantId, imageId));
+            // Now show the server copy
+            setUploadStateIfCurrent(productId, previewUrl, null);
+        } catch (err) {
+            setUploadStateIfCurrent(productId, previewUrl, { uploading: false, error: getChatProductUploadError(err) });
+        }
+        releasePreview(previewUrl);
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className={`p-4 rounded-lg flex items-start gap-3 ${isDark ? 'bg-indigo-900/20 border border-indigo-800' : 'bg-indigo-50 border border-indigo-100'}`}>
+                <Package className="text-indigo-500 mt-1 shrink-0" size={20} aria-hidden="true" />
+                <div>
+                    <h2 className={`font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-800'}`}>Chat Products</h2>
+                    <p className={`text-sm ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                        Shown as cards in the website chat when a visitor asks about your products. Up to {MAX_CHAT_PRODUCTS}.
+                    </p>
+                </div>
+            </div>
+
+            {products.map((product, index) => {
+                const n = index + 1;
+                const pid = product.productId;
+                const state = imageState[pid];
+                const uploading = state?.uploading ?? false;
+                const hasTitle = product.title.trim().length > 0;
+                const serverSrc = product.imageId && !brokenImageIds[product.imageId]
+                    ? getChatProductImageUrl(tenantId, product.imageId)
+                    : null;
+                const displaySrc = state?.previewUrl ?? serverSrc;
+                const hasImage = Boolean(state?.previewUrl || product.imageId);
+                const canPick = !readOnly && !uploading;
+                const openPicker = () => fileInputs.current[pid]?.click();
+                const ids = {
+                    heading: `chat-product-${pid}-heading`,
+                    title: `chat-product-${pid}-title`,
+                    titleCount: `chat-product-${pid}-title-count`,
+                    titleNote: `chat-product-${pid}-title-note`,
+                    description: `chat-product-${pid}-description`,
+                    descriptionCount: `chat-product-${pid}-description-count`,
+                };
+
+                return (
+                    <section key={pid} className={cardClass} aria-labelledby={ids.heading}>
+                        <div className={`flex items-center gap-3 mb-4 border-b pb-4 ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
+                            <div
+                                aria-hidden="true"
+                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${isDark ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'}`}
+                            >
+                                {n}
+                            </div>
+                            <h3 id={ids.heading} className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                Product {n}
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => removeProduct(pid)}
+                                disabled={readOnly}
+                                aria-label={`Remove product ${n}`}
+                                className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing} ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`}
+                            >
+                                <Trash2 size={16} aria-hidden="true" /> Remove product
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            {/* Image */}
+                            <div className="sm:w-56 shrink-0">
+                                <span className={labelClass}>Image</span>
+                                <input
+                                    ref={el => { fileInputs.current[pid] = el; }}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp"
+                                    className="hidden"
+                                    tabIndex={-1}
+                                    aria-hidden="true"
+                                    disabled={!canPick}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        e.target.value = ''; // allow re-choosing the same file
+                                        void handleFileChosen(pid, file);
+                                    }}
+                                />
+                                {hasImage ? (
+                                    <>
+                                        <div
+                                            onClick={canPick ? openPicker : undefined}
+                                            title={canPick ? 'Click to replace image' : undefined}
+                                            className={`relative h-[120px] w-full overflow-hidden rounded-lg border ${isDark ? 'border-slate-700 bg-slate-900' : 'border-gray-200 bg-gray-50'} ${canPick ? 'cursor-pointer' : ''}`}
+                                        >
+                                            {displaySrc ? (
+                                                <img
+                                                    src={displaySrc}
+                                                    alt={hasTitle ? `Image for ${product.title.trim()}` : `Image for product ${n}`}
+                                                    className="h-full w-full object-cover"
+                                                    onError={() => {
+                                                        const failedId = product.imageId;
+                                                        if (!state?.previewUrl && failedId) setBrokenImageIds(prev => ({ ...prev, [failedId]: true }));
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className={`flex h-full flex-col items-center justify-center gap-1 text-xs ${muted}`}>
+                                                    <ImageOff size={20} aria-hidden="true" />
+                                                    Image unavailable
+                                                </div>
+                                            )}
+                                            {uploading && (
+                                                <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 text-white text-xs font-medium">
+                                                    <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                                                    Uploading…
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            <button
+                                                type="button"
+                                                onClick={openPicker}
+                                                disabled={!canPick}
+                                                aria-label={`Replace image for product ${n}`}
+                                                className={`${smallBtn} ${isDark ? 'text-slate-200 hover:bg-slate-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                                            >
+                                                <RefreshCw size={14} aria-hidden="true" /> Replace
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(pid)}
+                                                disabled={!canPick}
+                                                aria-label={`Remove image for product ${n}`}
+                                                className={`${smallBtn} text-red-500 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`}
+                                            >
+                                                <X size={14} aria-hidden="true" /> Remove
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={openPicker}
+                                        disabled={readOnly}
+                                        className={`h-[120px] w-full rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1.5 px-2 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing} ${isDark
+                                            ? 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                                            : 'border-gray-300 bg-gray-50 text-gray-500 hover:border-gray-400 hover:text-gray-700'
+                                            }`}
+                                    >
+                                        <ImagePlus size={22} aria-hidden="true" />
+                                        <span className="text-xs font-medium">
+                                            Click to choose image<span className="sr-only"> for product {n}</span>
+                                        </span>
+                                        <span className="text-[11px]">PNG, JPG or WebP · max 2 MB</span>
+                                    </button>
+                                )}
+                                <p className="sr-only" aria-live="polite">
+                                    {uploading ? `Uploading image for product ${n}…` : ''}
+                                </p>
+                                {state?.error && (
+                                    <p role="alert" className="mt-2 flex items-start gap-1 text-xs text-red-500">
+                                        <AlertCircle size={14} className="shrink-0 mt-px" aria-hidden="true" />
+                                        <span>{state.error}</span>
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Text */}
+                            <div className="flex-1 min-w-0 space-y-4">
+                                <div>
+                                    <div className="flex items-end justify-between gap-2">
+                                        <label htmlFor={ids.title} className={labelClass}>
+                                            Title <span className="text-red-500" aria-hidden="true">*</span>
+                                        </label>
+                                        <span
+                                            id={ids.titleCount}
+                                            className={`mb-1.5 text-xs tabular-nums ${product.title.length >= CHAT_PRODUCT_TITLE_MAX ? 'text-amber-500' : muted}`}
+                                        >
+                                            {product.title.length}/{CHAT_PRODUCT_TITLE_MAX}
+                                        </span>
+                                    </div>
+                                    <input
+                                        id={ids.title}
+                                        ref={el => { titleInputs.current[pid] = el; }}
+                                        type="text"
+                                        value={product.title}
+                                        maxLength={CHAT_PRODUCT_TITLE_MAX}
+                                        required
+                                        aria-describedby={hasTitle ? ids.titleCount : `${ids.titleNote} ${ids.titleCount}`}
+                                        onChange={(e) => updateProduct(pid, { title: e.target.value })}
+                                        placeholder="e.g. Premium Plan"
+                                        className={inputClass}
+                                        disabled={readOnly}
+                                    />
+                                    {!hasTitle && (
+                                        <p id={ids.titleNote} className="mt-1.5 flex items-center gap-1 text-xs text-amber-500">
+                                            <AlertCircle size={12} className="shrink-0" aria-hidden="true" />
+                                            Add a title — products without one aren't saved or shown in the chat.
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className="flex items-end justify-between gap-2">
+                                        <label htmlFor={ids.description} className={labelClass}>Description</label>
+                                        <span
+                                            id={ids.descriptionCount}
+                                            className={`mb-1.5 text-xs tabular-nums ${product.description.length >= CHAT_PRODUCT_DESCRIPTION_MAX ? 'text-amber-500' : muted}`}
+                                        >
+                                            {product.description.length}/{CHAT_PRODUCT_DESCRIPTION_MAX}
+                                        </span>
+                                    </div>
+                                    <textarea
+                                        id={ids.description}
+                                        rows={3}
+                                        value={product.description}
+                                        maxLength={CHAT_PRODUCT_DESCRIPTION_MAX}
+                                        aria-describedby={ids.descriptionCount}
+                                        onChange={(e) => updateProduct(pid, { description: e.target.value })}
+                                        placeholder="A short description shown on the card"
+                                        className={inputClass}
+                                        disabled={readOnly}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                );
+            })}
+
+            <div className="space-y-2">
+                <button
+                    ref={addButtonRef}
+                    type="button"
+                    onClick={addProduct}
+                    disabled={readOnly || atLimit}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing} ${isDark
+                        ? 'border-indigo-700 text-indigo-400 hover:bg-indigo-900/20 disabled:hover:bg-transparent'
+                        : 'border-indigo-300 text-indigo-600 hover:bg-indigo-50 disabled:hover:bg-transparent'
+                        }`}
+                >
+                    <Plus size={18} aria-hidden="true" />
+                    Add product ({products.length}/{MAX_CHAT_PRODUCTS})
+                </button>
+                <p className={`text-xs ${muted}`}>
+                    {atLimit && `You've reached the maximum of ${MAX_CHAT_PRODUCTS} products. `}
+                    Images upload right away; product changes go live when you click Save Changes.
+                </p>
+            </div>
+        </div>
+    );
+};
+
 export const AdminClientDetailPage = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
@@ -71,6 +482,8 @@ export const AdminClientDetailPage = () => {
     // Question Map only exists for S3_MAPPING clients (e.g. ?tab=question_map on another plan)
     useEffect(() => {
         if (activeTab === 'question_map' && client && client.plan !== 'S3_MAPPING') setActiveTab('general');
+        // Chat products are an S3-plan feature (e.g. ?tab=products on another plan)
+        if (activeTab === 'products' && client && client.plan !== 'S3') setActiveTab('general');
     }, [activeTab, client?.plan]);
     const [generatedKey, setGeneratedKey] = useState<string>('');
     const [conversationCount, setConversationCount] = useState<number>(0);
@@ -800,7 +1213,9 @@ export const AdminClientDetailPage = () => {
                 isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100/80 border-slate-200/80'
             }`}>
                 <nav className="flex items-center gap-1.5 min-w-max" aria-label="Client Detail Tabs">
-                    {['general', 'branding', 'settings', 'qualifications',
+                    {['general', 'branding',
+                        ...(client.plan === 'S3' ? ['products'] : []),
+                        'settings', 'qualifications',
                         ...(client.plan === 'S3_MAPPING' ? ['question_map'] : []),
                         'knowledge', 'integration', 'conversations'].map((tab) => {
                             const active = activeTab === tab;
@@ -810,6 +1225,7 @@ export const AdminClientDetailPage = () => {
                             
                             const Icon = tab === 'general' ? Building2
                                 : tab === 'branding' ? Palette
+                                : tab === 'products' ? Package
                                 : tab === 'settings' ? Bot
                                 : tab === 'qualifications' ? FileText
                                 : tab === 'question_map' ? Code
@@ -960,6 +1376,34 @@ export const AdminClientDetailPage = () => {
                                 </div>
                             </div>
                         </>
+                    )}
+
+                    {/* PRODUCTS TAB — website-chat product cards (saved with Save Changes) */}
+                    {activeTab === 'products' && (
+                        <ChatProductsEditor
+                            tenantId={client.id}
+                            products={client.config?.chatProducts ?? []}
+                            onChange={(next) => updateConfig('chatProducts', next)}
+                            onImageUploaded={(productId, imageId) => {
+                                // Uploads resolve later: patch the latest state so edits made meanwhile aren't lost.
+                                setClient(prev => {
+                                    const current = prev?.config?.chatProducts;
+                                    if (!prev?.config || !current?.some(p => p.productId === productId)) return prev;
+                                    return {
+                                        ...prev,
+                                        config: {
+                                            ...prev.config,
+                                            chatProducts: current.map(p => (p.productId === productId ? { ...p, imageId } : p)),
+                                        },
+                                    };
+                                });
+                            }}
+                            readOnly={isReadOnly}
+                            isDark={isDark}
+                            cardClass={cardClass}
+                            inputClass={inputClass}
+                            labelClass={labelClass}
+                        />
                     )}
 
                     {/* SETTINGS TAB */}

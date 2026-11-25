@@ -7,7 +7,8 @@ export enum MessageRole {
 
 export interface SummaryData {
   sessionId?: string;
-  [key: string]: string | undefined;
+  // Values are usually strings, but S3 flows nest objects ({ label, answer }) and arrays
+  [key: string]: unknown;
 }
 
 export interface Message {
@@ -22,6 +23,19 @@ export interface Message {
   // S2-specific fields
   conversationalTransition?: string; // Thinking text before question
   isSoftDQ?: boolean; // Soft-disqualified lead visual
+  // Visitor chat UI
+  products?: ChatProductCard[]; // Product cards the bot showed with this message
+  currentState?: string;   // Backend current_state when this bot message arrived ("contact", "qualifying", ...)
+  quickReplies?: string[]; // Tap-to-answer options shown under this bot message
+  selectedReply?: string;  // The option the visitor tapped (its chip stays shown as checked)
+}
+
+/** A product the client added in the admin Products tab, as shown in the chat. */
+export interface ChatProductCard {
+  productId: string;
+  title: string;
+  description: string;
+  imageId?: string | null; // image served from /tenants/{tenantId}/chat-products/images/{imageId}
 }
 
 export interface ChatState {
@@ -46,6 +60,12 @@ export interface ChatResponse {
   summary_data?: Record<string, any>;  // Backend-created summary
   show_actions?: boolean;           // Explicit flag for action buttons
   quick_replies?: string[];         // Quick reply options for current question
+  products?: Array<{                // Product cards, sent when the visitor asks about products
+    product_id: string;
+    title: string;
+    description?: string;
+    image_id?: string | null;
+  }>;
 
   // S2-specific fields
   s2_lead_output?: {

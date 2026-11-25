@@ -1,289 +1,228 @@
-
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
+import { Check, Copy, Info, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Message, MessageRole } from '../../types';
-import { MapPin, DollarSign, Home, Calendar, CreditCard, User, Phone, ThumbsUp, ThumbsDown, Check, Info } from 'lucide-react';
+import { RobotAvatar } from './Mascot';
 
-
-interface ChatBubbleProps {
+export interface ChatBubbleProps {
   message: Message;
-  allowFeedback?: boolean;
-  onFeedback?: (feedbackType: 'up' | 'down') => void;
-  botAvatar?: string;
-  botName?: string;
+  /** Show this instead of message.text (used for the completion message). */
+  textOverride?: string;
+  /** When given, bot text bubbles get a Copy / thumbs up / thumbs down row. */
+  onFeedback?: (type: 'up' | 'down') => void;
+  /** Rendered under the bubble, left-aligned with the bubble (not the avatar): chips, form card, booking card. */
+  children?: React.ReactNode;
 }
 
-const ChatBubble: React.FC<ChatBubbleProps> = ({ message, allowFeedback, onFeedback, botAvatar, botName }) => {
+const focusRing =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-le-accent';
+
+/** Markdown -> plain-ish text for the clipboard. */
+const toPlainText = (text: string): string =>
+  text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+    .replace(/\*\*|__/g, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .trim();
+
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Older browsers / insecure contexts
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+};
+
+// Markdown inside the bot bubble: links use the client's link colour, everything else stays neutral.
+const markdownComponents: Components = {
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
+  li: ({ children }) => <li className="pl-0.5">{children}</li>,
+  strong: ({ children }) => <strong className="font-medium text-le-ink">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`rounded text-le-link underline underline-offset-2 [overflow-wrap:anywhere] ${focusRing}`}
+    >
+      {children}
+    </a>
+  ),
+  code: ({ children }) => (
+    <code className="rounded-md bg-le-disabled px-1.5 py-0.5 font-mono text-[0.85em] text-le-ink">{children}</code>
+  ),
+  pre: ({ children }) => (
+    <pre className="my-2 max-w-full overflow-x-auto rounded-xl bg-le-ink p-3 text-[13px] text-white [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit">
+      {children}
+    </pre>
+  ),
+  h1: ({ children }) => <h1 className="mb-2 text-base font-medium text-le-ink">{children}</h1>,
+  h2: ({ children }) => <h2 className="mb-2 text-[15px] font-medium text-le-ink">{children}</h2>,
+  h3: ({ children }) => <h3 className="mb-1 text-sm font-medium text-le-ink">{children}</h3>,
+  blockquote: ({ children }) => (
+    <blockquote className="my-2 border-l-[3px] border-le-field pl-3 text-le-muted">{children}</blockquote>
+  ),
+  hr: () => <hr className="my-3 border-le-field" />,
+  img: ({ src, alt }) => <img src={src} alt={alt || ''} className="my-2 max-w-full rounded-xl" loading="lazy" />,
+  // Wide tables scroll inside the bubble instead of stretching the page
+  table: ({ children }) => (
+    <div className="my-2 max-w-full overflow-x-auto rounded-xl border border-le-field">
+      <table className="min-w-full border-collapse text-xs">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead className="bg-le-disabled">{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: ({ children }) => <tr className="border-b border-le-field last:border-b-0">{children}</tr>,
+  th: ({ children }) => (
+    <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-le-ink">{children}</th>
+  ),
+  td: ({ children }) => <td className="whitespace-nowrap px-3 py-2 text-le-ink">{children}</td>,
+};
+
+const ChatBubble: React.FC<ChatBubbleProps> = ({ message, textOverride, onFeedback, children }) => {
   const isBot = message.role === MessageRole.Bot;
-  const hasSummaryCard = !!(message.isSummary && message.summaryData);
-  // Completion message: the Lead Qualification Summary card already shows these details, so hide the text above it
-  const hideMessageText = isBot && message.showActions && hasSummaryCard;
-  console.log(message)
+  const text = textOverride ?? message.text ?? '';
+  const hasText = text.trim().length > 0;
+
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    []
+  );
+
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(toPlainText(text));
+    if (!ok) return;
+    setCopied(true);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1600);
+  };
+
+  if (!isBot) {
+    return (
+      <div className="flex w-full flex-col items-end gap-2.5 motion-safe:animate-fade-in-up">
+        {hasText && (
+          <div className="max-w-[250px] whitespace-pre-wrap break-words rounded-[18px_6px_18px_18px] bg-le-bubble px-[14px] py-[11px] text-sm leading-normal text-le-on-bubble [overflow-wrap:anywhere]">
+            {text}
+          </div>
+        )}
+        {children && <div className="w-full min-w-0">{children}</div>}
+      </div>
+    );
+  }
+
+  const actionButton = `inline-flex h-[30px] w-[30px] items-center justify-center rounded-full transition-colors hover:bg-white/70 ${focusRing}`;
+  const actionTone = (active: boolean) => (active ? 'text-le-selected-text' : 'hover:text-le-icon');
 
   return (
-    <div className={`flex w-full mb-4 animate-fade-in-up ${isBot ? 'justify-start' : 'justify-end'}`}>
-      <div className={`flex gap-3 max-w-[95%] md:max-w-2xl ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
+    <div className="flex w-full items-start gap-2.5 motion-safe:animate-fade-in-up">
+      <RobotAvatar size={32} className="flex-shrink-0" />
 
-        {/* Avatar */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm mt-0 overflow-hidden 
-          ${isBot ? 'bg-white border border-gray-100' : 'bg-gray-900 border border-gray-700'}`}>
-          {isBot ? (
-            <img src={botAvatar || "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"} alt={botName || "Bot"} className="w-5 h-5 object-contain" />
-          ) : (
-            <User size={16} className="text-white" />
-          )}
-        </div>
-
-        <div className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}>
-
-          {/* Sender Name */}
-          <span className="text-[10px] text-gray-400 mb-1 px-1">
-            {isBot ? (botName || 'AI Assistant') : 'Me'}
-          </span>
-
-          {/* Message Content */}
-          {hideMessageText ? null : (
-            // Regular message rendering
-            <div
-              className={`
-                px-4 py-3 sm:px-5 sm:py-3.5 text-[15px] leading-relaxed break-words relative w-fit
-                ${isBot
-                  ? message.isSoftDQ
-                    ? 'bg-amber-50/90 backdrop-blur-md text-gray-800 rounded-2xl rounded-tl-none border border-amber-200/50 shadow-sm'
-                    : 'bg-white text-gray-800 rounded-2xl rounded-tl-none shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)] border border-gray-100'
-                  : 'bg-slate-800 text-white rounded-2xl rounded-tr-none shadow-[0_4px_14px_rgba(0,0,0,0.08)]'
-                }
-              `}
+      <div className="flex min-w-0 flex-1 flex-col items-start">
+        {hasText && (
+          <div
+            className={`min-w-0 max-w-[268px] break-words rounded-[6px_18px_18px_18px] border px-[14px] py-[11px] text-sm leading-normal text-le-ink [overflow-wrap:anywhere] ${
+              message.isSoftDQ ? 'border-amber-200 bg-amber-50' : 'border-le-bot-border bg-white/[.92]'
+            }`}
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkBreaks]}
+              rehypePlugins={[rehypeRaw]}
+              components={markdownComponents}
             >
-              {isBot ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                  rehypePlugins={[rehypeRaw]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                    li: ({ children }) => <li className="text-gray-700">{children}</li>,
-                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                    em: ({ children }) => <em className="italic">{children}</em>,
-                    code: ({ children }) => (
-                      <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600">{children}</code>
-                    ),
-                    pre: ({ children }) => (
-                      <pre className="bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto my-2 text-sm">{children}</pre>
-                    ),
-                    a: ({ href, children }) => (
-                      <a href={href} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>
-                    ),
-                    h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-lg font-bold mb-2">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-base font-bold mb-1">{children}</h3>,
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-gray-300 pl-3 italic text-gray-600 my-2">{children}</blockquote>
-                    ),
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto my-3 rounded-lg border border-blue-100 shadow-sm">
-                        <table className="min-w-full text-sm border-collapse">{children}</table>
-                      </div>
-                    ),
-                    thead: ({ children }) => <thead className="bg-blue-50">{children}</thead>,
-                    tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => <tr className="even:bg-slate-50">{children}</tr>,
-                    th: ({ children }) => (
-                      <th className="px-3 py-2 text-left font-semibold text-blue-800 border border-blue-100 whitespace-nowrap text-xs">{children}</th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="px-3 py-2 text-gray-700 border border-gray-100 whitespace-nowrap text-xs">{children}</td>
-                    ),
-                  }}
-                >
-                  {message.text}
-                </ReactMarkdown>
+              {text}
+            </ReactMarkdown>
+          </div>
+        )}
+
+        {message.isSoftDQ && (
+          <p className="mt-1.5 flex items-start gap-1.5 px-1 text-xs text-amber-800">
+            <Info size={14} strokeWidth={1.7} className="mt-px flex-shrink-0" aria-hidden="true" />
+            <span>We'll follow up when the timing is right.</span>
+          </p>
+        )}
+
+        {hasText && onFeedback && (
+          <div className="-ml-1.5 mt-1 flex items-center gap-0.5 text-le-faint">
+            <button
+              type="button"
+              onClick={handleCopy}
+              aria-label={copied ? 'Copied' : 'Copy message'}
+              title="Copy"
+              className={`${actionButton} ${actionTone(copied)}`}
+            >
+              {copied ? (
+                <Check size={14} strokeWidth={1.7} aria-hidden="true" />
               ) : (
-                <span className="whitespace-pre-wrap">{message.text}</span>
+                <Copy size={14} strokeWidth={1.7} aria-hidden="true" />
               )}
-            </div>
-          )}
+            </button>
+            <button
+              type="button"
+              onClick={() => onFeedback('up')}
+              aria-label="Helpful"
+              aria-pressed={message.feedback === 'up'}
+              title="Helpful"
+              className={`${actionButton} ${actionTone(message.feedback === 'up')}`}
+            >
+              <ThumbsUp
+                size={14}
+                strokeWidth={1.7}
+                className={message.feedback === 'up' ? 'fill-current' : ''}
+                aria-hidden="true"
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => onFeedback('down')}
+              aria-label="Not helpful"
+              aria-pressed={message.feedback === 'down'}
+              title="Not helpful"
+              className={`${actionButton} ${actionTone(message.feedback === 'down')}`}
+            >
+              <ThumbsDown
+                size={14}
+                strokeWidth={1.7}
+                className={message.feedback === 'down' ? 'fill-current' : ''}
+                aria-hidden="true"
+              />
+            </button>
+            {copied && <span className="ml-1 text-xs text-le-selected-text">Copied</span>}
+            <span role="status" className="sr-only">
+              {copied ? 'Message copied to clipboard' : ''}
+            </span>
+          </div>
+        )}
 
-          {/* Soft-DQ Info Banner */}
-          {isBot && message.isSoftDQ && (
-            <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 max-w-md">
-              <Info size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
-              <span className="text-xs text-amber-700">Based on your needs, we'll follow up when the timing is right.</span>
-            </div>
-          )}
-
-          {/* Summary Card */}
-          {hasSummaryCard && (
-            <div className={`${hideMessageText ? '' : 'mt-3'} w-full bg-white rounded-xl p-5 shadow-lg border border-gray-100 animate-fade-in-up`}>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b pb-2 flex items-center justify-between">
-                <span>Lead Qualification Summary</span>
-                <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full">Completed</span>
-              </h3>
-
-              {(() => {
-                const sd = message.summaryData || {};
-
-
-                // Helper to find key case-insensitively
-                const findKey = (search: string) => Object.keys(sd).find(k => k.toLowerCase() === search);
-
-                const nameKey = findKey('name');
-                const phoneKey = findKey('phone');
-
-                const getValue = (val: any): string => {
-                  if (val === null || val === undefined) return '';
-                  if (typeof val === 'string') return val;
-                  if (typeof val === 'object' && val.answer) return val.answer;
-                  return String(val);
-                };
-
-                const nameValue = nameKey ? getValue(sd[nameKey]) : null;
-                const phoneValue = phoneKey ? getValue(sd[phoneKey]) : null;
-
-                // Detect S3 Mapping format: has `answers` array and `lead_priority`
-                const isS3Mapping = Array.isArray(sd.answers) && sd.lead_priority !== undefined;
-
-                // S3 Mapping: internal structural keys to skip in generic grid
-                const S3_INTERNAL_KEYS = new Set([
-                  'name', 'phone', 'answers', 'signal_breakdown', 'avg_signal_score',
-                  'total_questions', 'disqualified', 'sessionId', 's3_max_lead_output',
-                  's3_lead_output', 's2_lead_output',
-                ]);
-
-                // Generic remaining data (for non-mapping leads)
-                const remainingData = Object.entries(sd).filter(([key]) => {
-                  const lower = key.toLowerCase();
-                  if (isS3Mapping) return !S3_INTERNAL_KEYS.has(key) && lower !== 'name' && lower !== 'phone';
-                  return lower !== 'name' && lower !== 'phone' && key !== 'sessionId' && !key.startsWith('q0')
-                    && key !== 's3_max_lead_output' && key !== 's3_lead_output' && key !== 's2_lead_output';
-                });
-
-                return (
-                  <div>
-                    {/* Spotlight: Name + Phone */}
-                    {(nameValue || phoneValue) && (
-                      <div className="flex items-center gap-4 mb-6 pb-6 border-b border-dashed border-gray-200">
-                        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                          <User size={24} />
-                        </div>
-                        <div>
-                          {nameValue && <h4 className="text-lg font-bold text-gray-900">{nameValue}</h4>}
-                          {phoneValue && (
-                            <div className="flex items-center gap-1.5 text-sm text-gray-500 mt-0.5">
-                              <Phone size={12} />
-                              <span>{phoneValue}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* S3 Mapping: clean Q&A rows, no internal scoring data shown to customer */}
-                    {isS3Mapping && Array.isArray(sd.answers) && sd.answers.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm text-gray-700">
-                        {sd.answers.map((ans: any, i: number) => {
-                          if (!ans || typeof ans !== 'object') return null;
-                          const question = typeof ans.question === 'string' ? ans.question : `Question ${i + 1}`;
-                          const answer = typeof ans.answer === 'string' ? ans.answer : String(ans.answer || '—');
-                          return (
-                            <div key={i} className="flex items-start gap-2.5">
-                              <div className="mt-0.5 p-1 rounded bg-gray-100 text-gray-600">
-                                <Check className="w-3.5 h-3.5" />
-                              </div>
-                              <div className="overflow-hidden">
-                                <span className="block text-xs text-gray-500 font-medium lowercase first-letter:uppercase">{question}</span>
-                                <span className="font-semibold truncate block" title={answer}>{answer}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Generic (non-S3-mapping) remaining grid */}
-                    {!isS3Mapping && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 text-sm text-gray-700">
-                        {remainingData.map(([key, value]) => {
-                          let label: string;
-                          let displayValue: string;
-
-                          const valueObj = value as { label?: string; answer?: string } | null;
-
-                          if (typeof value === 'object' && value !== null && valueObj?.label && valueObj?.answer !== undefined) {
-                            label = valueObj.label;
-                            displayValue = valueObj.answer || 'Not provided';
-                          } else {
-                            label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                            displayValue = typeof value === 'string' ? value : String(value || 'Not provided');
-                          }
-
-                          let icon = <Check className="w-3.5 h-3.5" />;
-                          let bgClass = "bg-gray-100 text-gray-600";
-
-                          const lowerKey = key.toLowerCase();
-                          const lowerLabel = label.toLowerCase();
-                          if (lowerKey.includes('location') || lowerLabel.includes('location') || lowerLabel.includes('address') || lowerLabel.includes('area')) {
-                            icon = <MapPin className="w-3.5 h-3.5" />;
-                            bgClass = "bg-red-50 text-red-500";
-                          } else if (lowerKey.includes('budget') || lowerLabel.includes('budget') || lowerLabel.includes('price')) {
-                            icon = <DollarSign className="w-3.5 h-3.5" />;
-                            bgClass = "bg-green-50 text-green-600";
-                          } else if (lowerKey.includes('type') || lowerLabel.includes('type') || lowerLabel.includes('bhk') || lowerLabel.includes('property')) {
-                            icon = <Home className="w-3.5 h-3.5" />;
-                            bgClass = "bg-blue-50 text-blue-500";
-                          } else if (lowerKey.includes('move') || lowerLabel.includes('move') || lowerLabel.includes('timeline') || lowerLabel.includes('date')) {
-                            icon = <Calendar className="w-3.5 h-3.5" />;
-                            bgClass = "bg-purple-50 text-purple-500";
-                          } else if (lowerKey.includes('financ') || lowerLabel.includes('financ') || lowerLabel.includes('loan')) {
-                            icon = <CreditCard className="w-3.5 h-3.5" />;
-                            bgClass = "bg-yellow-50 text-yellow-600";
-                          }
-
-                          return (
-                            <div key={key} className="flex items-start gap-2.5">
-                              <div className={`mt-0.5 p-1 rounded ${bgClass}`}>
-                                {icon}
-                              </div>
-                              <div className="overflow-hidden">
-                                <span className="block text-xs text-gray-500 font-medium lowercase first-letter:uppercase">{label}</span>
-                                <span className="font-semibold truncate block" title={displayValue}>{displayValue}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          {/* Feedback Section */}
-          {isBot && allowFeedback && onFeedback && (
-            <div className="flex gap-2 mt-2 ml-1 animate-fade-in">
-              <button
-                onClick={() => onFeedback('up')}
-                className={`p-1 rounded hover:bg-gray-100 transition-colors ${message.feedback === 'up' ? 'text-green-600 bg-green-50 hover:bg-green-100' : 'text-gray-400'}`}
-                title="Helpful"
-              >
-                <ThumbsUp size={14} className={message.feedback === 'up' ? 'fill-current' : ''} />
-              </button>
-              <button
-                onClick={() => onFeedback('down')}
-                className={`p-1 rounded hover:bg-gray-100 transition-colors ${message.feedback === 'down' ? 'text-red-500 bg-red-50 hover:bg-red-100' : 'text-gray-400'}`}
-                title="Not helpful"
-              >
-                <ThumbsDown size={14} className={message.feedback === 'down' ? 'fill-current' : ''} />
-              </button>
-              <span className="text-[10px] text-gray-300 self-center ml-1">Was this helpful?</span>
-            </div>
-          )}
-        </div>
+        {children && <div className={`w-full min-w-0 ${hasText ? 'mt-2.5' : ''}`}>{children}</div>}
       </div>
     </div>
   );

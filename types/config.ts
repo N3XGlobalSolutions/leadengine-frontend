@@ -6,7 +6,23 @@ export interface Question {
     optionsKey?: string;     // Reference to the options list in leadQualification.options
     options?: string[];      // Optional quick reply options
     isSystemGenerated?: boolean; // True if this is a system question (auto-handled by state machine)
+    stepLabel?: string;      // Short category name for the chat progress row (backend `label`, e.g. "Budget")
 }
+
+/**
+ * A product shown as a card in the website chat when a visitor asks about products.
+ * Backend (snake_case): { product_id, title, description, image_id }. Max 3 per tenant.
+ */
+export interface ChatProduct {
+    productId: string;          // 32 lowercase hex chars
+    title: string;              // 1–80 chars
+    description: string;        // ≤ 300 chars
+    imageId?: string | null;    // "<32 hex>.<png|jpg|webp>" — see services/chatProductService.ts
+}
+
+export const MAX_CHAT_PRODUCTS = 3;
+export const CHAT_PRODUCT_TITLE_MAX = 80;
+export const CHAT_PRODUCT_DESCRIPTION_MAX = 300;
 
 export type TenantPlan = 'S1' | 'S2' | 'S3' | 'S3_MAX' | 'S3_MAPPING';
 
@@ -18,6 +34,7 @@ export interface TenantConfig {
     botDisplayName: string;
     botAvatar: string;
     apiKey?: string; // Generated API key for the widget
+    privacyPolicyUrl?: string; // Chat footer "By chatting you agree to our Privacy Policy" shows only when set
 
     colors: {
         primary: string;
@@ -65,6 +82,9 @@ export interface TenantConfig {
     whatsapp_enabled?: boolean;
     whatsapp_access_token?: string;
     whatsapp_phone_number_id?: string;
+
+    // Website-chat product cards (backend `chat_products`), up to MAX_CHAT_PRODUCTS
+    chatProducts?: ChatProduct[];
 }
 
 // Default template with placeholder questions
@@ -105,5 +125,7 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
     messages: {
         scheduleSuccess: 'Thank you! Our team will be in touch shortly.',
         maybeLater: 'No problem! Feel free to reach out whenever you are ready.'
-    }
+    },
+
+    chatProducts: []
 };

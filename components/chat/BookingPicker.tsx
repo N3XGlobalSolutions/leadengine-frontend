@@ -1,53 +1,67 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CalendarDays, Clock, Globe, Loader2, X } from 'lucide-react';
+import { CalendarDays, Clock, Loader2 } from 'lucide-react';
 import {
     bookingService,
     type BookingAvailability,
     type BookSlotResponse,
 } from '../../services/bookingService';
-import { formatBookingDateTime, formatSlotTime, plainDateParts } from '../../utils/bookingFormat';
+import {
+    daysUntil,
+    formatSlotShort,
+    formatSlotTime,
+    formatTimezoneAbbr,
+    plainDateParts,
+    relativeDayLabel,
+} from '../../utils/bookingFormat';
+import { formatPhoneIN } from '../../utils/phone';
 
 interface BookingPickerProps {
     tenantId: string;
     apiKey?: string;
     conversationId: string | null;
-    primaryColor: string;
+    phone?: string | null;      // 10 digits; footer "We'll call +91 98765 43210"
     onConfirmed: (result: BookSlotResponse) => void;
-    onSkip: () => void;
-    onCancel: () => void;
+    onSkip: () => void;         // "Have the team call me instead"
+    onMaybeLater: () => void;   // "Maybe later"
 }
 
-const isHexColor = (color: string) => /^#([0-9A-F]{3}){1,2}$/i.test(color);
-
-/** Translucent version of the brand color for soft backgrounds/borders. */
-const withAlpha = (color: string, alpha: number): string => {
-    if (isHexColor(color)) {
-        let h = color.replace('#', '');
-        if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-        const num = parseInt(h, 16);
-        return `rgba(${num >> 16}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
-    }
-    // Named colors (e.g. "indigo") - let the browser mix it
-    return `color-mix(in srgb, ${color} ${Math.round(alpha * 100)}%, transparent)`;
-};
-
 /** Visitor-friendly message from an axios error (FastAPI puts it in response.data.detail). */
-const getErrorDetail = (error: any, fallback: string): string => {
-    const detail = error?.response?.data?.detail;
+type ApiError = { response?: { status?: number; data?: { detail?: unknown } } };
+
+const getErrorDetail = (error: unknown, fallback: string): string => {
+    const detail = (error as ApiError | undefined)?.response?.data?.detail;
     return typeof detail === 'string' && detail.trim() ? detail : fallback;
 };
 
-// Keyboard-only focus ring; its color comes from an inline `outlineColor` (the brand color)
-const focusRing = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2';
+const focusRing =
+    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-le-accent';
+// Inside the horizontally scrolling date row an outside outline would be clipped, so draw it inset
+const insetFocusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-le-accent';
+
+const cellBase = 'border transition-colors disabled:cursor-not-allowed';
+// Cells are only disabled while a booking is in flight (never "taken"), so no strike-through here
+const cellIdle =
+    'bg-white border-le-field text-le-ink enabled:hover:border-le-selected-border disabled:bg-le-disabled disabled:text-le-faint';
+const cellSelected = 'bg-le-selected-bg border-le-selected-border text-le-selected-text';
+
+const textButton = `inline-flex items-center justify-center min-h-[44px] px-2 rounded-lg text-[13px] font-medium text-le-muted hover:text-le-ink underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${focusRing}`;
+
+const SlotSkeleton: React.FC<{ count: number }> = ({ count }) => (
+    <div className="grid grid-cols-3 gap-2">
+        {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="h-[38px] rounded-[10px] bg-le-disabled motion-safe:animate-pulse" />
+        ))}
+    </div>
+);
 
 const BookingPicker: React.FC<BookingPickerProps> = ({
     tenantId,
     apiKey,
     conversationId,
-    primaryColor,
+    phone,
     onConfirmed,
     onSkip,
-    onCancel,
+    onMaybeLater,
 }) => {
     const [availability, setAvailability] = useState<BookingAvailability | null>(null);
     const [availabilityLoading, setAvailabilityLoading] = useState<boolean>(!!conversationId);
@@ -63,7 +77,7 @@ const BookingPicker: React.FC<BookingPickerProps> = ({
     const [bookError, setBookError] = useState<string | null>(null);
 
     const slotsRequestRef = useRef(0);
-    const confirmRef = useRef<HTMLDivElement>(null);
+    const confirmRef = useRef<HTMLButtonElement>(null);
 
     // ── Load availability on mount ────────────────────────────────────
     useEffect(() => {
@@ -151,10 +165,10 @@ const BookingPicker: React.FC<BookingPickerProps> = ({
             // Pass the slot ISO string back exactly as received
             const result = await bookingService.bookSlot(tenantId, conversationId, selectedSlot, apiKey);
             onConfirmed(result);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Failed to book slot:', error);
             setBookError(getErrorDetail(error, "Sorry, we couldn't book that time. Please try again."));
-            if (error?.response?.status === 409) {
+            if ((error as ApiError | undefined)?.response?.status === 409) {
                 // Slot was just taken (or a call is already booked) - refresh the times
                 setSelectedSlot(null);
                 if (selectedDate) loadSlots(selectedDate);
@@ -169,108 +183,86 @@ const BookingPicker: React.FC<BookingPickerProps> = ({
     const bookingUnavailable =
         !conversationId || availabilityFailed || (!availabilityLoading && availability !== null && dates.length === 0);
 
-    const primarySoft = withAlpha(primaryColor, 0.08);
+    const tzAbbr = formatTimezoneAbbr(timezone, selectedSlot || slots[0]);
+    const phoneText = phone ? formatPhoneIN(phone) : null;
+    const footerParts = [tzAbbr ? `Times in ${tzAbbr}` : null, phoneText ? `We'll call ${phoneText}` : null].filter(Boolean);
 
     return (
         <div
-            className="w-full max-w-md min-w-0 bg-white rounded-2xl border border-gray-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.08)] p-4 sm:p-5 animate-fade-in-up"
+            className="flex w-full min-w-0 flex-col gap-3 rounded-[18px] border border-white/95 bg-white/80 p-[14px] shadow-le-card motion-safe:animate-fade-in-up"
             role="region"
             aria-label="Book a call"
         >
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-start gap-2.5 min-w-0">
-                    <div
-                        className="mt-0.5 p-1.5 rounded-lg flex-shrink-0"
-                        style={{ backgroundColor: primarySoft, color: primaryColor }}
-                    >
-                        <CalendarDays className="w-4 h-4" aria-hidden="true" />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-gray-900 leading-snug">Pick a time for your call</h3>
-                        {duration ? (
-                            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                                <Clock className="w-3 h-3" aria-hidden="true" />
-                                {duration}-min call
-                            </p>
-                        ) : null}
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    disabled={submitting}
-                    aria-label="Close booking"
-                    className={`p-1.5 -mr-1.5 -mt-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 flex-shrink-0 ${focusRing}`}
-                    style={{ outlineColor: primaryColor }}
-                >
-                    <X className="w-4 h-4" />
-                </button>
+            <div className="flex items-center justify-between gap-3">
+                <h3 className="flex items-center gap-2 text-sm font-medium text-le-ink leading-snug">
+                    <CalendarDays className="w-[18px] h-[18px] text-le-accent flex-shrink-0" strokeWidth={1.6} aria-hidden="true" />
+                    Pick a slot
+                </h3>
+                {duration ? (
+                    <span className="flex items-center gap-1 text-xs text-le-muted flex-shrink-0">
+                        <Clock className="w-3.5 h-3.5" strokeWidth={1.7} aria-hidden="true" />
+                        {duration} min
+                    </span>
+                ) : null}
             </div>
 
             {availabilityLoading ? (
                 /* Loading skeleton */
                 <div aria-busy="true" aria-live="polite">
                     <span className="sr-only">Loading available dates…</span>
-                    <div className="flex gap-2 mb-4 overflow-hidden">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                            <div key={i} className="w-14 h-[68px] rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div key={i} className="h-[50px] rounded-xl bg-le-disabled motion-safe:animate-pulse" />
                         ))}
                     </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <div key={i} className="h-9 rounded-lg bg-gray-100 animate-pulse" />
-                        ))}
-                    </div>
+                    <SlotSkeleton count={6} />
                 </div>
             ) : bookingUnavailable ? (
                 /* No online booking - fall back to the team calling */
-                <div className="text-center py-3">
-                    <p className="text-sm text-gray-600 mb-3">Online booking isn't available right now.</p>
+                <div className="text-center">
+                    <p className="text-sm text-le-muted mb-3">Online booking isn't available right now.</p>
                     <button
                         type="button"
                         onClick={onSkip}
-                        className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-sm font-medium text-white shadow-md hover:shadow-lg hover:opacity-95 transition-all ${focusRing}`}
-                        style={{ backgroundColor: primaryColor, outlineColor: primaryColor }}
+                        className={`w-full h-11 flex items-center justify-center rounded-xl bg-le-btn text-le-on-btn font-medium text-sm hover:brightness-105 transition ${focusRing}`}
                     >
                         Have the team call me
+                    </button>
+                    <button type="button" onClick={onMaybeLater} className={`${textButton} mt-2`}>
+                        Maybe later
                     </button>
                 </div>
             ) : (
                 <>
-                    {/* Date chips - only this row scrolls horizontally */}
+                    {/* Date cells: three per row, the row scrolls sideways when there are more */}
                     <div
-                        className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 pt-1 mb-2 [scrollbar-width:thin]"
+                        className="flex gap-2 overflow-x-auto snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                         role="group"
                         aria-label="Choose a date"
                     >
                         {dates.map((date) => {
                             const parts = plainDateParts(date);
                             const selected = date === selectedDate;
+                            // Past a week, the month says more than a repeated weekday name
+                            const topLine = daysUntil(date, timezone) < 7 ? relativeDayLabel(date, timezone) : parts.month;
                             return (
                                 <button
                                     key={date}
                                     type="button"
                                     onClick={() => handleSelectDate(date)}
                                     aria-pressed={selected}
-                                    aria-label={`${parts.weekday} ${parts.day} ${parts.month}`}
+                                    aria-label={`${topLine}, ${parts.weekday} ${parts.day} ${parts.month}`}
                                     disabled={submitting}
-                                    className={`flex-shrink-0 w-14 py-2 rounded-xl border text-center transition-all disabled:cursor-not-allowed ${focusRing} ${
-                                        selected
-                                            ? 'text-white shadow-md'
-                                            : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                    className={`flex flex-shrink-0 basis-[calc((100%_-_1rem)_/_3)] snap-start flex-col items-center gap-px rounded-xl py-[7px] px-1 text-center ${cellBase} ${insetFocusRing} ${
+                                        selected ? cellSelected : cellIdle
                                     }`}
-                                    style={{
-                                        outlineColor: primaryColor,
-                                        ...(selected ? { backgroundColor: primaryColor, borderColor: primaryColor } : {}),
-                                    }}
                                 >
-                                    <span className={`block text-[10px] font-medium uppercase tracking-wide ${selected ? 'text-white/80' : 'text-gray-400'}`}>
-                                        {parts.weekday}
+                                    <span className={`block max-w-full text-[11px] leading-tight truncate ${selected ? 'text-le-link' : 'text-le-muted'}`}>
+                                        {topLine}
                                     </span>
-                                    <span className="block text-base font-bold leading-tight">{parts.day}</span>
-                                    <span className={`block text-[10px] font-medium ${selected ? 'text-white/80' : 'text-gray-500'}`}>
-                                        {parts.month}
+                                    <span className="block text-sm font-medium leading-[1.3]">
+                                        {parts.weekday} {parts.day}
                                     </span>
                                 </button>
                             );
@@ -280,30 +272,27 @@ const BookingPicker: React.FC<BookingPickerProps> = ({
                     {/* Time slots */}
                     <div className="min-h-[84px]" aria-live="polite" aria-busy={slotsLoading}>
                         {slotsLoading ? (
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <>
                                 <span className="sr-only">Loading available times…</span>
-                                {Array.from({ length: 8 }).map((_, i) => (
-                                    <div key={i} className="h-9 rounded-lg bg-gray-100 animate-pulse" />
-                                ))}
-                            </div>
+                                <SlotSkeleton count={6} />
+                            </>
                         ) : slotsError ? (
-                            <div className="text-center py-4">
-                                <p className="text-xs text-red-600 mb-2">{slotsError}</p>
+                            <div className="text-center py-2">
+                                <p className="text-[13px] text-le-danger mb-1">{slotsError}</p>
                                 <button
                                     type="button"
                                     onClick={() => selectedDate && loadSlots(selectedDate)}
-                                    className={`text-xs font-medium underline underline-offset-2 rounded ${focusRing}`}
-                                    style={{ color: primaryColor, outlineColor: primaryColor }}
+                                    className={`inline-flex items-center min-h-[44px] px-2 rounded-lg text-[13px] font-medium text-le-link underline underline-offset-2 ${focusRing}`}
                                 >
                                     Try again
                                 </button>
                             </div>
                         ) : slots.length === 0 ? (
-                            <p className="text-xs text-gray-500 text-center py-6">
+                            <p className="text-[13px] text-le-muted text-center py-6">
                                 No free times left on this day — try another date.
                             </p>
                         ) : (
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2" role="group" aria-label="Choose a time">
+                            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Choose a time">
                                 {slots.map((slot) => {
                                     const selected = slot === selectedSlot;
                                     return (
@@ -313,17 +302,9 @@ const BookingPicker: React.FC<BookingPickerProps> = ({
                                             onClick={() => handleSelectSlot(slot)}
                                             aria-pressed={selected}
                                             disabled={submitting}
-                                            className={`h-9 px-1 rounded-lg border text-xs font-medium whitespace-nowrap transition-all disabled:cursor-not-allowed ${focusRing} ${
-                                                selected
-                                                    ? 'text-white shadow-md'
-                                                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                            className={`h-[38px] px-1 rounded-[10px] text-[13px] whitespace-nowrap ${cellBase} ${focusRing} ${
+                                                selected ? `${cellSelected} font-medium` : cellIdle
                                             }`}
-                                            style={{
-                                                outlineColor: primaryColor,
-                                                ...(selected
-                                                    ? { backgroundColor: primaryColor, borderColor: primaryColor }
-                                                    : {}),
-                                            }}
                                         >
                                             {formatSlotTime(slot, timezone)}
                                         </button>
@@ -333,56 +314,53 @@ const BookingPicker: React.FC<BookingPickerProps> = ({
                         )}
                     </div>
 
-                    {timezone && (
-                        <p className="mt-3 text-[11px] text-gray-400 flex items-center gap-1">
-                            <Globe className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-                            <span className="truncate">Times shown in {timezone}</span>
-                        </p>
-                    )}
-
                     {bookError && (
-                        <p className="mt-3 text-xs text-red-600" role="alert">
+                        <p className="text-[13px] text-le-danger text-center" role="alert">
                             {bookError}
                         </p>
                     )}
 
                     {/* Confirm */}
-                    {selectedSlot && (
-                        <div ref={confirmRef} className="mt-4">
-                            <button
-                                type="button"
-                                onClick={handleConfirm}
-                                disabled={submitting}
-                                className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-medium text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-80 disabled:cursor-wait disabled:hover:translate-y-0 ${focusRing}`}
-                                style={{ backgroundColor: primaryColor, outlineColor: primaryColor }}
-                            >
-                                {submitting ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                                        Booking…
-                                    </>
-                                ) : (
-                                    <span className="truncate">Confirm {formatBookingDateTime(selectedSlot, timezone)}</span>
-                                )}
-                            </button>
-                        </div>
-                    )}
-                </>
-            )}
-
-            {/* Always-available fallback (the unavailable state already shows it as the main button) */}
-            {!bookingUnavailable && (
-                <div className="mt-4 pt-3 border-t border-gray-100 text-center">
                     <button
+                        ref={confirmRef}
                         type="button"
-                        onClick={onSkip}
-                        disabled={submitting}
-                        className={`text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline rounded transition-colors disabled:opacity-50 ${focusRing}`}
-                        style={{ outlineColor: primaryColor }}
+                        onClick={handleConfirm}
+                        disabled={!selectedSlot || submitting}
+                        className={`w-full h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-le-btn text-le-on-btn font-medium text-sm transition ${
+                            submitting
+                                ? 'opacity-90 cursor-wait'
+                                : selectedSlot
+                                  ? 'hover:brightness-105'
+                                  : 'opacity-50 cursor-not-allowed'
+                        } ${focusRing}`}
                     >
-                        Skip — just have the team call me
+                        {submitting ? (
+                            <>
+                                <Loader2 className="w-4 h-4 motion-safe:animate-spin" aria-hidden="true" />
+                                Booking…
+                            </>
+                        ) : selectedSlot ? (
+                            <span className="truncate">Confirm {formatSlotShort(selectedSlot, timezone)}</span>
+                        ) : (
+                            'Choose a time'
+                        )}
                     </button>
-                </div>
+
+                    {footerParts.length > 0 && (
+                        <p className="text-xs text-le-muted text-center">{footerParts.join(' · ')}</p>
+                    )}
+
+                    {/* Alternatives to picking a slot */}
+                    <div className="pt-1 border-t border-le-field flex flex-wrap items-center justify-center gap-x-3">
+                        <button type="button" onClick={onSkip} disabled={submitting} className={textButton}>
+                            Have the team call me instead
+                        </button>
+                        <span className="text-le-faint" aria-hidden="true">·</span>
+                        <button type="button" onClick={onMaybeLater} disabled={submitting} className={textButton}>
+                            Maybe later
+                        </button>
+                    </div>
+                </>
             )}
         </div>
     );

@@ -1,74 +1,78 @@
 import React from 'react';
-import { ArrowRight, Bot } from 'lucide-react';
-import OrbitingCirclesGlobe from '../ui/orbiting-circles-02';
+import { RobotMascot } from './Mascot';
 
-interface WelcomeScreenProps {
-  onStart: () => void;
-  config: {
-    headline: string;
-    highlightedHeadline: string;
-    subheadline: string;
-    startBtnText: string;
-    features: string[];
-  };
+export interface WelcomeScreenProps {
+  /** Bot's display name, e.g. "A2D" → "Hi, I'm A2D" */
+  botName: string;
+  /** Muted text after the name in the speech bubble, e.g. "your Nuke Pc guide" */
+  tagline?: string;
+  /** Time-of-day greeting, e.g. "Good afternoon," */
+  greeting: string;
+  headline?: string;
 }
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart, config }) => {
+/** Four-point twinkle star used around the mascot. */
+const Sparkle: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className={className} style={style}>
+    <path
+      d="M12 0C12.6 6.5 17.5 11.4 24 12C17.5 12.6 12.6 17.5 12 24C11.4 17.5 6.5 12.6 0 12C6.5 11.4 11.4 6.5 12 0Z"
+      style={{ fill: 'rgb(var(--brand-rgb, 109 91 240) / 0.5)' }}
+    />
+  </svg>
+);
+
+/**
+ * Centre hero of the welcome view: speech bubble, robot mascot and greeting.
+ * The page header and the message input are rendered by ChatPage around it.
+ */
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
+  botName,
+  tagline,
+  greeting,
+  headline = 'How can I help you today?',
+}) => {
   return (
-    <div className="relative flex-1 flex flex-col items-center justify-between min-h-[calc(100vh-90px)] w-full text-center px-4 sm:px-8 pt-4 pb-0 overflow-hidden select-none bg-white">
-      
-      {/* Foreground Hero Content */}
-      <div className="relative z-10 flex flex-col items-center max-w-xl mx-auto my-auto pt-4 sm:pt-6">
-        {/* Live Status Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 bg-white/95 backdrop-blur-xl text-xs font-bold text-slate-800 shadow-sm mb-6 sm:mb-8">
-          <span className="flex items-center gap-1.5">
-            <Bot size={15} className="text-indigo-600" />
-            LeadEngine AI Assistant • Online
-          </span>
+    <div className="flex-1 flex flex-col items-center justify-center w-full px-4 py-6 text-center">
+      {/* Mascot + speech bubble */}
+      <div className="flex flex-col items-center">
+        {/* Bubble starts just left of the robot's centre line and grows to the right, wrapping if the name is long */}
+        <div className="relative z-10 w-0 flex -mb-1.5 self-center">
+          <p
+            className="shrink-0 -ml-5 w-max max-w-[min(20rem,50vw)] bg-white rounded-2xl px-4 py-2.5 shadow-chat-card text-left text-[15px] leading-snug motion-safe:animate-fade-in-up"
+          >
+            <span className="font-medium text-chat-ink">Hi, I&apos;m {botName}</span>
+            {tagline && <span className="text-chat-muted"> · {tagline}</span>}
+          </p>
         </div>
 
-        {/* Headline */}
-        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-slate-900 leading-[1.1] mb-3 sm:mb-4">
-          {config.headline}{' '}
-          <span className="text-indigo-600 block sm:inline">
-            {config.highlightedHeadline}
-          </span>
+        <div className="relative">
+          {/* Soft brand glow behind the robot */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[360px] sm:h-[360px] rounded-full"
+            style={{
+              background:
+                'radial-gradient(circle, rgb(var(--brand-rgb, 109 91 240) / 0.16) 0%, rgb(var(--brand-rgb, 109 91 240) / 0.06) 42%, transparent 70%)',
+            }}
+          />
+
+          <Sparkle className="absolute -left-6 top-[6%] w-3.5 h-3.5 sm:w-4 sm:h-4 motion-safe:animate-twinkle" />
+          <Sparkle
+            className="absolute -right-7 top-[60%] w-3 h-3 sm:w-3.5 sm:h-3.5 motion-safe:animate-twinkle"
+            style={{ animationDelay: '1.2s' }}
+          />
+
+          <RobotMascot size={172} className="relative sm:w-[208px] sm:h-[238px]" />
+        </div>
+      </div>
+
+      {/* Greeting */}
+      <div className="mt-8 sm:mt-10">
+        <p className="text-[19px] sm:text-[22px] text-chat-muted leading-snug">{greeting}</p>
+        <h1 className="mt-1 text-[26px] sm:text-[32px] font-semibold tracking-tight text-chat-ink leading-tight">
+          {headline}
         </h1>
-
-        {/* Subheadline */}
-        <p className="text-slate-600 text-sm sm:text-lg font-medium max-w-md mx-auto leading-relaxed mb-6 sm:mb-8">
-          {config.subheadline}
-        </p>
-
-        {/* Action Button */}
-        <button
-          onClick={onStart}
-          className="group relative inline-flex items-center justify-center gap-3 bg-slate-900 text-white font-extrabold text-sm sm:text-base px-8 sm:px-9 py-3.5 sm:py-4 rounded-full shadow-xl hover:bg-indigo-600 hover:scale-[1.04] active:scale-[0.98] transition-all duration-300 pointer-events-auto"
-        >
-          <span>{config.startBtnText}</span>
-          <div className="p-1 rounded-full bg-white/20 group-hover:bg-white/30 transition-colors">
-            <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-1 transition-transform" />
-          </div>
-        </button>
-
-        {/* Feature Pills */}
-        <div className="flex items-center justify-center gap-2 sm:gap-4 text-xs font-bold text-slate-700 flex-wrap max-w-xl mt-6 sm:mt-10">
-          {config.features.map((feature, index) => (
-            <div key={index} className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-slate-200 bg-white/90 backdrop-blur-xl shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-              <span>{feature}</span>
-            </div>
-          ))}
-        </div>
       </div>
-
-      {/* Bottom Orbiting Circles Globe Animation (Anchored at very bottom of screen) */}
-      <div className="absolute bottom-0 inset-x-0 flex justify-center pointer-events-none z-0 opacity-95">
-        <OrbitingCirclesGlobe />
-      </div>
-
-      {/* Ambient Soft Glow at bottom */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/4 w-[580px] h-[580px] bg-indigo-500/10 rounded-full blur-[130px] pointer-events-none z-0" />
     </div>
   );
 };

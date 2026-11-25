@@ -2,7 +2,8 @@ import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'ax
 import { authService } from './authService';
 
 // Default to localhost:8000 if not specified
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+export const API_BASE_URL: string = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const BASE_URL = API_BASE_URL;
 
 export const api = axios.create({
     baseURL: BASE_URL,

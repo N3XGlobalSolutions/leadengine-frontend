@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TenantConfig } from '../types/config';
+import { DEFAULT_PRIMARY } from '../utils/theme/generateTheme';
 
 export const useTenantConfig = (tenantId?: string) => {
     const [config, setConfig] = useState<TenantConfig | null>(null);
@@ -35,10 +36,11 @@ export const useTenantConfig = (tenantId?: string) => {
                     botName: branding.bot_name || 'AI Assistant',
                     botDisplayName: branding.bot_name || 'AI Assistant',
                     botAvatar: branding.avatar_url,
+                    privacyPolicyUrl: branding.privacy_policy_url || undefined,
 
                     colors: {
-                        primary: branding.primary_color || '#4F46E5',
-                        secondary: branding.secondary_color || '#6366F1'
+                        primary: branding.primary_color || DEFAULT_PRIMARY,
+                        secondary: branding.secondary_color || '' // optional: generateTheme derives one
                     },
 
                     welcome: {
@@ -55,8 +57,9 @@ export const useTenantConfig = (tenantId?: string) => {
                             id: q.id,
                             label: q.question,
                             instruction: q.question,
-                            collects: [], // Backend doesn't explicitly send extraction fields yet
-                            options: q.quick_replies?.map((qr: any) => qr.text) || []
+                            collects: q.collects || [],
+                            options: q.quick_replies?.map((qr: any) => qr.text) || [],
+                            stepLabel: q.label || undefined
                         })) || []
                     },
 

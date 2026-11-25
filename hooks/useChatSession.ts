@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Message, MessageRole, SummaryData } from '../types';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Message, MessageRole, SummaryData, type ChatProductCard, type ChatResponse } from '../types';
 import { chatService } from '../services/chatService';
 import type { BookSlotResponse } from '../services/bookingService';
 import { formatBookingDateTime } from '../utils/bookingFormat';
+import { formatPhoneIN, normalizePhoneIN } from '../utils/phone';
 
 import { TenantConfig } from '../types/config';
 import { getCookie, setCookie } from '../utils/cookies';
@@ -13,7 +14,31 @@ const generateSessionId = () => {
 
 // Storage keys
 const getStorageKey = (sessionId: string, key: string) => `qbot_${sessionId}_${key}`;
+const getSessionCookieName = (clientSlug: string) => `qbot_session_${clientSlug}`;
 const SESSION_EXPIRY_HOURS = 24;
+
+interface QuestionProgress {
+    current: number;
+    total: number;
+    currentStepId: string | null;     // backend current_state of the latest reply
+    estimatedProgress: number | null; // S3 Max: 0.0 - 1.0
+}
+
+/** What the progress row above the messages shows. */
+export interface ChatProgress {
+    mode: 'steps' | 'estimate'; // steps: "Step 2 of 5" + segments; estimate (S3 Max): single bar
+    label: string;              // "About you", "Budget", "Book a call"
+    current: number;            // 1-based step (steps mode; 0 in estimate mode)
+    total: number;              // number of steps (steps mode; 0 in estimate mode)
+    percent: number;            // 0-100
+    isFinal: boolean;           // the booking step: show "Final step" instead of a percentage
+}
+
+/** Visitor's name and phone, from the contact form or the backend's lead summary. */
+export interface ContactDetails {
+    name: string | null;
+    phone: string | null; // 10 digits, no country code
+}
 
 interface PersistedChatState {
     messages: Message[];
@@ -22,6 +47,8 @@ interface PersistedChatState {
     leadData: SummaryData | null;
     createdAt: number; // Timestamp when session was created
     conversationId: string | null; // Backend Conversation ID
+    contact?: ContactDetails;
+    questionProgress?: QuestionProgress;
 }
 
 const saveChatState = (sessionId: string, state: PersistedChatState) => {
@@ -79,9 +106,39 @@ const clearChatState = (sessionId: string) => {
     }
 };
 
+const EMPTY_CONTACT: ContactDetails = { name: null, phone: null };
+
+/** Backend product cards (snake_case) → message cards; undefined when there are none. */
+const toProductCards = (products: ChatResponse['products']): ChatProductCard[] | undefined => {
+    const cards = (products || [])
+        .filter((p) => p && typeof p.title === 'string' && p.title.trim() && typeof p.product_id === 'string')
+        .map((p) => ({
+            productId: p.product_id,
+            title: p.title.trim(),
+            description: (p.description || '').trim(),
+            imageId: p.image_id || null,
+        }));
+    return cards.length > 0 ? cards : undefined;
+};
+
+/** Backend question labels default to "Question"/"Q1"; those make poor progress labels. */
+const isGenericStepLabel = (label?: string) =>
+    !label || /^(question|q)\s*\d*$/i.test(label.trim()) || label.trim().length > 28;
+
+/** Case-insensitive summary lookup; values may be plain strings or { label, answer } objects. */
+const pickSummaryValue = (data: SummaryData | null, key: string): string | null => {
+    if (!data) return null;
+    const match = Object.keys(data).find((k) => k.toLowerCase() === key);
+    if (!match) return null;
+    const value = data[match];
+    if (typeof value === 'string') return value.trim() || null;
+    const answer = value && typeof value === 'object' ? (value as { answer?: unknown }).answer : undefined;
+    return typeof answer === 'string' ? answer.trim() || null : null;
+};
+
 export const useChatSession = (config: TenantConfig, clientSlug: string) => {
-    const [sessionId] = useState(() => {
-        const cookieName = `qbot_session_${clientSlug}`;
+    const [sessionId, setSessionId] = useState(() => {
+        const cookieName = getSessionCookieName(clientSlug);
         const existingSession = getCookie(cookieName);
         if (existingSession) {
             console.log('Resuming existing session:', existingSession);
@@ -95,32 +152,29 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     // Load persisted state on init
     const [persistedState] = useState(() => loadChatState(sessionId));
 
-    const [messages, setMessages] = useState<Message[]>(persistedState?.messages || []);
-    const [hasStarted, setHasStarted] = useState(persistedState?.hasStarted || false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [leadData, setLeadData] = useState<SummaryData | null>(persistedState?.leadData || null);
-    const [quickReplies, setQuickReplies] = useState<string[]>([]);
-    const [isChatEnded, setIsChatEnded] = useState(persistedState?.isChatEnded || false);
-    const [systemError, setSystemError] = useState<string | null>(null);
-    const [conversationId, setConversationId] = useState<string | null>(persistedState?.conversationId || null);
-    // Inline call-booking picker (opened by "Yes, schedule a call"). Not persisted.
-    const [isBookingOpen, setIsBookingOpen] = useState(false);
-
-    // ⭐ NEW: Question progress tracking
-    const [questionProgress, setQuestionProgress] = useState<{
-        current: number;
-        total: number;
-        currentStepId: string | null;
-        estimatedProgress: number | null; // S3 Max: 0.0 - 1.0
-    }>({
+    const initialQuestionProgress = (): QuestionProgress => ({
         current: 0,
-        total: 0,
+        total: config?.leadQualification?.questions?.length || 0,
         currentStepId: null,
         estimatedProgress: null,
     });
 
+    const [messages, setMessages] = useState<Message[]>(persistedState?.messages || []);
+    const [hasStarted, setHasStarted] = useState(persistedState?.hasStarted || false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [leadData, setLeadData] = useState<SummaryData | null>(persistedState?.leadData || null);
+    const [isChatEnded, setIsChatEnded] = useState(persistedState?.isChatEnded || false);
+    const [systemError, setSystemError] = useState<string | null>(null);
+    const [conversationId, setConversationId] = useState<string | null>(persistedState?.conversationId || null);
+    const [contact, setContact] = useState<ContactDetails>(persistedState?.contact || EMPTY_CONTACT);
+    // Set once the visitor books a call slot; the page then shows the confirmation screen. Not persisted.
+    const [booking, setBooking] = useState<BookSlotResponse | null>(null);
+    const [questionProgress, setQuestionProgress] = useState<QuestionProgress>(
+        () => persistedState?.questionProgress || initialQuestionProgress()
+    );
+
     // Track when the session was created (for 24h expiry)
-    const [sessionCreatedAt] = useState(() => persistedState?.createdAt || Date.now());
+    const [sessionCreatedAt, setSessionCreatedAt] = useState(() => persistedState?.createdAt || Date.now());
 
     // Save state whenever it changes
     useEffect(() => {
@@ -131,17 +185,19 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 isChatEnded,
                 leadData,
                 createdAt: sessionCreatedAt,
-                conversationId
+                conversationId,
+                contact,
+                questionProgress,
             });
         }
-    }, [messages, hasStarted, isChatEnded, leadData, sessionId, sessionCreatedAt, conversationId]);
+    }, [messages, hasStarted, isChatEnded, leadData, sessionId, sessionCreatedAt, conversationId, contact, questionProgress]);
 
-    // ⭐ NEW: Initialize total questions from config
+    // Keep the total in sync with the loaded config
     useEffect(() => {
         if (config?.leadQualification?.questions) {
             setQuestionProgress(prev => ({
                 ...prev,
-                total: config.leadQualification.questions.length
+                total: prev.total || config.leadQualification.questions.length
             }));
         }
     }, [config]);
@@ -162,7 +218,7 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
     );
 
     const determineQuickReplies = (text: string, currentStepId: string | null): string[] => {
-        // ⭐ NEW: Try to match based on current step first (context-aware)
+        // Try to match based on current step first (context-aware)
         if (currentStepId && config.leadQualification?.questions) {
             const currentStep = config.leadQualification.questions.find(
                 q => q.id === currentStepId
@@ -204,31 +260,28 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
         return [];
     };
 
-    const handleBotResponse = async (userMessageText: string) => {
+    const handleBotResponse = async (userMessageText: string, opts?: { fresh?: boolean }) => {
         if (systemError) return;
 
+        // `fresh` = first message of a brand-new conversation (state from this render is stale)
+        const convId = opts?.fresh ? null : conversationId;
+
         setIsLoading(true);
-        setQuickReplies([]);
 
         try {
-            // Call Chat Service
             const response = await chatService.sendMessage({
                 query: userMessageText,
-                tenant_id: clientSlug, // clientSlug is used as tenant_id usually, or we should pass actual ID if different
-                conversation_id: conversationId,
+                tenant_id: clientSlug,
+                conversation_id: convId,
                 user_identifier: sessionId // Using sessionId as a temporary user identifier
-            }, config.apiKey); // Pass API Key if available in config
+            }, config.apiKey);
 
             setIsLoading(false);
 
             // Update Conversation ID if new
-            if (response.conversation_id && !conversationId) {
+            if (response.conversation_id && !convId) {
                 setConversationId(response.conversation_id);
             }
-
-            // ============================================================
-            // NEW: Use explicit backend state - NO MORE JSON PARSING!
-            // ============================================================
 
             let botText = response.answer;
 
@@ -236,7 +289,6 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
             botText = botText.replace(/\[STEP:\w+\]/g, '').trim();
 
             // S2: Strip conversational_transition from answer to avoid duplication
-            // (backend merges it into answer, but we show it separately as a thinking effect)
             const transition = response.conversational_transition || undefined;
             if (transition && botText.startsWith(transition)) {
                 botText = botText.slice(transition.length).trim();
@@ -247,7 +299,7 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
 
             // TRUST ONLY response.show_actions from the backend.
             // DO NOT fallback to current_state === 'completed' — that would cause
-            // every post-completion message (Maybe Later reply, etc.) to show buttons again.
+            // every post-completion message (Maybe Later reply, etc.) to show the booking card again.
             const isFirstCompletion = response.show_actions === true;
             // 'chat_ended' is sent by S3 Mapping and S3 Max for all terminal states
             // 'lead_captured' is sent by S1/S2/S3 shared flow
@@ -255,15 +307,15 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                 response.suggested_actions?.includes('lead_captured') ||
                 response.suggested_actions?.includes('chat_ended');
 
-            // showActions: show buttons ONLY when backend explicitly says show_actions=true
-            // (i.e., the very first completion message, NOT on every reply after that)
-            // S3_MAX: agentic flow doesn't handle button responses — suppress action buttons entirely
+            // S3_MAX: agentic flow doesn't handle button responses — suppress the booking card entirely
             const isS3Max = config.plan === 'S3_MAX';
             const shouldShowActions = isFirstCompletion && !isSoftDQ && !isS3Max;
 
-            // isSummary: show lead summary card ONLY on the first completion message
             const isSummary = response.summary_data != null && isFirstCompletion;
             const summaryData = response.summary_data || null;
+            if (summaryData && isFirstCompletion) {
+                setLeadData(summaryData);
+            }
 
             // Update progress from backend
             if (response.estimated_progress !== undefined && response.estimated_progress !== null) {
@@ -282,37 +334,36 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                     total: response.total_steps || prev.total,
                     currentStepId: response.current_state || prev.currentStepId
                 }));
+            } else if (response.current_state) {
+                setQuestionProgress(prev => ({ ...prev, currentStepId: response.current_state! }));
             }
 
-            // Add bot message with explicit flags from backend
+            // Quick replies from backend if provided, otherwise keyword matching
+            const replies = response.quick_replies && response.quick_replies.length > 0
+                ? response.quick_replies
+                : determineQuickReplies(response.answer, response.current_state || '');
+
             addMessage(MessageRole.Bot, botText, {
                 showActions: shouldShowActions,
                 isSummary: isSummary,
                 summaryData: summaryData,
                 conversationalTransition: transition,
                 isSoftDQ: isSoftDQ,
+                products: toProductCards(response.products),
+                currentState: response.current_state || undefined,
+                quickReplies: replies.length > 0 ? replies : undefined,
             });
 
             // End chat input ONLY on first completion or terminal actions (schedule/later)
             if (isFirstCompletion || isTerminalAction) {
-                console.log('✅ Lead captured! Ending chat input.');
                 setIsChatEnded(true);
-            }
-
-            // Use quick replies from backend if provided, otherwise fall back to keyword matching
-            if (response.quick_replies && response.quick_replies.length > 0) {
-                setQuickReplies(response.quick_replies);
-            } else {
-                // Fallback: Determine quick replies based on active step or keywords
-                const replies = determineQuickReplies(response.answer, response.current_state || '');
-                setQuickReplies(replies);
             }
 
         } catch (error: any) {
             console.error("Chat Error:", error);
 
             // Handle 404 (Conversation Not Found) - likely stale session ID
-            if (error.response?.status === 404 && conversationId) {
+            if (error.response?.status === 404 && convId) {
                 console.warn("Conversation not found (404), starting new session...");
                 setConversationId(null);
 
@@ -330,9 +381,14 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
                         setConversationId(retryResponse.conversation_id);
                     }
 
-                    addMessage(MessageRole.Bot, retryResponse.answer);
-                    const replies = determineQuickReplies(retryResponse.answer, questionProgress.currentStepId);
-                    setQuickReplies(replies);
+                    const replies = retryResponse.quick_replies && retryResponse.quick_replies.length > 0
+                        ? retryResponse.quick_replies
+                        : determineQuickReplies(retryResponse.answer, questionProgress.currentStepId);
+                    addMessage(MessageRole.Bot, retryResponse.answer, {
+                        products: toProductCards(retryResponse.products),
+                        currentState: retryResponse.current_state || undefined,
+                        quickReplies: replies.length > 0 ? replies : undefined,
+                    });
                     return;
 
                 } catch (retryError) {
@@ -344,79 +400,61 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
             }
 
             setIsLoading(false);
-            if (!conversationId || error.response?.status !== 404) {
+            if (!convId || error.response?.status !== 404) {
                 addMessage(MessageRole.Bot, "I'm having trouble connecting right now. Please try again later.");
             }
         }
     };
 
-    const handleStart = async () => {
-        if (systemError) return;
-        setHasStarted(true);
-        const startMsg = `Hello! I'm interested.`;
-        // Don't add user start message visually if we want bot to welcome first, 
-        // but usually handleStart implies user clicked "Start Chat" which sends the message.
-        // Actually, previous implementation relied on bot response WITHOUT user message shown for "Hello".
-        // Let's keep it consistent: send "Hello" implicitly to trigger bot welcome flow?
-        // Or if Welcome Screen is just a UI start, we send the first message now.
-        // Previous code: await handleBotResponse(startMsg); (without adding user message to UI?)
-        // Let's check previous impl logic:
-        // if (messages.length === 0 && userMessageText.includes('Hello!')) ...
-
-        // We will just send it as a user message to backend but maybe hide it? 
-        // Or just show it. Showing it is clearer.
-        // But if we want the BOT to speak first (after welcome screen), we send a hidden message.
-
-        // We'll mimic previous behavior: Send message to backend to get first bot response.
-        // We won't add it to UI if we want to mimic "System Init". 
-        // But for simplicity, let's treat it as user intent.
-
-        // Actually, let's just call handleBotResponse with the start text. 
-        // We WON'T add it to the UI messages list to keep the "Welcome" feel clean.
-        await handleBotResponse(startMsg);
-    };
-
+    /** Visitor typed a message (welcome screen or chat input). */
     const handleSendMessage = async (text: string) => {
-        if (systemError) return;
-        setQuickReplies([]);
+        if (systemError || !text.trim()) return;
         if (!hasStarted) {
             setHasStarted(true);
         }
-        addMessage(MessageRole.User, text);
-        await handleBotResponse(text);
+        addMessage(MessageRole.User, text.trim());
+        await handleBotResponse(text.trim());
     };
 
-    // "Yes, schedule a call" opens the inline date/time picker instead of messaging the bot
-    const handleScheduleCall = () => {
-        setQuickReplies([]);
-        setIsBookingOpen(true);
+    /** Visitor tapped a chip under a bot message: the chip shows as checked instead of a user bubble. */
+    const handleQuickReply = async (messageId: string, option: string) => {
+        if (systemError || isLoading) return;
+        setMessages((prev) =>
+            prev.map((msg) => (msg.id === messageId ? { ...msg, selectedReply: option } : msg))
+        );
+        await handleBotResponse(option);
     };
 
-    // Picker booked a slot: show the visitor's choice + the backend's confirmation text
+    /**
+     * Contact form card. The backend parses "Name, 9876543210" (name before a 10-digit Indian
+     * mobile), so that is what is sent; the bubble shows a friendlier "Name · +91 98765 43210".
+     */
+    const handleSubmitContact = async (name: string, phone: string) => {
+        if (systemError || isLoading) return;
+        const cleanName = name.trim().replace(/\s+/g, ' ');
+        const digits = normalizePhoneIN(phone);
+        setContact({ name: cleanName, phone: digits });
+        addMessage(MessageRole.User, `${cleanName} · ${formatPhoneIN(digits)}`);
+        await handleBotResponse(`${cleanName}, ${digits}`);
+    };
+
+    // Picker booked a slot: record the choice + the backend's confirmation text, then show the success screen
     const handleBookingConfirmed = (result: BookSlotResponse) => {
-        setIsBookingOpen(false);
         const when = formatBookingDateTime(result.booking.start_time, result.booking.timezone);
-        addMessage(MessageRole.User, `📅 Book a call on ${when}`);
+        addMessage(MessageRole.User, `Book a call on ${when}`);
         addMessage(MessageRole.Bot, result.message);
+        setBooking(result);
         setIsChatEnded(true);
     };
 
     // Fallback (no slots / visitor prefers a callback): the original "team will call you" flow
     const handleBookingSkip = async () => {
-        setIsBookingOpen(false);
-        setQuickReplies([]);
-        addMessage(MessageRole.User, 'Yes, schedule a call.');
+        addMessage(MessageRole.User, 'Please have the team call me.');
         await handleBotResponse('Yes, schedule a call');
         setIsChatEnded(true);
     };
 
-    // Close the picker; the Yes / Maybe later buttons show again
-    const handleBookingCancel = () => {
-        setIsBookingOpen(false);
-    };
-
     const handleMaybeLater = async () => {
-        setQuickReplies([]);
         addMessage(MessageRole.User, 'Maybe later.');
         await handleBotResponse('Maybe later');
         setIsChatEnded(true);
@@ -424,42 +462,123 @@ export const useChatSession = (config: TenantConfig, clientSlug: string) => {
 
     const handleFeedback = (messageId: string, feedbackType: 'up' | 'down') => {
         setMessages((prev) =>
-            prev.map((msg) => (msg.id === messageId ? { ...msg, feedback: feedbackType } : msg))
+            prev.map((msg) =>
+                msg.id === messageId
+                    ? { ...msg, feedback: msg.feedback === feedbackType ? undefined : feedbackType }
+                    : msg
+            )
         );
-        // We could send feedback to backend if API existed
+        // No feedback API on the backend yet - kept locally only
     };
 
-    const handleNewChat = () => {
-        clearChatState(sessionId);
+    const resetConversation = () => {
         setMessages([]);
         setConversationId(null);
         setHasStarted(false);
         setIsChatEnded(false);
+        setIsLoading(false);
         setLeadData(null);
-        setQuickReplies([]);
-        setIsBookingOpen(false);
+        setContact(EMPTY_CONTACT);
+        setBooking(null);
+        setSystemError(null);
+        setQuestionProgress(initialQuestionProgress());
+        setSessionCreatedAt(Date.now());
     };
+
+    /** Menu "New chat" / "Start a new chat": fresh conversation, same visitor session. */
+    const handleNewChat = () => {
+        clearChatState(sessionId);
+        resetConversation();
+    };
+
+    /** Send `text` as the first message of a brand-new conversation (welcome screen after a finished chat). */
+    const handleStartNewChatWith = async (text: string) => {
+        if (!text.trim()) return;
+        clearChatState(sessionId);
+        resetConversation();
+        setHasStarted(true);
+        addMessage(MessageRole.User, text.trim());
+        await handleBotResponse(text.trim(), { fresh: true });
+    };
+
+    /** Menu "Clear chat": wipe the stored transcript and start over as a brand-new visitor session. */
+    const handleClearChat = () => {
+        clearChatState(sessionId);
+        const newSession = generateSessionId();
+        setCookie(getSessionCookieName(clientSlug), newSession, 7);
+        setSessionId(newSession);
+        resetConversation();
+    };
+
+    const lastBotMessage = useMemo(
+        () => [...messages].reverse().find((m) => m.role === MessageRole.Bot) || null,
+        [messages]
+    );
+
+    const progress = useMemo<ChatProgress | null>(() => {
+        if (!hasStarted) return null;
+        const { current, total, estimatedProgress, currentStepId } = questionProgress;
+
+        // Booking step: the completion message is showing the slot picker
+        if (lastBotMessage?.showActions && !booking) {
+            const steps = Math.max(total, 1);
+            return { mode: 'steps', label: 'Book a call', current: steps, total: steps, percent: 100, isFinal: true };
+        }
+        if (isChatEnded) return null;
+
+        if (estimatedProgress !== null) {
+            if (estimatedProgress <= 0) return null;
+            return {
+                mode: 'estimate',
+                label: 'Your needs',
+                current: 0,
+                total: 0,
+                percent: Math.min(100, Math.round(estimatedProgress * 100)),
+                isFinal: false,
+            };
+        }
+
+        if (total <= 0 || current <= 0) return null;
+        const step = Math.min(current, total);
+        let label = 'Your needs';
+        if (currentStepId === 'contact') {
+            label = 'About you';
+        } else {
+            const stepLabel = config.leadQualification?.questions?.[step - 1]?.stepLabel;
+            if (stepLabel && !isGenericStepLabel(stepLabel)) label = stepLabel.trim();
+        }
+        return { mode: 'steps', label, current: step, total, percent: Math.round((step / total) * 100), isFinal: false };
+    }, [hasStarted, questionProgress, lastBotMessage, booking, isChatEnded, config]);
+
+    const contactDetails = useMemo<ContactDetails>(() => ({
+        name: contact.name || pickSummaryValue(leadData, 'name'),
+        phone: contact.phone || (() => {
+            const fromSummary = pickSummaryValue(leadData, 'phone');
+            return fromSummary ? normalizePhoneIN(fromSummary) : null;
+        })(),
+    }), [contact, leadData]);
 
     return {
         messages,
         hasStarted,
         isLoading,
-        leadData,
-        quickReplies,
         isChatEnded,
         systemError,
         sessionId,
-        questionProgress,  // ⭐ NEW: Export progress for display
         conversationId,
-        isBookingOpen,
-        handleStart,
+        progress,
+        booking,
+        contact: contactDetails,
+        summaryData: leadData,
         handleSendMessage,
-        handleScheduleCall,
-        handleMaybeLater,
+        handleQuickReply,
+        handleSubmitContact,
         handleBookingConfirmed,
         handleBookingSkip,
-        handleBookingCancel,
+        handleMaybeLater,
         handleFeedback,
         handleNewChat,
+        handleStartNewChatWith,
+        handleClearChat,
     };
 };

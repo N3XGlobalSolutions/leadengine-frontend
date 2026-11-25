@@ -1,7 +1,45 @@
 import { Client, DashboardStats, OnboardingData, CreateClientInput, TenantDocument, DashboardMetrics, DailyMetric, DashboardLead, SystemHealth, PlatformStats, AuditLog } from '@/types/admin';
 import { api } from './api';
-import { TenantConfig } from '@/types/config';
+import { TenantConfig, ChatProduct, MAX_CHAT_PRODUCTS, CHAT_PRODUCT_TITLE_MAX, CHAT_PRODUCT_DESCRIPTION_MAX } from '@/types/config';
 import { chatService } from './chatService';
+
+// --- Chat products: backend `chat_products` (snake_case) <-> frontend `chatProducts` (camelCase) ---
+interface BackendChatProduct {
+    product_id: string;
+    title: string;
+    description: string;
+    image_id: string | null;
+}
+
+const mapChatProductsFromBackend = (raw: unknown): ChatProduct[] => {
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object')
+        .map((p) => ({
+            productId: String(p.product_id ?? ''),
+            title: typeof p.title === 'string' ? p.title : '',
+            description: typeof p.description === 'string' ? p.description : '',
+            imageId: typeof p.image_id === 'string' && p.image_id ? p.image_id : null,
+        }))
+        .filter((p) => p.productId);
+};
+
+/**
+ * Returns undefined when the config never loaded products (key omitted -> backend keeps what it has).
+ * Products without a title are skipped: the backend requires 1–80 chars and would reject the whole config.
+ */
+const mapChatProductsToBackend = (products: ChatProduct[] | undefined): BackendChatProduct[] | undefined => {
+    if (!Array.isArray(products)) return undefined;
+    return products
+        .filter((p) => p && p.productId && (p.title || '').trim())
+        .slice(0, MAX_CHAT_PRODUCTS)
+        .map((p) => ({
+            product_id: p.productId,
+            title: p.title.trim().slice(0, CHAT_PRODUCT_TITLE_MAX),
+            description: (p.description || '').trim().slice(0, CHAT_PRODUCT_DESCRIPTION_MAX),
+            image_id: p.imageId || null,
+        }));
+};
 
 // --- MOCK STATS (Backend doesn't have stats yet) ---
 const MOCK_STATS: DashboardStats = {
@@ -138,6 +176,7 @@ const mapTenantToClient = (tenant: any): Client => {
         whatsapp_enabled: backendConfig.whatsapp_enabled ?? false,
         whatsapp_access_token: backendConfig.whatsapp_access_token || '',
         whatsapp_phone_number_id: backendConfig.whatsapp_phone_number_id || '',
+        chatProducts: mapChatProductsFromBackend(backendConfig.chat_products),
     };
     return {
         id: tenant.tenant_id, name: tenant.name, slug: backendConfig.url_slug || tenant.tenant_id, status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), //Use backend status if available 
@@ -459,6 +498,7 @@ export const updateClient = async (client: Client): Promise<Client> => {
         whatsapp_enabled: client.config?.whatsapp_enabled,
         whatsapp_access_token: client.config?.whatsapp_access_token,
         whatsapp_phone_number_id: client.config?.whatsapp_phone_number_id,
+        chat_products: mapChatProductsToBackend(client.config?.chatProducts),
     };
 
     const payload = {
@@ -534,6 +574,7 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
             whatsapp_enabled: clientData.config.whatsapp_enabled,
             whatsapp_access_token: clientData.config.whatsapp_access_token,
             whatsapp_phone_number_id: clientData.config.whatsapp_phone_number_id,
+            chat_products: mapChatProductsToBackend(clientData.config.chatProducts),
         }
     };
 

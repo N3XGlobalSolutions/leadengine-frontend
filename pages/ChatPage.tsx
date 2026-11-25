@@ -1,360 +1,325 @@
-import React, { useMemo, useEffect, useRef } from 'react';
-import { useParams, Navigate, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { ArrowRight, Loader2, RotateCw, Trash2 } from 'lucide-react';
 import { useTenantConfig } from '../hooks/useTenantConfig';
 import { useChatSession } from '../hooks/useChatSession';
-import { MessageCircle, Send, Bot } from 'lucide-react';
+import { MessageRole } from '../types';
+import type { TenantConfig } from '../types/config';
+import { getInitials } from '../utils/chatTheme';
+import { getThemeStyle } from '../utils/theme/cssVars';
+import ChatHeader, { type ChatMenuItem } from '../components/chat/ChatHeader';
+import StepProgress from '../components/chat/StepProgress';
 import WelcomeScreen from '../components/chat/WelcomeScreen';
 import ChatBubble from '../components/chat/ChatBubble';
-import ChatInput from '../components/chat/ChatInput';
-import ActionButtons from '../components/chat/ActionButtons';
-import BookingPicker from '../components/chat/BookingPicker';
 import QuickReplies from '../components/chat/QuickReplies';
+import ContactFormCard from '../components/chat/ContactFormCard';
+import ProductCards from '../components/chat/ProductCards';
+import TypingIndicator from '../components/chat/TypingIndicator';
+import ChatInput from '../components/chat/ChatInput';
+import BookingPicker from '../components/chat/BookingPicker';
+import BookingSuccess from '../components/chat/BookingSuccess';
 import CookieConsent from '../components/chat/CookieConsent';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
-// Utility to check if a color is a hex code
-const isHexColor = (color: string) => /^#([0-9A-F]{3}){1,2}$/i.test(color);
+// 'transcript' = the conversation, opened with Back from the booking confirmation
+type ChatView = 'welcome' | 'chat' | 'transcript';
 
-// Utility to darken a hex color (for gradients/hover states)
-const adjustColor = (hex: string, percent: number): string => {
-    if (!isHexColor(hex)) return hex;
-    const num = parseInt(hex.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = Math.max(0, Math.min(255, (num >> 16) + amt));
-    const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
-    const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
-    return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
+/** Visitor's local time of day. */
+const getGreeting = (date = new Date()): string => {
+    const hour = date.getHours();
+    if (hour < 12) return 'Good morning,';
+    if (hour < 17) return 'Good afternoon,';
+    return 'Good evening,';
 };
 
-// Create a lighter version of a color for backgrounds
-const lightenColor = (hex: string): string => adjustColor(hex, 80);
-
-// Generate theme styles from primary color (either hex or named)
-const getThemeStyles = (primaryColor: string, secondaryColor: string) => {
-    const isHex = isHexColor(primaryColor);
-
-        if (isHex) {
-        // We will tone it down aggressively for the glass outer background
-        return {
-            bgGradientStyle: {
-                background: `radial-gradient(circle at top left, ${lightenColor(primaryColor)}33, transparent 40%),
-                             radial-gradient(circle at bottom right, ${primaryColor}22, transparent 40%),
-                             #f8fafc`
-            },
-            iconBgStyle: { backgroundColor: primaryColor },
-            loadingDotStyle: { backgroundColor: primaryColor },
-            accentStyle: { color: primaryColor },
-            progressBarStyle: {
-                background: `linear-gradient(to right, ${primaryColor}, ${secondaryColor || adjustColor(primaryColor, -20)})`
-            },
-            // Fallback classes (won't be used when isHex is true)
-            bgGradient: '',
-            iconBg: '',
-            loadingDot: '',
-            accent: '',
-            isCustom: true
-        };
-    }
-
-    // Fallback to named color classes
-    const colorMap: Record<string, { bgGradient: string; iconBg: string; loadingDot: string; accent: string }> = {
-        blue: {
-            bgGradient: 'from-blue-50/80 via-slate-50 to-gray-50',
-            iconBg: 'bg-blue-600',
-            loadingDot: 'bg-blue-500',
-            accent: 'text-blue-600'
-        },
-        indigo: {
-            bgGradient: 'from-indigo-50/80 via-slate-50 to-gray-50',
-            iconBg: 'bg-indigo-600',
-            loadingDot: 'bg-indigo-500',
-            accent: 'text-indigo-600'
-        },
-        green: {
-            bgGradient: 'from-green-50/80 via-slate-50 to-gray-50',
-            iconBg: 'bg-green-600',
-            loadingDot: 'bg-green-500',
-            accent: 'text-green-600'
-        },
-        purple: {
-            bgGradient: 'from-purple-50/80 via-slate-50 to-gray-50',
-            iconBg: 'bg-purple-600',
-            loadingDot: 'bg-purple-500',
-            accent: 'text-purple-600'
-        }
-    };
-
-    const theme = colorMap[primaryColor] || colorMap['indigo'];
-    return {
-        ...theme,
-        bgGradientStyle: {},
-        iconBgStyle: {},
-        loadingDotStyle: {},
-        accentStyle: {},
-        progressBarStyle: {},
-        isCustom: false
-    };
+const firstNameOf = (name?: string | null): string | null => {
+    const first = (name || '').trim().split(/\s+/)[0];
+    return first || null;
 };
 
-const ChatInterface = ({ tenantId, config }: { tenantId: string, config: any }) => {
-    const navigate = useNavigate();
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-
+const ChatInterface = ({ tenantId, config }: { tenantId: string; config: TenantConfig }) => {
     const {
         messages,
         hasStarted,
         isLoading,
-        quickReplies,
         isChatEnded,
         systemError,
-        sessionId,
-        questionProgress,  // ⭐ NEW: Get progress tracking
         conversationId,
-        isBookingOpen,
-        handleStart,
+        progress,
+        booking,
+        contact,
+        summaryData,
         handleSendMessage,
-        handleScheduleCall,
-        handleMaybeLater,
+        handleQuickReply,
+        handleSubmitContact,
         handleBookingConfirmed,
         handleBookingSkip,
-        handleBookingCancel,
+        handleMaybeLater,
         handleFeedback,
+        handleNewChat,
+        handleStartNewChatWith,
+        handleClearChat,
     } = useChatSession(config, tenantId);
 
-    const themeStyles = useMemo(() => getThemeStyles(
-        config.colors?.primary || '#4F46E5',
-        config.colors?.secondary || '#6366F1'
-    ), [config.colors?.primary, config.colors?.secondary]);
+    const [view, setView] = useState<ChatView>(() => (hasStarted ? 'chat' : 'welcome'));
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll to bottom when messages change (or the booking picker opens)
+    const themeVars = useMemo(
+        () => getThemeStyle(config.colors?.primary, config.colors?.secondary),
+        [config.colors?.primary, config.colors?.secondary]
+    );
+    const companyName = config.shortName || config.companyName || 'LeadEngine';
+    const botName = config.botDisplayName || 'Assistant';
+    const greeting = useMemo(() => getGreeting(), []);
+
+    // A confirmed booking replaces the conversation with the confirmation screen (Back shows the transcript)
+    const screen: 'welcome' | 'chat' | 'success' =
+        booking && view !== 'transcript' ? 'success' : view === 'welcome' ? 'welcome' : 'chat';
+
+    // Keep the newest message (or the typing indicator) in view
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isLoading, isBookingOpen]);
+        if (screen === 'chat') {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+    }, [messages, isLoading, screen]);
+
+    const startFresh = (clear: boolean) => {
+        if (clear) handleClearChat();
+        else handleNewChat();
+        setView('welcome');
+    };
+
+    const menuItems: ChatMenuItem[] = [
+        { id: 'new', label: 'New chat', icon: RotateCw, onSelect: () => startFresh(false) },
+        { id: 'clear', label: 'Clear chat', icon: Trash2, tone: 'danger', onSelect: () => startFresh(true) },
+    ];
+
+    const sendFromWelcome = (text: string) => {
+        setView('chat');
+        // A finished conversation can't take more messages, so a new message starts a new one
+        if (hasStarted && isChatEnded) handleStartNewChatWith(text);
+        else handleSendMessage(text);
+    };
+
+    const firstName = firstNameOf(contact.name);
+    // The backend's completion message repeats every answer; the success screen shows those,
+    // so the chat shows a short lead-in above the slot picker instead.
+    const completionLeadIn = `Thanks${firstName ? `, ${firstName}` : ''}! Want a quick call with our team to go over the details?`;
+
+    const lastMessage = messages[messages.length - 1];
+    const isBookingCardShowing = !!(lastMessage?.role === MessageRole.Bot && lastMessage.showActions && !booking);
+
+    // ── Connection error ────────────────────────────────────────────────
+    if (systemError) {
+        return (
+            <div className="font-chat bg-le-page text-le-ink min-h-[100dvh]" style={themeVars}>
+                <div className="mx-auto flex min-h-[100dvh] w-full max-w-[640px] flex-col">
+                    <ChatHeader
+                        variant="brand"
+                        title={companyName}
+                        initials={getInitials(companyName)}
+                        statusText="AI Assistant"
+                        menuItems={[]}
+                    />
+                    <main className="flex flex-1 items-center justify-center px-4">
+                        <div className="w-full max-w-sm rounded-[18px] border border-white/95 bg-white/80 p-6 text-center shadow-le-card" role="alert">
+                            <p className="text-base font-medium text-le-ink">We couldn't connect</p>
+                            <p className="mt-1.5 text-sm text-le-muted">{systemError}</p>
+                            <button
+                                type="button"
+                                onClick={() => startFresh(false)}
+                                className="mt-5 h-11 w-full rounded-xl bg-le-btn text-sm font-medium text-le-on-btn transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--le-accent)]"
+                            >
+                                Start a new chat
+                            </button>
+                        </div>
+                    </main>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div
-            className={`min-h-[100dvh] font-sans flex flex-col bg-white`}
-        >
-            {/* Ultra-Elegant Floating Glassmorphic Navbar (Matching Landing Page style) */}
-            <div className="sticky top-3 sm:top-5 z-50 px-4 max-w-5xl mx-auto w-full">
-                <header className="bg-white/80 backdrop-blur-2xl border border-zinc-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-full px-5 sm:px-6 py-2.5 sm:py-3 transition-all duration-300">
-                    <div className="flex justify-between items-center">
-                        {/* Logo / Tenant Branding */}
-                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-                            <div
-                                className={`p-2 rounded-xl text-white shadow-md shadow-black/10 transition-transform hover:scale-105 flex items-center justify-center ${!themeStyles.isCustom ? themeStyles.iconBg : 'bg-black'}`}
-                                style={themeStyles.isCustom ? themeStyles.iconBgStyle : undefined}
-                            >
-                                <Bot className="w-4.5 h-4.5" />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-base sm:text-lg font-black tracking-wider text-black leading-tight">
-                                    {config.shortName || 'LeadEngine'}
-                                </span>
-                                <span className="text-[9px] font-mono text-amber-600 font-bold tracking-widest uppercase leading-none mt-0.5">
-                                    AI AGENT
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Right: AI Assistant Badge */}
-                        <div className="flex items-center gap-3">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest font-bold">AI Assistant</p>
-                                <p
-                                    className={`text-xs sm:text-sm font-bold ${!themeStyles.isCustom ? themeStyles.accent : 'text-black'}`}
-                                    style={themeStyles.isCustom ? themeStyles.accentStyle : undefined}
-                                >
-                                    {config.botDisplayName}
+        <div className="font-chat bg-le-page text-le-ink" style={themeVars}>
+            <div className="mx-auto flex h-[100dvh] w-full max-w-[640px] flex-col">
+                {/* ── Welcome ─────────────────────────────────────────── */}
+                {screen === 'welcome' && (
+                    <>
+                        <ChatHeader
+                            variant="brand"
+                            title={companyName}
+                            initials={getInitials(companyName)}
+                            statusText="AI Assistant · Online"
+                            menuItems={menuItems}
+                        />
+                        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                            <WelcomeScreen
+                                botName={botName}
+                                tagline={`your ${companyName} guide`}
+                                greeting={greeting}
+                                headline="How can I help you today?"
+                            />
+                        </main>
+                        <footer className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+                            {hasStarted && !isChatEnded && messages.length > 0 && (
+                                <div className="mb-3 flex justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setView('chat')}
+                                        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-le-border bg-white/85 px-3.5 text-[13px] text-le-link transition-colors hover:bg-le-selected-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--le-accent)]"
+                                    >
+                                        Continue your chat
+                                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                                    </button>
+                                </div>
+                            )}
+                            <ChatInput onSend={sendFromWelcome} disabled={isLoading} placeholder="Ask anything..." />
+                            {config.privacyPolicyUrl && (
+                                <p className="mt-3 text-center text-[11px] text-le-muted">
+                                    By chatting you agree to our{' '}
+                                    <a
+                                        href={config.privacyPolicyUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-le-link underline underline-offset-2"
+                                    >
+                                        Privacy Policy
+                                    </a>
                                 </p>
-                            </div>
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-50 border-2 border-white shadow-md flex items-center justify-center overflow-hidden transition-transform hover:scale-105">
-                                <img
-                                    src={config.botAvatar || "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"}
-                                    alt={config.botDisplayName}
-                                    className="w-5 h-5 sm:w-6 sm:h-6 object-contain"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </header>
-            </div>
+                            )}
+                        </footer>
+                    </>
+                )}
 
-            {/* Main Chat Area */}
-            {systemError ? (
-                <main className="flex-1 flex items-center justify-center max-w-5xl w-full mx-auto px-4 sm:px-6">
-                    <div className="p-6 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center max-w-md">
-                        <p className="font-medium mb-1">Connection Error</p>
-                        <p className="text-red-500">{systemError}</p>
-                    </div>
-                </main>
-            ) : !hasStarted ? (
-                <main className="flex-1 flex flex-col w-full overflow-hidden">
-                    <WelcomeScreen
-                        onStart={handleStart}
-                        config={config.welcome}
-                    />
-                </main>
-            ) : (
-                <main className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-4 sm:px-6 overflow-hidden">
-                    <div className="flex-1 flex flex-col overflow-hidden py-6">
-                        {/* Session ID Badge */}
-                        <div className="text-center mb-6">
-                            <span className="text-xs text-gray-400 font-medium tracking-wide">
-                                SESSION ID: {' '}
-                                <span className={`font-semibold ${!themeStyles.isCustom ? themeStyles.accent : ''}`} style={themeStyles.isCustom ? themeStyles.accentStyle : undefined}>
-                                    {sessionId?.slice(0, 8).toUpperCase()}
-                                </span>
-                            </span>
-                        </div>
-
-                        {/* ⭐ Progress Indicator */}
-                        {/* S3 Max: Dynamic estimated progress (no fixed total) */}
-                        {questionProgress.estimatedProgress !== null && !isChatEnded && questionProgress.estimatedProgress > 0 && (
-                            <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-medium text-gray-700">
-                                        Qualification Progress
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                        Estimated ~{Math.round(questionProgress.estimatedProgress * 100)}% Complete
-                                    </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                                    <div
-                                        className="h-2 rounded-full transition-all duration-700 ease-out"
-                                        style={{
-                                            width: `${Math.min(questionProgress.estimatedProgress * 100, 100)}%`,
-                                            ...themeStyles.progressBarStyle
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        )}
-                        {/* S1/S2/S3: Step-based progress (has fixed total) */}
-                        {questionProgress.estimatedProgress === null && questionProgress.total > 0 && !isChatEnded && questionProgress.current > 0 && (
-                            <div className="mb-4 bg-white rounded-lg shadow-sm border border-gray-200 px-4 py-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-medium text-gray-700">
-                                        Question {questionProgress.current} of {questionProgress.total}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                        {Math.round((questionProgress.current / questionProgress.total) * 100)}% Complete
-                                    </span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                                    <div
-                                        className="h-2 rounded-full transition-all duration-500 ease-out"
-                                        style={{
-                                            width: `${(questionProgress.current / questionProgress.total) * 100}%`,
-                                            ...themeStyles.progressBarStyle
-                                        }}
-                                    />
-                                </div>
+                {/* ── Conversation ────────────────────────────────────── */}
+                {screen === 'chat' && (
+                    <>
+                        <ChatHeader
+                            variant="centered"
+                            title={`${companyName} Assistant`}
+                            statusText="Online"
+                            onBack={() => setView(booking ? 'chat' : 'welcome')}
+                            menuItems={menuItems}
+                        />
+                        {progress && (
+                            <div className="px-5 pb-1 pt-1">
+                                <StepProgress progress={progress} />
                             </div>
                         )}
 
-                        {/* Messages Container */}
-                        <div className="flex-1 overflow-y-auto space-y-4 pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                            {messages.map((msg, idx) => (
-                                <div key={msg.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 50}ms` }}>
-                                    <ChatBubble
-                                        message={msg}
-                                        botAvatar={config.botAvatar}
-                                        botName={config.botDisplayName}
-                                        allowFeedback={true}
-                                        onFeedback={(type) => handleFeedback(msg.id, type)}
-                                    />
+                        <main
+                            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-4"
+                            aria-live="polite"
+                            aria-relevant="additions"
+                        >
+                            <div className="flex flex-col gap-5">
+                                {messages.map((msg, idx) => {
+                                    const isBot = msg.role === MessageRole.Bot;
+                                    const isLast = idx === messages.length - 1;
+                                    const canAnswer = isBot && isLast && !isLoading && !isChatEnded;
 
-                                    {msg.showActions && idx === messages.length - 1 && (
-                                        <div className="mt-3 pl-11 min-w-0">
-                                            {isBookingOpen ? (
+                                    const chips = isBot && !msg.showActions ? msg.quickReplies || [] : [];
+                                    const showChips = chips.length > 0 && (!!msg.selectedReply || canAnswer);
+                                    const showContactForm = canAnswer && msg.currentState === 'contact';
+                                    const showBooking = isBot && isLast && !!msg.showActions && !booking;
+                                    const textOverride = isBot && msg.showActions && msg.isSummary ? completionLeadIn : undefined;
+
+                                    return (
+                                        <ChatBubble
+                                            key={msg.id}
+                                            message={msg}
+                                            textOverride={textOverride}
+                                            onFeedback={isBot ? (type) => handleFeedback(msg.id, type) : undefined}
+                                        >
+                                            {isBot && msg.products && msg.products.length > 0 && (
+                                                <ProductCards
+                                                    tenantId={tenantId}
+                                                    products={msg.products}
+                                                    disabled={isLoading || isChatEnded}
+                                                    onSelect={(product) => handleSendMessage(`I'm interested in ${product.title}`)}
+                                                />
+                                            )}
+                                            {showChips && (
+                                                <QuickReplies
+                                                    options={chips}
+                                                    selected={msg.selectedReply}
+                                                    disabled={!canAnswer}
+                                                    onSelect={(option) => handleQuickReply(msg.id, option)}
+                                                />
+                                            )}
+                                            {showContactForm && (
+                                                <ContactFormCard
+                                                    defaultName={contact.name || undefined}
+                                                    defaultPhone={contact.phone || undefined}
+                                                    disabled={isLoading}
+                                                    onSubmit={handleSubmitContact}
+                                                />
+                                            )}
+                                            {showBooking && (
                                                 <BookingPicker
                                                     tenantId={tenantId}
                                                     apiKey={config.apiKey}
                                                     conversationId={conversationId}
-                                                    primaryColor={config.colors?.primary || '#4F46E5'}
+                                                    phone={contact.phone}
                                                     onConfirmed={handleBookingConfirmed}
                                                     onSkip={handleBookingSkip}
-                                                    onCancel={handleBookingCancel}
-                                                />
-                                            ) : (
-                                                <ActionButtons
-                                                    onSchedule={handleScheduleCall}
-                                                    onLater={handleMaybeLater}
+                                                    onMaybeLater={handleMaybeLater}
                                                 />
                                             )}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                        </ChatBubble>
+                                    );
+                                })}
 
-                            {/* Loading Indicator */}
-                            {isLoading && (
-                                <div className="flex items-start gap-3 animate-fade-in">
-                                    <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                                        <img
-                                            src={config.botAvatar || "https://cdn-icons-png.flaticon.com/512/4712/4712109.png"}
-                                            alt={config.botDisplayName}
-                                            className="w-5 h-5 object-contain"
-                                        />
-                                    </div>
-                                    <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-100 flex items-center gap-1.5">
-                                        <span
-                                            className={`w-2 h-2 rounded-full animate-bounce ${!themeStyles.isCustom ? themeStyles.loadingDot : ''}`}
-                                            style={{ animationDelay: '0ms', ...(themeStyles.isCustom ? themeStyles.loadingDotStyle : {}) }}
-                                        />
-                                        <span
-                                            className={`w-2 h-2 rounded-full animate-bounce ${!themeStyles.isCustom ? themeStyles.loadingDot : ''}`}
-                                            style={{ animationDelay: '150ms', ...(themeStyles.isCustom ? themeStyles.loadingDotStyle : {}) }}
-                                        />
-                                        <span
-                                            className={`w-2 h-2 rounded-full animate-bounce ${!themeStyles.isCustom ? themeStyles.loadingDot : ''}`}
-                                            style={{ animationDelay: '300ms', ...(themeStyles.isCustom ? themeStyles.loadingDotStyle : {}) }}
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                                {isLoading && <TypingIndicator botName={botName} />}
+                            </div>
+                            <div ref={messagesEndRef} className="h-px" />
+                        </main>
 
-                            <div ref={messagesEndRef} className="h-1" />
-                        </div>
-                    </div>
-                </main>
-            )}
-
-            {/* Fixed Bottom Input Area */}
-            {
-                hasStarted && !isChatEnded && (
-                    <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/90 pb-4 pt-2 z-50">
-                        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
-                            {/* Quick Replies */}
-                            {quickReplies.length > 0 && !isLoading && (
-                                <div className="mb-3">
-                                    <QuickReplies
-                                        options={quickReplies}
-                                        onSelect={handleSendMessage}
-                                        primaryColor={config.colors?.primary}
-                                        secondaryColor={config.colors?.secondary}
-                                    />
-                                </div>
-                            )}
-
-                            {/* Input Field */}
-                            <div className="relative">
+                        <footer className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+                            {!isChatEnded ? (
                                 <ChatInput
                                     onSend={handleSendMessage}
                                     disabled={isLoading}
-                                    placeholder="Type your message here..."
-                                    primaryColor={config.colors?.primary}
-                                    secondaryColor={config.colors?.secondary}
+                                    placeholder="Type your reply..."
+                                    autoFocus
                                 />
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+                            ) : !isBookingCardShowing && !isLoading ? (
+                                <button
+                                    type="button"
+                                    onClick={() => startFresh(false)}
+                                    className="h-11 w-full rounded-xl border border-le-border bg-white text-sm font-medium text-le-selected-text transition-colors hover:bg-le-selected-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--le-accent)]"
+                                >
+                                    Start a new chat
+                                </button>
+                            ) : null}
+                        </footer>
+                    </>
+                )}
 
-            {/* Cookie Consent */}
+                {/* ── Booking confirmed ──────────────────────────────── */}
+                {screen === 'success' && booking && (
+                    <>
+                        <ChatHeader
+                            variant="centered"
+                            title={`${companyName} Assistant`}
+                            statusText={null}
+                            onBack={() => setView('transcript')}
+                            menuItems={menuItems}
+                        />
+                        <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                            <BookingSuccess
+                                booking={booking.booking}
+                                name={contact.name}
+                                phone={contact.phone}
+                                companyName={companyName}
+                                summaryData={summaryData}
+                                onStartNewChat={() => startFresh(false)}
+                            />
+                        </main>
+                    </>
+                )}
+            </div>
+
             {hasStarted && <CookieConsent />}
         </div>
     );
@@ -365,14 +330,19 @@ export const ChatPage = () => {
     const { config, id, loading } = useTenantConfig(tenantId);
 
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+        return (
+            <div className="font-chat flex min-h-[100dvh] items-center justify-center bg-white text-le-muted" role="status">
+                <Loader2 className="h-6 w-6 motion-safe:animate-spin" aria-hidden="true" />
+                <span className="sr-only">Loading chat…</span>
+            </div>
+        );
     }
 
     if (!config) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col gap-4">
-                <h1 className="text-2xl font-bold text-gray-800">404 - Tenant Not Found</h1>
-                <p className="text-gray-500">The tenant "{tenantId}" does not exist.</p>
+            <div className="font-chat flex min-h-[100dvh] flex-col items-center justify-center gap-2 bg-white px-6 text-center">
+                <h1 className="text-2xl font-medium text-le-ink">Chat not found</h1>
+                <p className="text-le-muted">There's no chat at "{tenantId}". Check the link and try again.</p>
             </div>
         );
     }

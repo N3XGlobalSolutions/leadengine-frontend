@@ -411,6 +411,7 @@ export const ProductsPage: React.FC = () => {
                   className={inputClass}
                   placeholder="https://example.com/brochures/crm.pdf"
                 />
+                <p className="text-[11px] text-slate-400 mt-1">Sent to customers as a PDF on WhatsApp when they ask for a brochure. Must be a public link that opens the PDF directly (max 100 MB).</p>
               </div>
 
               <div>
@@ -420,8 +421,17 @@ export const ProductsPage: React.FC = () => {
                   value={formData.images}
                   onChange={(e) => setFormData({ ...formData, images: e.target.value })}
                   className={inputClass}
-                  placeholder="https://example.com/img1.png, https://example.com/img2.png"
+                  placeholder="https://example.com/img1.jpg, https://example.com/img2.png"
                 />
+                <p className="text-[11px] text-slate-400 mt-1">Sent as real photos on WhatsApp when a customer asks for pics (up to 3 per request). Use public, direct JPG/PNG links (max 5 MB each); Google Drive "share" pages won't work.</p>
+                {formData.images.split(',').map((u) => u.trim()).filter(Boolean).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.images.split(',').map((u) => u.trim()).filter(Boolean).slice(0, 6).map((url) => (
+                      <img key={url} src={url} alt="" className="h-14 w-14 object-cover rounded-lg border border-slate-600/40"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0.25'; (e.currentTarget as HTMLImageElement).title = 'Image could not be loaded - WhatsApp will fail to send it'; }} />
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 border-t border-slate-700/50 pt-4 mt-6">

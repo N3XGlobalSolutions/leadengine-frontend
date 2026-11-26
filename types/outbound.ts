@@ -18,7 +18,13 @@ export interface Campaign {
   tenant_id: string;
   name: string;
   status: CampaignStatus;
+  /** 'template' = approved WhatsApp template (reaches anyone); 'text' = free text (24h window only) */
+  message_type: CampaignMessageType;
   message_template: string;
+  template_name?: string | null;
+  template_language?: string | null;
+  template_body?: string;
+  template_params?: string[];
   batch_size: number;
   message_delay_seconds: number;
   batch_delay_seconds: number;
@@ -26,7 +32,9 @@ export interface Campaign {
   sent_count: number;
   failed_count: number;
   delivered_count: number;
+  read_count: number;
   response_count: number;
+  skipped_count: number;
   created_at: string;
   updated_at: string;
   started_at?: string;
@@ -36,9 +44,16 @@ export interface Campaign {
   original_filename?: string;
 }
 
+export type CampaignMessageType = 'text' | 'template';
+
 export interface CampaignCreate {
   name: string;
+  message_type?: CampaignMessageType;
   message_template?: string;
+  template_name?: string | null;
+  template_language?: string | null;
+  template_body?: string;
+  template_params?: string[];
   batch_size?: number;
   message_delay_seconds?: number;
   batch_delay_seconds?: number;
@@ -46,7 +61,12 @@ export interface CampaignCreate {
 
 export interface CampaignUpdate {
   name?: string;
+  message_type?: CampaignMessageType;
   message_template?: string;
+  template_name?: string | null;
+  template_language?: string | null;
+  template_body?: string;
+  template_params?: string[];
   batch_size?: number;
   message_delay_seconds?: number;
   batch_delay_seconds?: number;
@@ -60,7 +80,35 @@ export interface OutboundDashboardStats {
   total_leads: number;
   messages_sent: number;
   messages_failed: number;
+  messages_delivered: number;
+  messages_read: number;
+  replies: number;
+  skipped_opted_out: number;
+  delivery_rate: number;
+  read_rate: number;
   response_rate: number;
+}
+
+// ── WhatsApp templates ───────────────────────────────────────────────
+
+export interface WhatsAppTemplate {
+  name: string;
+  language: string;
+  category: string;
+  body: string;
+  header_text: string;
+  header_format: string | null;
+  footer: string;
+  buttons: string[];
+  body_param_count: number;
+  header_param_count: number;
+  supported: boolean;
+  unsupported_reason: string;
+}
+
+export interface WhatsAppTemplateList {
+  templates: WhatsAppTemplate[];
+  error?: string;
 }
 
 // ── Outbound Lead ────────────────────────────────────────────────────
@@ -73,7 +121,9 @@ export type MessageStatus =
   | 'SENDING'
   | 'SENT'
   | 'DELIVERED'
-  | 'FAILED';
+  | 'READ'
+  | 'FAILED'
+  | 'SKIPPED';
 
 export interface OutboundLead {
   lead_id: string;
@@ -88,6 +138,9 @@ export interface OutboundLead {
   retry_count: number;
   created_at: string;
   sent_at?: string;
+  delivered_at?: string;
+  read_at?: string;
+  replied_at?: string;
 }
 
 export interface OutboundLeadUpdate {
@@ -119,13 +172,27 @@ export interface UploadResponse {
 export interface CampaignStats {
   campaign_id: string;
   status: CampaignStatus;
+  message_type: CampaignMessageType;
   total_leads: number;
   sent: number;
   failed: number;
+  skipped: number;
   delivered: number;
+  read: number;
   response_count: number;
   pending: number;
   progress_percent: number;
+  delivery_rate: number;
+  read_rate: number;
+  response_rate: number;
+  conversations: number;
+  qualified: number;
+  not_qualified: number;
+  opted_out: number;
+  handoffs: number;
+  ai_tokens: number;
+  ai_cost_usd: number;
+  ai_cost_inr: number;
 }
 
 // ── Campaign Audit ───────────────────────────────────────────────────
@@ -174,5 +241,7 @@ export const MESSAGE_STATUS_COLORS: Record<MessageStatus, string> = {
   SENDING: 'text-yellow-500',
   SENT: 'text-green-500',
   DELIVERED: 'text-indigo-500',
+  READ: 'text-sky-500',
   FAILED: 'text-red-500',
+  SKIPPED: 'text-amber-500',
 };

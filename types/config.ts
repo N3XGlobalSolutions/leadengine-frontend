@@ -85,6 +85,7 @@ export interface TenantConfig {
 
     // Website-chat product cards (backend `chat_products`), up to MAX_CHAT_PRODUCTS
     chatProducts?: ChatProduct[];
+    whatsapp_business_account_id?: string;
 }
 
 // Default template with placeholder questions
@@ -92,6 +93,7 @@ export const DEFAULT_TENANT_CONFIG: TenantConfig = {
     whatsapp_enabled: false,
     whatsapp_access_token: '',
     whatsapp_phone_number_id: '',
+    whatsapp_business_account_id: '',
     companyName: '',
     shortName: '',
     botName: 'LeadEngine',

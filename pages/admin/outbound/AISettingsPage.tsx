@@ -7,6 +7,22 @@ import { useAdminTheme } from '../../../contexts/AdminThemeContext';
 import { useAdminAuth } from '../../../contexts/AdminAuthContext';
 import { getAISettings, updateAISettings, OutboundAISettings } from '../../../services/outboundAIService';
 
+const MAX_INSTRUCTIONS_LENGTH = 6000;
+
+const INSTRUCTIONS_PLACEHOLDER = `Example:
+You are Priya from ABC Academy, following up with people who enquired about our teacher-training courses.
+
+Conversation flow:
+1. Greet them by name and ask which course they are interested in (B.Ed, D.El.Ed or Montessori).
+2. Ask for their highest qualification.
+3. Ask whether they prefer online or offline classes, and their city.
+4. Ask when they would like to start.
+
+Qualification: the lead is qualified if they are a graduate and want to start within 3 months.
+If qualified, offer a call with a counsellor. If not, thank them and say the team will keep them posted.
+
+Rules: don't quote fees; say a counsellor will share the fee details.`;
+
 export const AISettingsPage: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
@@ -24,7 +40,12 @@ export const AISettingsPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await getAISettings(clientId);
-      setSettings(data);
+      // Existing clients only have the old business summary: start the new
+      // Prompt / Instructions field from it so nothing they wrote is lost.
+      setSettings({
+        ...data,
+        agent_instructions: data.agent_instructions || data.business_summary || '',
+      });
     } catch (e: any) {
       setError(e?.response?.data?.detail || 'Failed to load AI settings');
     }
@@ -207,15 +228,31 @@ export const AISettingsPage: React.FC = () => {
                 </div>
 
                 <div className="mt-6">
-                  <label className={labelClass}>Business summary / Sales Context</label>
+                  <div className="flex items-baseline justify-between">
+                    <label className={labelClass}>Prompt / Instructions</label>
+                    <span className={`text-[10px] ${
+                      (settings.agent_instructions?.length || 0) > MAX_INSTRUCTIONS_LENGTH * 0.9
+                        ? 'text-amber-500'
+                        : 'text-slate-400'
+                    }`}>
+                      {settings.agent_instructions?.length || 0} / {MAX_INSTRUCTIONS_LENGTH}
+                    </span>
+                  </div>
                   <textarea
-                    rows={6}
+                    rows={14}
                     required
-                    value={settings.business_summary}
-                    onChange={(e) => handleChange('business_summary', e.target.value)}
-                    className={`${inputClass} resize-none`}
-                    placeholder="Describe your company services, core value proposition, location details, support lines, etc. The AI uses this context to explain business facts to prospects."
+                    maxLength={MAX_INSTRUCTIONS_LENGTH}
+                    value={settings.agent_instructions || ''}
+                    onChange={(e) => handleChange('agent_instructions', e.target.value)}
+                    className={`${inputClass} resize-y font-mono text-xs leading-relaxed`}
+                    placeholder={INSTRUCTIONS_PLACEHOLDER}
                   />
+                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                    The main instruction for the WhatsApp AI: who it is, the conversation flow, which questions to
+                    ask and how to qualify a lead. Company facts are answered from your uploaded knowledge base, and
+                    products or meetings are only looked up when the customer asks for them. Shorter, clear
+                    instructions use fewer tokens per message.
+                  </p>
                 </div>
               </div>
             </div>

@@ -177,6 +177,7 @@ const mapTenantToClient = (tenant: any): Client => {
         whatsapp_access_token: backendConfig.whatsapp_access_token || '',
         whatsapp_phone_number_id: backendConfig.whatsapp_phone_number_id || '',
         chatProducts: mapChatProductsFromBackend(backendConfig.chat_products),
+        whatsapp_business_account_id: backendConfig.whatsapp_business_account_id || '',
     };
     return {
         id: tenant.tenant_id, name: tenant.name, slug: backendConfig.url_slug || tenant.tenant_id, status: tenant.status || (tenant.is_active ? 'Active' : 'Inactive'), //Use backend status if available 
@@ -499,6 +500,7 @@ export const updateClient = async (client: Client): Promise<Client> => {
         whatsapp_access_token: client.config?.whatsapp_access_token,
         whatsapp_phone_number_id: client.config?.whatsapp_phone_number_id,
         chat_products: mapChatProductsToBackend(client.config?.chatProducts),
+        whatsapp_business_account_id: client.config?.whatsapp_business_account_id,
     };
 
     const payload = {
@@ -575,6 +577,7 @@ export const createClient = async (clientData: CreateClientInput): Promise<Clien
             whatsapp_access_token: clientData.config.whatsapp_access_token,
             whatsapp_phone_number_id: clientData.config.whatsapp_phone_number_id,
             chat_products: mapChatProductsToBackend(clientData.config.chatProducts),
+            whatsapp_business_account_id: clientData.config.whatsapp_business_account_id,
         }
     };
 

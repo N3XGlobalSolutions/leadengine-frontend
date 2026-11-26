@@ -14,7 +14,17 @@ import {
   OutboundLead,
   OutboundLeadUpdate,
   UploadResponse,
+  WhatsAppTemplateList,
 } from '@/types/outbound';
+
+// ═══════════════════════════════════════════════════════════════════════
+// WhatsApp templates
+// ═══════════════════════════════════════════════════════════════════════
+
+export const listWhatsAppTemplates = async (tenantId: string): Promise<WhatsAppTemplateList> => {
+  const res = await api.get(`/outbound/${tenantId}/whatsapp/templates`);
+  return res.data;
+};
 
 // ═══════════════════════════════════════════════════════════════════════
 // Dashboard

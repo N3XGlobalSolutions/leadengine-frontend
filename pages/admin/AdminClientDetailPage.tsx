@@ -1568,6 +1568,17 @@ export const AdminClientDetailPage = () => {
                                     </div>
 
                                     <div>
+                                        <label className={labelClass}>WhatsApp Business Account ID</label>
+                                        <input
+                                            type="text"
+                                            value={client.config?.whatsapp_business_account_id || ''}
+                                            onChange={(e) => updateConfig('whatsapp_business_account_id', e.target.value)}
+                                            className={inputClass}
+                                            placeholder="e.g. 1565669768915042 (needed for templates)"
+                                        />
+                                    </div>
+
+                                    <div>
                                         <label className={labelClass}>WhatsApp Access Token</label>
                                         <input
                                             type="password"

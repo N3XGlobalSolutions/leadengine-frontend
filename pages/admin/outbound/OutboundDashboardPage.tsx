@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Plus, Megaphone, Users, Send, AlertTriangle, TrendingUp,
-  Play, Pause, Eye, Archive, Trash2, RefreshCw, Search, Filter, Zap
+  ArrowLeft, Plus, Megaphone, Users, Send, TrendingUp,
+  Play, Pause, Eye, Archive, Trash2, RefreshCw, Search, CheckCheck
 } from 'lucide-react';
 import { AdminLayout } from '../../../components/admin/AdminLayout';
 import { OutboundTabs } from '../../../components/admin/outbound/OutboundTabs';
@@ -103,12 +103,12 @@ export const OutboundDashboardPage: React.FC = () => {
 
   const cardClass = `rounded-xl border backdrop-blur-sm ${isDark ? 'bg-slate-800/80 border-slate-700/50' : 'bg-white border-gray-200'}`;
   const statCards = stats ? [
-    { label: 'Total Campaigns', value: stats.total_campaigns, icon: Megaphone, color: 'from-indigo-500 to-purple-600' },
-    { label: 'Running', value: stats.running_campaigns, icon: Zap, color: 'from-green-500 to-emerald-600' },
-    { label: 'Total Leads', value: stats.total_leads, icon: Users, color: 'from-blue-500 to-cyan-600' },
-    { label: 'Messages Sent', value: stats.messages_sent, icon: Send, color: 'from-violet-500 to-fuchsia-600' },
-    { label: 'Failed', value: stats.messages_failed, icon: AlertTriangle, color: 'from-red-500 to-rose-600' },
-    { label: 'Response Rate', value: `${stats.response_rate}%`, icon: TrendingUp, color: 'from-amber-500 to-orange-600' },
+    { label: 'Campaigns', value: stats.total_campaigns, sub: `${stats.running_campaigns} running`, icon: Megaphone, color: 'from-indigo-500 to-purple-600' },
+    { label: 'Total Leads', value: stats.total_leads.toLocaleString(), sub: `${stats.skipped_opted_out} opted out`, icon: Users, color: 'from-blue-500 to-cyan-600' },
+    { label: 'Messages Sent', value: stats.messages_sent.toLocaleString(), sub: `${stats.messages_failed} failed`, icon: Send, color: 'from-violet-500 to-fuchsia-600' },
+    { label: 'Delivered', value: `${stats.delivery_rate}%`, sub: `${stats.messages_delivered.toLocaleString()} messages`, icon: CheckCheck, color: 'from-green-500 to-emerald-600' },
+    { label: 'Read', value: `${stats.read_rate}%`, sub: `${stats.messages_read.toLocaleString()} of delivered`, icon: Eye, color: 'from-sky-500 to-cyan-600' },
+    { label: 'Replied', value: `${stats.response_rate}%`, sub: `${stats.replies.toLocaleString()} leads replied`, icon: TrendingUp, color: 'from-amber-500 to-orange-600' },
   ] : [];
 
   return (
@@ -181,8 +181,11 @@ export const OutboundDashboardPage: React.FC = () => {
               <div className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 {card.value}
               </div>
-              <div className={`text-xs font-medium mt-1 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
+              <div className={`text-xs font-semibold mt-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
                 {card.label}
+              </div>
+              <div className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                {card.sub}
               </div>
             </div>
           ))}
@@ -225,7 +228,7 @@ export const OutboundDashboardPage: React.FC = () => {
           <table className="w-full">
             <thead>
               <tr className={`border-b ${isDark ? 'border-slate-700 bg-slate-800/50' : 'border-gray-100 bg-gray-50'}`}>
-                {['Campaign Name', 'Status', 'Total Leads', 'Sent', 'Failed', 'Created', 'Actions'].map(h => (
+                {['Campaign Name', 'Status', 'Leads', 'Sent', 'Delivered', 'Replied', 'Failed', 'Created', 'Actions'].map(h => (
                   <th key={h} className={`px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                     {h}
                   </th>
@@ -236,7 +239,7 @@ export const OutboundDashboardPage: React.FC = () => {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-4">
                         <div className={`h-4 rounded animate-pulse ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} style={{ width: `${50 + Math.random() * 50}%` }} />
                       </td>
@@ -245,7 +248,7 @@ export const OutboundDashboardPage: React.FC = () => {
                 ))
               ) : filteredCampaigns.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className={`px-4 py-16 text-center ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
+                  <td colSpan={9} className={`px-4 py-16 text-center ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>
                     <Megaphone size={48} className="mx-auto mb-4 opacity-30" />
                     <p className="text-lg font-medium">No campaigns yet</p>
                     <p className="text-sm mt-1">Create your first outbound campaign to get started</p>
@@ -272,6 +275,11 @@ export const OutboundDashboardPage: React.FC = () => {
                       </td>
                       <td className={`px-4 py-4 text-sm ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>{c.total_leads.toLocaleString()}</td>
                       <td className="px-4 py-4 text-sm text-green-500 font-medium">{c.sent_count.toLocaleString()}</td>
+                      <td className="px-4 py-4 text-sm text-indigo-500 font-medium">
+                        {(c.delivered_count || 0).toLocaleString()}
+                        {c.sent_count > 0 && <span className={`ml-1 text-xs ${isDark ? 'text-slate-500' : 'text-gray-400'}`}>({Math.round((c.delivered_count || 0) / c.sent_count * 100)}%)</span>}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-purple-500 font-medium">{(c.response_count || 0).toLocaleString()}</td>
                       <td className="px-4 py-4 text-sm text-red-500 font-medium">{c.failed_count}</td>
                       <td className={`px-4 py-4 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
                         {new Date(c.created_at).toLocaleDateString()}

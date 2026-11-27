@@ -1,9 +1,32 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Bell, Moon, Sun, Save, Shield, Mail } from 'lucide-react';
+import { User, Bell, Moon, Save, Shield, Mail } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
+import { PageContainer, PageHeader, Card, Field, Input, Button, Switch, Mark, tone } from '../../components/admin/ui/kit';
+import { cn } from '../../utils/cn';
+
+/** Card title with the 34px grey icon tile (design `.h2` + tile). */
+const SectionTitle: React.FC<{ isDark: boolean; icon: React.ReactNode; children: React.ReactNode }> = ({ isDark, icon, children }) => (
+    <h2 className={cn('m-0 flex items-center gap-3 text-[18px] font-extrabold tracking-[-0.02em]', tone(isDark).text)}>
+        <span className={cn('w-[34px] h-[34px] flex-none rounded-[10px] flex items-center justify-center', tone(isDark).subtle, tone(isDark).text)}>
+            {icon}
+        </span>
+        {children}
+    </h2>
+);
+
+/** Setting row: 14px/700 title + 12.5px hint on the left, control on the right. */
+const SettingRow: React.FC<{ isDark: boolean; title: string; description: string; children: React.ReactNode }> = ({ isDark, title, description, children }) => (
+    <div className="flex flex-wrap items-center justify-between gap-4">
+        <span className="flex flex-col gap-0.5 min-w-0 flex-1">
+            <span className={cn('text-sm font-bold', tone(isDark).text)}>{title}</span>
+            <span className={cn('text-[12.5px] leading-[1.5]', tone(isDark).hint)}>{description}</span>
+        </span>
+        {children}
+    </div>
+);
 
 export const AdminSettingsPage = () => {
     const { user } = useAdminAuth();
@@ -25,151 +48,107 @@ export const AdminSettingsPage = () => {
         alert('Settings saved successfully!');
     };
 
+    const iconProps = { size: 17, strokeWidth: 1.9, 'aria-hidden': true } as const;
+
     return (
-        <AdminLayout>
-            <div className="max-w-4xl mx-auto px-3 sm:px-4">
-                <div className="mb-6 sm:mb-8">
-                    <h1 className={`text-2xl sm:text-3xl font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>Settings</h1>
-                    <p className={`text-sm sm:text-base ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Manage your account preferences and system settings.</p>
-                </div>
+        <AdminLayout breadcrumb={[{ label: 'Platform' }, { label: 'Settings' }]}>
+            <PageContainer className="max-w-[900px]">
+                <PageHeader
+                    isDark={isDark}
+                    eyebrow="Platform"
+                    title={<Mark isDark={isDark}>Settings</Mark>}
+                    description="Manage your account preferences and system settings."
+                />
 
-                <div className="space-y-4 sm:space-y-6">
-                    {/* Profile Section */}
-                    <section className={`rounded-lg sm:rounded-xl border p-4 sm:p-6 transition-colors ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100 shadow-sm'
-                        }`}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
-                                <User size={20} />
-                            </div>
-                            <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Profile Information</h2>
-                        </div>
-
-                        <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Full Name</label>
-                                <input
+                {/* Profile Section */}
+                <Card isDark={isDark}>
+                    <SectionTitle isDark={isDark} icon={<User {...iconProps} />}>Profile Information</SectionTitle>
+                    <form onSubmit={handleSave} className="flex flex-col gap-[18px]">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <Field isDark={isDark} label="Full Name" htmlFor="settings-full-name">
+                                <Input
+                                    isDark={isDark}
+                                    id="settings-full-name"
                                     type="text"
+                                    autoComplete="name"
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
-                                    className={`w-full p-3 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all ${isDark
-                                        ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500'
-                                        : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
-                                        }`}
                                 />
-                            </div>
-                            <div className="space-y-2">
-                                <label className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Email Address</label>
-                                <div className="relative">
-                                    <Mail size={18} className={`absolute left-3 top-3.5 ${isDark ? 'text-slate-500' : 'text-gray-400'}`} />
+                            </Field>
+                            <Field isDark={isDark} label="Email Address" htmlFor="settings-email">
+                                <div className={cn(
+                                    'flex items-center gap-2 h-[46px] px-3.5 rounded-[10px] border-[1.5px] transition-shadow focus-within:ring-[3px]',
+                                    isDark
+                                        ? 'bg-neutral-950 border-neutral-700 focus-within:border-white focus-within:ring-white/15'
+                                        : 'bg-white border-[#E5E5E5] focus-within:border-[#111111] focus-within:ring-black/10',
+                                )}>
+                                    <Mail size={16} strokeWidth={1.8} aria-hidden="true" className={cn('flex-none', tone(isDark).hint)} />
                                     <input
+                                        id="settings-email"
                                         type="email"
+                                        autoComplete="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className={`w-full pl-10 p-3 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all ${isDark
-                                            ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500'
-                                            : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
-                                            }`}
+                                        className={cn(
+                                            'flex-1 min-w-0 border-none outline-none bg-transparent text-sm font-medium',
+                                            isDark ? 'text-white placeholder-neutral-500' : 'text-[#0A0A0A] placeholder-[#A3A3A3]',
+                                        )}
                                     />
                                 </div>
-                            </div>
-
-                            <div className="md:col-span-2 flex justify-end">
-                                <button type="submit" className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto">
-                                    <Save size={18} />
-                                    <span>Save Changes</span>
-                                </button>
-                            </div>
-                        </form>
-                    </section>
-
-                    {/* Appearance Section */}
-                    <section className={`rounded-lg sm:rounded-xl border p-4 sm:p-6 transition-colors ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100 shadow-sm'
-                        }`}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
-                                {isDark ? <Moon size={20} /> : <Sun size={20} />}
-                            </div>
-                            <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Appearance</h2>
+                            </Field>
                         </div>
+                        <Button isDark={isDark} variant="primary" type="submit" className="self-stretch sm:self-end">
+                            <Save size={15} strokeWidth={2} aria-hidden="true" />
+                            Save Changes
+                        </Button>
+                    </form>
+                </Card>
 
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="flex-1">
-                                <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Dark Mode</p>
-                                <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Adjust the appearance of the admin panel to reduce eye strain.</p>
-                            </div>
-                            <button
-                                onClick={toggleTheme}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDark ? 'bg-indigo-600' : 'bg-gray-200'
-                                    }`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isDark ? 'translate-x-6' : 'translate-x-1'
-                                    }`} />
-                            </button>
-                        </div>
-                    </section>
+                {/* Appearance Section */}
+                <Card isDark={isDark}>
+                    <SectionTitle isDark={isDark} icon={<Moon {...iconProps} />}>Appearance</SectionTitle>
+                    <SettingRow isDark={isDark} title="Dark Mode" description="Adjust the appearance of the admin panel to reduce eye strain.">
+                        <Switch isDark={isDark} on={isDark} onToggle={toggleTheme} label="Dark Mode" />
+                    </SettingRow>
+                </Card>
 
-                    {/* Notifications Section */}
-                    <section className={`rounded-lg sm:rounded-xl border p-4 sm:p-6 transition-colors ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100 shadow-sm'
-                        }`}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
-                                <Bell size={20} />
-                            </div>
-                            <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Notifications</h2>
-                        </div>
+                {/* Notifications Section */}
+                <Card isDark={isDark}>
+                    <SectionTitle isDark={isDark} icon={<Bell {...iconProps} />}>Notifications</SectionTitle>
+                    {[
+                        { id: 'email', label: 'Email Notifications', desc: 'Receive daily summaries and alerts via email.' },
+                        { id: 'push', label: 'Push Notifications', desc: 'Get real-time browser alerts for new leads.' },
+                        { id: 'marketing', label: 'Marketing Updates', desc: 'Receive news about new features and promotions.' }
+                    ].map((item) => {
+                        const key = item.id as keyof typeof notifications;
+                        return (
+                            <SettingRow key={item.id} isDark={isDark} title={item.label} description={item.desc}>
+                                <Switch
+                                    isDark={isDark}
+                                    on={notifications[key]}
+                                    onToggle={() => setNotifications({ ...notifications, [key]: !notifications[key] })}
+                                    label={item.label}
+                                />
+                            </SettingRow>
+                        );
+                    })}
+                </Card>
 
-                        <div className="space-y-4">
-                            {[
-                                { id: 'email', label: 'Email Notifications', desc: 'Receive daily summaries and alerts via email.' },
-                                { id: 'push', label: 'Push Notifications', desc: 'Get real-time browser alerts for new leads.' },
-                                { id: 'marketing', label: 'Marketing Updates', desc: 'Receive news about new features and promotions.' }
-                            ].map((item) => (
-                                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-2 gap-2">
-                                    <div className="flex-1">
-                                        <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{item.label}</p>
-                                        <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{item.desc}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setNotifications({ ...notifications, [item.id]: !notifications[item.id as keyof typeof notifications] })}
-                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifications[item.id as keyof typeof notifications] ? 'bg-indigo-600' : 'bg-gray-200'
-                                            }`}
-                                    >
-                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notifications[item.id as keyof typeof notifications] ? 'translate-x-6' : 'translate-x-1'
-                                            }`} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    {/* Security Section (Mock) */}
-                    <section className={`rounded-lg sm:rounded-xl border p-4 sm:p-6 transition-colors ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-100 shadow-sm'
-                        }`}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
-                                <Shield size={20} />
-                            </div>
-                            <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Security</h2>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="flex-1">
-                                <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Password</p>
-                                <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>Last changed 3 months ago</p>
-                            </div>
-                            <button
-                                onClick={() => navigate(`/admin/users?highlight=${user?.user_id}`)}
-                                className={`px-4 py-2 rounded-lg border font-medium transition-colors w-full sm:w-auto text-sm ${isDark
-                                    ? 'border-slate-600 text-slate-300 hover:bg-slate-700'
-                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                                    }`}
-                            >
-                                Change Password
-                            </button>
-                        </div>
-                    </section>
-                </div>
-            </div>
+                {/* Security Section (Mock) */}
+                <Card isDark={isDark}>
+                    <SectionTitle isDark={isDark} icon={<Shield {...iconProps} />}>Security</SectionTitle>
+                    <SettingRow isDark={isDark} title="Password" description="Last changed 3 months ago">
+                        <Button
+                            isDark={isDark}
+                            variant="secondary"
+                            className="min-h-[40px] text-[13px]"
+                            onClick={() => navigate(`/admin/users?highlight=${user?.user_id}`)}
+                        >
+                            Change Password
+                        </Button>
+                    </SettingRow>
+                </Card>
+            </PageContainer>
         </AdminLayout>
     );
 };

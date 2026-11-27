@@ -1,42 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
-    Tooltip, ResponsiveContainer, Legend
+    Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { MessageCircle, Target, TrendingUp, RefreshCw } from 'lucide-react';
+import { MessageSquare, Target, TrendingUp, RefreshCw, LucideIcon } from 'lucide-react';
 import { getPlatformDailyMetrics, PlatformDailyPoint, PlatformDailySummary } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
+import { cn } from '../../utils/cn';
+import { Card, IconButton, tone } from './ui/kit';
 
-interface CustomTooltipProps {
+interface VolumeTooltipProps {
     active?: boolean;
-    payload?: any[];
-    label?: string;
+    payload?: ReadonlyArray<{ dataKey?: string | number; name?: string | number; value?: number | string; color?: string }>;
+    label?: string | number;
     isDark: boolean;
 }
 
-const CustomTooltip = ({ active, payload, label, isDark }: CustomTooltipProps) => {
+/** White tooltip card (neutral-900 in dark). */
+const VolumeTooltip = ({ active, payload, label, isDark }: VolumeTooltipProps) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className={`px-4 py-3 rounded-2xl shadow-xl border text-sm font-sans backdrop-blur-xl ${
-            isDark
-                ? 'bg-slate-900/95 border-slate-800 text-white shadow-slate-950/50'
-                : 'bg-white/95 border-slate-200/90 text-slate-900 shadow-slate-200/50'
-        }`}>
-            <p className={`text-xs font-semibold mb-2 uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                {label}
-            </p>
-            {payload.map((entry: any) => (
-                <div key={entry.dataKey} className="flex items-center justify-between gap-4 mb-1">
-                    <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: entry.color }} />
-                        <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{entry.name}:</span>
-                    </div>
-                    <span className="font-extrabold text-sm">{entry.value.toLocaleString()}</span>
+        <div className={cn('px-3.5 py-2.5 rounded-xl border font-jakarta min-w-[160px] shadow-[0_8px_24px_rgba(0,0,0,.08)]',
+            isDark ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-[#E5E5E5] text-[#0A0A0A]')}>
+            <p className={cn('m-0 mb-1.5 text-[11.5px] font-bold tracking-[0.08em] uppercase', tone(isDark).hint)}>{label}</p>
+            {payload.map(entry => (
+                <div key={String(entry.dataKey)} className="flex items-center justify-between gap-4 text-[13px] leading-6">
+                    <span className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: entry.color }} />
+                        <span className={tone(isDark).muted}>{entry.name}</span>
+                    </span>
+                    <span className="font-extrabold">{Number(entry.value ?? 0).toLocaleString()}</span>
                 </div>
             ))}
         </div>
     );
 };
+
+/** Summary tile: "Today / 7-Day Total" label + icon, 26px value, caption. */
+const SummaryTile: React.FC<{ isDark: boolean; label: string; value: number; caption: string; icon: LucideIcon }> = ({ isDark, label, value, caption, icon: Icon }) => (
+    <div className={cn('flex flex-col gap-1.5 p-4 rounded-xl border min-w-0',
+        isDark ? 'border-neutral-800 bg-neutral-950' : 'border-[#E5E5E5] bg-[#FAFAFA]')}>
+        <div className="flex items-center justify-between gap-2">
+            <span className={cn('text-[12.5px]', tone(isDark).hint)}>{label}</span>
+            <Icon size={16} strokeWidth={1.8} aria-hidden="true" className={isDark ? 'text-neutral-400' : 'text-[#525252]'} />
+        </div>
+        <span className={cn('text-[26px] font-extrabold tracking-[-0.02em] leading-tight', tone(isDark).text)}>{value.toLocaleString()}</span>
+        <span className={cn('text-xs', tone(isDark).hint)}>{caption}</span>
+    </div>
+);
 
 export const PlatformConversationsGraph = () => {
     const [data, setData] = useState<PlatformDailyPoint[]>([]);
@@ -44,6 +55,7 @@ export const PlatformConversationsGraph = () => {
     const [loading, setLoading] = useState(true);
     const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
     const { isDark } = useAdminTheme();
+    const t = tone(isDark);
 
     const fetchData = async () => {
         setLoading(true);
@@ -65,179 +77,113 @@ export const PlatformConversationsGraph = () => {
         fetchData();
     }, []);
 
-    const cardBase = `rounded-2xl p-4 border transition-all ${
-        isDark
-            ? 'bg-slate-800/60 border-slate-700/80 hover:border-slate-600'
-            : 'bg-slate-50 border-slate-200/80 hover:border-slate-300'
-    }`;
+    const ink = isDark ? '#FFFFFF' : '#0A0A0A';
+    const leadsColor = isDark ? '#A3A3A3' : '#8A8A8A';
+    const grid = isDark ? '#262626' : '#EEEEEE';
+    const tick = isDark ? '#737373' : '#6B6B6B';
+    const isEmpty = data.length === 0 || data.every(d => d.conversations === 0 && d.leads === 0);
+    const rangeLabel = data.length > 0 ? `${data[0].display} to ${data[data.length - 1].display}` : 'the last 7 days';
 
     return (
-        <div className={`p-6 sm:p-8 rounded-3xl border transition-all shadow-sm ${
-            isDark
-                ? 'bg-slate-900 border-slate-800 text-white'
-                : 'bg-white border-slate-200/80 text-slate-900'
-        }`}>
+        <Card isDark={isDark}>
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h3 className="text-xl font-extrabold tracking-tight">
-                        Platform Volume & Engagement
-                    </h3>
-                    <p className={`text-xs sm:text-sm mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Aggregated daily conversation & lead volume across all tenant accounts
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-1 min-w-0">
+                    <h2 className={cn('m-0 text-lg font-extrabold tracking-[-0.02em]', t.text)}>Platform Volume &amp; Engagement</h2>
+                    <p className={cn('m-0 text-[13px] leading-[1.55]', t.muted)}>
+                        Aggregated daily conversation &amp; lead volume across all tenant accounts
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={fetchData}
-                        disabled={loading}
-                        className={`p-2.5 rounded-xl border transition-all ${
-                            isDark
-                                ? 'border-slate-700 hover:bg-slate-800 text-slate-300'
-                                : 'border-slate-200 hover:bg-slate-100 text-slate-700 shadow-sm'
-                        }`}
-                        title="Refresh Data"
-                    >
-                        <RefreshCw size={16} className={loading ? 'animate-spin text-emerald-500' : ''} />
-                    </button>
-                </div>
+                <IconButton isDark={isDark} label="Refresh platform metrics" onClick={fetchData} disabled={loading}>
+                    <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={loading ? 'animate-spin' : ''} />
+                </IconButton>
             </div>
 
-            {/* KPI Summary Cards */}
+            {/* KPI Summary Tiles */}
             {summary && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                    <div className={cardBase}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Today</span>
-                            <div className={`p-1.5 rounded-lg ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
-                                <MessageCircle size={16} />
-                            </div>
-                        </div>
-                        <p className="text-2xl font-extrabold tracking-tight">
-                            {summary.today_conversations.toLocaleString()}
-                        </p>
-                        <p className={`text-[11px] font-medium mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Conversations</p>
-                    </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <SummaryTile isDark={isDark} label="Today" value={summary.today_conversations} caption="Conversations" icon={MessageSquare} />
+                    <SummaryTile isDark={isDark} label="Today" value={summary.today_leads} caption="Leads Created" icon={Target} />
+                    <SummaryTile isDark={isDark} label="7-Day Total" value={summary.period_conversations} caption="Total Convos" icon={TrendingUp} />
+                    <SummaryTile isDark={isDark} label="7-Day Total" value={summary.period_leads} caption="Total Leads" icon={Target} />
+                </div>
+            )}
 
-                    <div className={cardBase}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Today</span>
-                            <div className={`p-1.5 rounded-lg ${isDark ? 'bg-sky-500/20 text-sky-400' : 'bg-sky-100 text-sky-700'}`}>
-                                <Target size={16} />
-                            </div>
-                        </div>
-                        <p className="text-2xl font-extrabold tracking-tight">
-                            {summary.today_leads.toLocaleString()}
-                        </p>
-                        <p className={`text-[11px] font-medium mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Leads Created</p>
-                    </div>
-
-                    <div className={cardBase}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>7-Day Total</span>
-                            <div className={`p-1.5 rounded-lg ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-800'}`}>
-                                <TrendingUp size={16} />
-                            </div>
-                        </div>
-                        <p className="text-2xl font-extrabold tracking-tight">
-                            {summary.period_conversations.toLocaleString()}
-                        </p>
-                        <p className={`text-[11px] font-medium mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total Convos</p>
-                    </div>
-
-                    <div className={cardBase}>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>7-Day Total</span>
-                            <div className={`p-1.5 rounded-lg ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-800'}`}>
-                                <Target size={16} />
-                            </div>
-                        </div>
-                        <p className="text-2xl font-extrabold tracking-tight">
-                            {summary.period_leads.toLocaleString()}
-                        </p>
-                        <p className={`text-[11px] font-medium mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total Leads</p>
-                    </div>
+            {/* Legend */}
+            {!loading && !isEmpty && (
+                <div className={cn('flex justify-end flex-wrap gap-4 text-[12.5px]', isDark ? 'text-neutral-300' : 'text-[#333333]')}>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-4 h-[2.5px]" style={{ background: ink }} aria-hidden="true" />
+                        Conversations
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                        <span className="w-4 h-0 border-t-[2.5px] border-dashed" style={{ borderColor: leadsColor }} aria-hidden="true" />
+                        Leads
+                    </span>
                 </div>
             )}
 
             {/* Chart */}
-            <div className="h-[280px] w-full">
+            <figure className="m-0 h-[260px] w-full" aria-label={`Daily conversations and leads, ${rangeLabel}`}>
                 {loading ? (
-                    <div className={`h-full flex flex-col items-center justify-center gap-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        <RefreshCw size={24} className="animate-spin text-emerald-500" />
+                    <div className={cn('h-full flex flex-col items-center justify-center gap-3', t.hint)}>
+                        <RefreshCw size={22} className="animate-spin" aria-hidden="true" />
                         <span className="text-sm font-medium">Fetching conversation trends...</span>
                     </div>
-                ) : data.length === 0 || data.every(d => d.conversations === 0 && d.leads === 0) ? (
-                    <div className={`h-full flex flex-col items-center justify-center gap-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        <MessageCircle size={32} className="opacity-30" />
-                        <p className="text-sm font-medium">No conversation metrics recorded for this timeframe</p>
+                ) : isEmpty ? (
+                    <div className={cn('h-full flex flex-col items-center justify-center gap-2', t.hint)}>
+                        <MessageSquare size={30} className="opacity-40" aria-hidden="true" />
+                        <p className="m-0 text-sm font-medium">No conversation metrics recorded for this timeframe</p>
                     </div>
                 ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="gradConversations" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="gradLeads" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#0284c7" stopOpacity={0.25} />
-                                    <stop offset="95%" stopColor="#0284c7" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid 
-                                strokeDasharray="4 4" 
-                                vertical={false} 
-                                stroke={isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)'} 
-                            />
+                        <AreaChart data={data} margin={{ top: 10, right: 14, left: -10, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 4" vertical={false} stroke={grid} />
                             <XAxis
                                 dataKey="display"
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: isDark ? '#94A3B8' : '#64748B', fontSize: 12, fontWeight: 500 }}
-                                dy={10}
+                                tick={{ fill: tick, fontSize: 12 }}
+                                dy={8}
                             />
                             <YAxis
                                 axisLine={false}
                                 tickLine={false}
-                                tick={{ fill: isDark ? '#94A3B8' : '#64748B', fontSize: 12, fontWeight: 500 }}
+                                tick={{ fill: tick, fontSize: 12 }}
                                 allowDecimals={false}
+                                width={40}
                             />
-                            <Tooltip content={<CustomTooltip isDark={isDark} />} />
-                            <Legend
-                                verticalAlign="top"
-                                align="right"
-                                wrapperStyle={{ paddingBottom: '15px' }}
-                                formatter={(value) => <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{value}</span>}
-                            />
+                            <Tooltip cursor={{ stroke: grid, strokeWidth: 1 }} content={<VolumeTooltip isDark={isDark} />} />
                             <Area
                                 type="monotone"
                                 dataKey="conversations"
                                 name="Conversations"
-                                stroke="#10b981"
-                                strokeWidth={3}
-                                fill="url(#gradConversations)"
-                                activeDot={{ r: 6, stroke: isDark ? '#0f172a' : '#ffffff', strokeWidth: 2, fill: '#10b981' }}
+                                stroke={ink}
+                                strokeWidth={2.5}
+                                fill={ink}
+                                fillOpacity={0.08}
+                                activeDot={{ r: 5, stroke: isDark ? '#171717' : '#FFFFFF', strokeWidth: 2, fill: ink }}
                             />
                             <Area
                                 type="monotone"
                                 dataKey="leads"
                                 name="Leads"
-                                stroke="#0284c7"
-                                strokeWidth={3}
-                                fill="url(#gradLeads)"
-                                activeDot={{ r: 6, stroke: isDark ? '#0f172a' : '#ffffff', strokeWidth: 2, fill: '#0284c7' }}
+                                stroke={leadsColor}
+                                strokeWidth={2.5}
+                                strokeDasharray="6 4"
+                                fill={leadsColor}
+                                fillOpacity={0.1}
+                                activeDot={{ r: 5, stroke: isDark ? '#171717' : '#FFFFFF', strokeWidth: 2, fill: leadsColor }}
                             />
                         </AreaChart>
                     </ResponsiveContainer>
                 )}
-            </div>
+            </figure>
 
             {/* Footer timestamp */}
-            <p className={`text-xs mt-4 text-right font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <p className={cn('m-0 text-[12.5px] leading-[1.5] text-right', t.hint)}>
                 Last synced at {lastRefreshed.toLocaleTimeString()}
             </p>
-        </div>
+        </Card>
     );
 };
-

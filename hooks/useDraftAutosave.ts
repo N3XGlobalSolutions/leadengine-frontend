@@ -139,7 +139,8 @@ interface UseDraftAutosaveReturn {
     /** Delete the draft on the server */
     deleteDraft: () => Promise<void>;
     /** Force an immediate save (e.g. before navigation) */
-    forceSave: (data: Record<string, any>) => Promise<void>;
+    /** Resolves true when saved (or nothing needed saving), false when the save failed. */
+    forceSave: (data: Record<string, any>) => Promise<boolean>;
     /** Whether the local form is dirty compared to baseline */
     isDirty: boolean;
 }
@@ -168,6 +169,7 @@ export function useDraftAutosave(
     const isMounted = useRef(true);
     const initialDataRef = useRef<Record<string, any> | null>(null);
     const lastSavedDataRef = useRef<Record<string, any> | null>(null);
+    const inFlightSaveRef = useRef<Promise<void> | null>(null);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -186,21 +188,27 @@ export function useDraftAutosave(
      * Creates a new draft if none exists, otherwise updates.
      */
     const saveDraft = useCallback(
-        async (data: Record<string, any>) => {
-            if (!isMounted.current) return;
+        async (data: Record<string, any>): Promise<boolean> => {
+            if (!isMounted.current) return false;
 
             const baseline = draftExistsOnServer.current
                 ? (lastSavedDataRef.current || initialValue || initialDataRef.current)
                 : (initialValue || initialDataRef.current);
 
-            // Skip save if data hasn't actually changed in a meaningful way
+            // Skip save if data hasn't actually changed in a meaningful way (nothing to save counts as success)
             if (!isMeaningfulValue(data, baseline)) {
-                return;
+                return true;
             }
 
             const cleanData = stripSensitive(data);
 
             setSaveStatus('saving');
+
+            // Track the in-flight request so deleteDraft can wait for it (otherwise a save that
+            // finishes after the delete would re-create the draft).
+            let resolveInFlight: () => void = () => {};
+            const inFlight = new Promise<void>((resolve) => { resolveInFlight = resolve; });
+            inFlightSaveRef.current = inFlight;
 
             try {
                 let result: DraftResponse | null;
@@ -226,11 +234,16 @@ export function useDraftAutosave(
                         setSaveStatus('error');
                     }
                 }
+                return !!result;
             } catch (err) {
                 console.error('Draft autosave failed:', err);
                 if (isMounted.current) {
                     setSaveStatus('error');
                 }
+                return false;
+            } finally {
+                resolveInFlight();
+                if (inFlightSaveRef.current === inFlight) inFlightSaveRef.current = null;
             }
         },
         [draftType, initialValue]
@@ -335,6 +348,11 @@ export function useDraftAutosave(
             debounceTimerRef.current = null;
         }
 
+        // Let a save that is already in flight finish first, so it can't re-create the draft after we delete it
+        if (inFlightSaveRef.current) {
+            await inFlightSaveRef.current;
+        }
+
         try {
             await deleteClientDraft(draftType);
         } catch (err) {
@@ -365,8 +383,9 @@ export function useDraftAutosave(
                 ? (lastSavedDataRef.current || initialValue || initialDataRef.current)
                 : (initialValue || initialDataRef.current);
             if (isMeaningfulValue(data, baseline)) {
-                await saveDraft(data);
+                return saveDraft(data);
             }
+            return true; // nothing new to save
         },
         [saveDraft, initialValue]
     );

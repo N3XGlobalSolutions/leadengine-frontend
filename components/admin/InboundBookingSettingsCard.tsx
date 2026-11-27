@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, AlertTriangle, CalendarClock, CheckCircle, Loader2, RefreshCw, Save } from 'lucide-react';
 import { bookingService, InboundBookingSettings } from '../../services/bookingService';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { cn } from '../../utils/cn';
+import { Button, Card, CardHeader, Field, Hint, Input, Select, StatusPill, tone } from './ui/kit';
 
 /**
  * Inbound (website chat) call-booking settings for one client.
@@ -103,11 +105,11 @@ const normalize = (s: Partial<InboundBookingSettings> | null | undefined): Booki
     };
 };
 
-const errorDetail = (err: any, fallback: string): string => {
-    const detail = err?.response?.data?.detail;
+const errorDetail = (err: unknown, fallback: string): string => {
+    const detail = (err as { response?: { data?: { detail?: unknown } } } | null)?.response?.data?.detail;
     if (typeof detail === 'string' && detail.trim()) return detail;
     if (Array.isArray(detail) && detail.length > 0) {
-        const msgs = detail.map((d: any) => (typeof d === 'string' ? d : d?.msg)).filter(Boolean);
+        const msgs = detail.map((d: unknown) => (typeof d === 'string' ? d : (d as { msg?: string } | null)?.msg)).filter(Boolean);
         if (msgs.length) return msgs.join('. ');
     }
     return fallback;
@@ -144,7 +146,7 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
             if (isCancelled()) return;
             applyLoaded(normalize(data));
             setStatus('ready');
-        } catch (err: any) {
+        } catch (err) {
             if (isCancelled()) return;
             setLoadError(errorDetail(err, "Couldn't load call booking settings."));
             setStatus('error');
@@ -267,84 +269,95 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
             applyLoaded(normalize(result ?? payload));
             setSaveMessage({ type: 'success', text: 'Booking settings saved' });
             hideTimer.current = setTimeout(() => setSaveMessage(null), 3000);
-        } catch (err: any) {
+        } catch (err) {
             setSaveMessage({ type: 'error', text: errorDetail(err, "Couldn't save booking settings. Please try again.") });
         } finally {
             setSaving(false);
         }
     };
 
-    // --- Styles (match AdminClientDetailPage) ---
-    const cardClass = `p-4 sm:p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`;
-    const inputClass = `w-full px-3 sm:px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors disabled:cursor-not-allowed ${isDark ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500 [color-scheme:dark]' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'}`;
-    const labelClass = `block text-xs sm:text-sm font-medium mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`;
-    const hintClass = `text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-gray-500'}`;
-    const fieldErrorClass = `text-xs mt-1.5 flex items-center gap-1 ${isDark ? 'text-red-400' : 'text-red-600'}`;
+    // --- Styles (v2 black/white design) ---
+    const t = tone(isDark);
+    const fieldInput = cn('disabled:cursor-not-allowed', isDark && '[color-scheme:dark]');
+    const fieldSelect = 'w-full h-[46px] text-sm font-medium disabled:cursor-not-allowed';
+    const fieldErrorClass = cn('m-0 mt-2 flex items-center gap-1.5 text-[12.5px] font-semibold', isDark ? 'text-red-400' : 'text-[#B91C1C]');
+    const focusRing = cn('focus:outline-none focus-visible:ring-[3px]', isDark ? 'focus-visible:ring-white/25' : 'focus-visible:ring-black/15');
 
     const header = (
-        <div className="mb-5">
-            <h2 className={`text-lg font-semibold mb-1 flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                <CalendarClock size={20} /> Call Booking
-            </h2>
-            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                When a visitor clicks 'Yes, schedule a call', they pick one of these slots in the chat.
-            </p>
-        </div>
+        <CardHeader
+            isDark={isDark}
+            title={
+                <span className="inline-flex items-center gap-2.5">
+                    <CalendarClock size={18} strokeWidth={1.8} aria-hidden="true" /> Call Booking
+                </span>
+            }
+            help="When a visitor clicks 'Yes, schedule a call', they pick one of these slots in the chat."
+        />
     );
 
     if (status === 'loading') {
-        const bar = isDark ? 'bg-slate-700' : 'bg-gray-100';
         return (
-            <div className={cardClass} aria-busy="true" aria-label="Loading call booking settings">
+            <Card isDark={isDark}>
                 {header}
-                <div className="animate-pulse space-y-5">
-                    <div className={`h-6 w-72 max-w-full rounded ${bar}`} />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className={`h-16 rounded-lg ${bar}`} />
-                        <div className={`h-16 rounded-lg ${bar}`} />
-                        <div className={`h-16 rounded-lg ${bar}`} />
-                        <div className={`h-16 rounded-lg ${bar}`} />
+                <div className="animate-pulse flex flex-col gap-[18px]" aria-busy="true" aria-label="Loading call booking settings">
+                    <div className={cn('h-[60px] rounded-xl', t.subtle)} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        <div className={cn('h-[74px] rounded-xl', t.subtle)} />
+                        <div className={cn('h-[74px] rounded-xl', t.subtle)} />
+                        <div className={cn('h-[74px] rounded-xl', t.subtle)} />
+                        <div className={cn('h-[74px] rounded-xl', t.subtle)} />
                     </div>
-                    <div className={`h-10 w-48 rounded-lg ${bar}`} />
+                    <div className={cn('h-11 w-56 max-w-full rounded-[11px]', t.subtle)} />
                 </div>
-            </div>
+            </Card>
         );
     }
 
     if (status === 'error') {
         return (
-            <div className={cardClass}>
+            <Card isDark={isDark}>
                 {header}
                 <div
                     role="alert"
-                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border ${isDark ? 'bg-red-500/10 border-red-500/20 text-red-300' : 'bg-red-50 border-red-200 text-red-700'}`}
+                    className={cn(
+                        'flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 rounded-xl border',
+                        isDark ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-[#FEE2E2] border-[#FECACA] text-[#991B1B]',
+                    )}
                 >
-                    <span className="flex items-center gap-2 text-sm">
-                        <AlertCircle size={16} className="shrink-0" /> {loadError || "Couldn't load call booking settings."}
+                    <span className="flex items-center gap-2 text-[13.5px] font-semibold">
+                        <AlertCircle size={16} className="shrink-0" aria-hidden="true" /> {loadError || "Couldn't load call booking settings."}
                     </span>
-                    <button
-                        type="button"
-                        onClick={() => load()}
-                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors shrink-0 ${isDark ? 'border-slate-600 bg-slate-800 text-white hover:bg-slate-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                        <RefreshCw size={14} /> Retry
-                    </button>
+                    <Button isDark={isDark} variant="secondary" onClick={() => load()} className="min-h-[36px] px-3.5 text-[13px] shrink-0">
+                        <RefreshCw size={14} aria-hidden="true" /> Retry
+                    </Button>
                 </div>
-            </div>
+            </Card>
         );
     }
 
     const fieldsDisabled = !form.enabled || readOnly;
 
     return (
-        <div className={cardClass}>
+        <Card isDark={isDark}>
             {header}
 
             {/* Enabled toggle */}
-            <div className="flex items-center justify-between gap-4">
-                <label htmlFor={`booking-enabled-${tenantId}`} className={`text-sm font-medium cursor-pointer ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>
-                    Let visitors book a call slot in the chat
-                </label>
+            <div
+                className={cn(
+                    'flex items-center justify-between gap-4 px-4 py-3.5 rounded-xl border',
+                    isDark ? 'bg-neutral-950 border-neutral-800' : 'bg-[#FAFAFA] border-[#E5E5E5]',
+                )}
+            >
+                <div className="flex flex-col gap-0.5 min-w-0">
+                    <label htmlFor={`booking-enabled-${tenantId}`} className={cn('text-sm font-bold cursor-pointer', t.text)}>
+                        Let visitors book a call slot in the chat
+                    </label>
+                    {!form.enabled && (
+                        <p className={cn('m-0 text-[12.5px] leading-[1.5]', t.muted)}>
+                            Visitors will be told the team will call them.
+                        </p>
+                    )}
+                </div>
                 <button
                     id={`booking-enabled-${tenantId}`}
                     type="button"
@@ -352,62 +365,59 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
                     aria-checked={form.enabled}
                     disabled={readOnly}
                     onClick={() => update('enabled', !form.enabled)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'focus-visible:ring-offset-slate-800' : 'focus-visible:ring-offset-white'} ${form.enabled ? 'bg-indigo-600' : isDark ? 'bg-slate-600' : 'bg-gray-300'}`}
+                    className={cn(
+                        'flex-none w-12 h-7 rounded-[14px] border-none cursor-pointer p-[3px] flex transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+                        focusRing,
+                        form.enabled
+                            ? (isDark ? 'bg-white justify-end' : 'bg-[#111111] justify-end')
+                            : (isDark ? 'bg-neutral-700 justify-start' : 'bg-[#D4D4D4] justify-start'),
+                    )}
                 >
-                    <span
-                        aria-hidden="true"
-                        className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${form.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
-                    />
+                    <span aria-hidden="true" className={cn('w-[22px] h-[22px] rounded-full shadow-sm', form.enabled && isDark ? 'bg-black' : 'bg-white')} />
                 </button>
             </div>
-            {!form.enabled && (
-                <p className={`text-sm mt-2 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                    Visitors will be told the team will call them.
-                </p>
-            )}
 
             <fieldset
                 disabled={fieldsDisabled}
-                className={`mt-6 space-y-6 transition-opacity ${!form.enabled ? 'opacity-50' : ''}`}
+                className={cn('m-0 p-0 border-0 min-w-0 flex flex-col gap-[18px] transition-opacity', !form.enabled && 'opacity-50')}
             >
                 <legend className="sr-only">Bookable slots</legend>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     {/* Timezone */}
-                    <div>
-                        <label htmlFor={`booking-tz-${tenantId}`} className={labelClass}>Timezone</label>
-                        <select
+                    <Field isDark={isDark} label="Timezone" htmlFor={`booking-tz-${tenantId}`} hint="Slots are shown to visitors in this timezone.">
+                        <Select
+                            isDark={isDark}
                             id={`booking-tz-${tenantId}`}
                             value={form.timezone}
                             onChange={(e) => update('timezone', e.target.value)}
-                            className={inputClass}
+                            className={fieldSelect}
                         >
                             {timezoneOptions.map((tz) => (
                                 <option key={tz.value} value={tz.value}>{tz.label}</option>
                             ))}
-                        </select>
-                        <p className={hintClass}>Slots are shown to visitors in this timezone.</p>
-                    </div>
+                        </Select>
+                    </Field>
 
                     {/* Call length */}
-                    <div>
-                        <label htmlFor={`booking-duration-${tenantId}`} className={labelClass}>Call length</label>
-                        <select
+                    <Field isDark={isDark} label="Call length" htmlFor={`booking-duration-${tenantId}`}>
+                        <Select
+                            isDark={isDark}
                             id={`booking-duration-${tenantId}`}
                             value={form.meeting_duration}
                             onChange={(e) => update('meeting_duration', Number(e.target.value))}
-                            className={inputClass}
+                            className={fieldSelect}
                         >
                             {durationOptions.map((d) => (
                                 <option key={d} value={d}>{d} minutes</option>
                             ))}
-                        </select>
-                    </div>
+                        </Select>
+                    </Field>
                 </div>
 
                 {/* Working days */}
-                <div>
-                    <span id={`booking-days-${tenantId}`} className={labelClass}>Working days</span>
+                <div className="flex flex-col gap-2 min-w-0">
+                    <span id={`booking-days-${tenantId}`} className={cn('text-[13px] font-bold', t.text)}>Working days</span>
                     <div role="group" aria-labelledby={`booking-days-${tenantId}`} className="flex flex-wrap gap-2">
                         {WEEK_DAYS.map((day) => {
                             const selected = form.working_days.includes(day.value);
@@ -418,13 +428,13 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
                                     aria-pressed={selected}
                                     aria-label={day.value.charAt(0).toUpperCase() + day.value.slice(1)}
                                     onClick={() => toggleDay(day.value)}
-                                    className={`min-w-[3.25rem] px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed ${
+                                    className={cn(
+                                        'inline-flex items-center justify-center min-w-[56px] min-h-[38px] px-3.5 rounded-full border text-[13px] font-bold transition-colors cursor-pointer disabled:cursor-not-allowed',
+                                        focusRing,
                                         selected
-                                            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                            : isDark
-                                                ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                            ? (isDark ? 'bg-white text-black border-white' : 'bg-[#0A0A0A] text-white border-[#0A0A0A]')
+                                            : (isDark ? 'bg-neutral-900 text-neutral-300 border-neutral-700 hover:bg-neutral-800' : 'bg-white text-[#333333] border-[#E5E5E5] hover:bg-[#F7F7F7]'),
+                                    )}
                                 >
                                     {day.label}
                                 </button>
@@ -432,46 +442,48 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
                         })}
                     </div>
                     {daysError && (
-                        <p className={fieldErrorClass}><AlertCircle size={12} /> {daysError}</p>
+                        <p className={fieldErrorClass}><AlertCircle size={13} aria-hidden="true" /> {daysError}</p>
                     )}
                 </div>
 
                 {/* Working hours */}
-                <div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor={`booking-start-${tenantId}`} className={labelClass}>Working hours start</label>
-                            <input
+                <div className="min-w-0">
+                    <div className="grid grid-cols-2 gap-3.5">
+                        <Field isDark={isDark} label="Working hours start" htmlFor={`booking-start-${tenantId}`}>
+                            <Input
+                                isDark={isDark}
                                 id={`booking-start-${tenantId}`}
                                 type="time"
                                 value={form.working_hours_start}
                                 onChange={(e) => update('working_hours_start', e.target.value)}
-                                className={inputClass}
+                                className={fieldInput}
+                                invalid={Boolean(hoursError)}
                                 required
                             />
-                        </div>
-                        <div>
-                            <label htmlFor={`booking-end-${tenantId}`} className={labelClass}>Working hours end</label>
-                            <input
+                        </Field>
+                        <Field isDark={isDark} label="Working hours end" htmlFor={`booking-end-${tenantId}`}>
+                            <Input
+                                isDark={isDark}
                                 id={`booking-end-${tenantId}`}
                                 type="time"
                                 value={form.working_hours_end}
                                 onChange={(e) => update('working_hours_end', e.target.value)}
-                                className={inputClass}
+                                className={fieldInput}
+                                invalid={Boolean(hoursError)}
                                 required
                             />
-                        </div>
+                        </Field>
                     </div>
                     {hoursError && (
-                        <p className={fieldErrorClass}><AlertCircle size={12} /> {hoursError}</p>
+                        <p className={fieldErrorClass}><AlertCircle size={13} aria-hidden="true" /> {hoursError}</p>
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     {/* Buffer */}
-                    <div>
-                        <label htmlFor={`booking-buffer-${tenantId}`} className={labelClass}>Gap between calls (minutes)</label>
-                        <input
+                    <Field isDark={isDark} label="Gap between calls (minutes)" htmlFor={`booking-buffer-${tenantId}`} hint="Kept free before and after each booked call.">
+                        <Input
+                            isDark={isDark}
                             id={`booking-buffer-${tenantId}`}
                             type="number"
                             inputMode="numeric"
@@ -484,15 +496,14 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
                                 setSaveMessage(null);
                             }}
                             onBlur={commitBuffer}
-                            className={inputClass}
+                            className={fieldInput}
                         />
-                        <p className={hintClass}>Kept free before and after each booked call.</p>
-                    </div>
+                    </Field>
 
                     {/* Booking window */}
-                    <div>
-                        <label htmlFor={`booking-window-${tenantId}`} className={labelClass}>Booking window (days)</label>
-                        <input
+                    <Field isDark={isDark} label="Booking window (days)" htmlFor={`booking-window-${tenantId}`} hint="How many days ahead visitors can book.">
+                        <Input
+                            isDark={isDark}
                             id={`booking-window-${tenantId}`}
                             type="number"
                             inputMode="numeric"
@@ -505,24 +516,31 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
                                 setSaveMessage(null);
                             }}
                             onBlur={commitDaysAhead}
-                            className={inputClass}
+                            className={fieldInput}
                         />
-                        <p className={hintClass}>How many days ahead visitors can book.</p>
-                    </div>
+                    </Field>
                 </div>
 
                 {/* Live preview */}
                 {form.enabled && !hoursError && (
                     slots.length > 0 ? (
-                        <p className={`text-sm p-3 rounded-lg border ${isDark ? 'bg-slate-900/50 border-slate-700 text-slate-300' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
-                            Visitors will see <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{slots.length} {slots.length === 1 ? 'slot' : 'slots'} per day</span>: {slotPreview}
+                        <p
+                            className={cn(
+                                'm-0 text-[13.5px] leading-[1.55] px-4 py-3 rounded-xl border',
+                                isDark ? 'bg-neutral-950 border-neutral-800 text-neutral-300' : 'bg-[#FAFAFA] border-[#E5E5E5] text-[#525252]',
+                            )}
+                        >
+                            Visitors will see <span className={cn('font-bold', t.text)}>{slots.length} {slots.length === 1 ? 'slot' : 'slots'} per day</span>: {slotPreview}
                         </p>
                     ) : (
                         <p
                             role="status"
-                            className={`text-sm p-3 rounded-lg border flex items-start gap-2 ${isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-700'}`}
+                            className={cn(
+                                'm-0 text-[13.5px] leading-[1.55] px-4 py-3 rounded-xl border flex items-start gap-2',
+                                isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-[#FEF3C7] border-[#FDE68A] text-[#92400E]',
+                            )}
                         >
-                            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                            <AlertTriangle size={16} className="shrink-0 mt-0.5" aria-hidden="true" />
                             <span>
                                 No slots fit: a {form.meeting_duration}-minute call doesn't fit between {formatMinutes(startMin ?? 0)} and {formatMinutes(endMin ?? 0)}. Visitors won't be able to book.
                             </span>
@@ -532,47 +550,45 @@ export const InboundBookingSettingsCard: React.FC<InboundBookingSettingsCardProp
             </fieldset>
 
             {/* Save */}
-            <div className={`mt-6 pt-5 border-t ${isDark ? 'border-slate-700' : 'border-gray-200'}`}>
+            <div className={cn('pt-[18px] border-t', isDark ? 'border-neutral-800' : 'border-[#EEEEEE]')}>
                 {readOnly ? (
-                    <p className={hintClass}>View only - your role can't change booking settings.</p>
+                    <Hint isDark={isDark}>View only - your role can't change booking settings.</Hint>
                 ) : (
-                    <>
+                    <div className="flex flex-col gap-2">
                         <div className="flex flex-wrap items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                            >
+                            <Button isDark={isDark} variant="primary" onClick={handleSave} disabled={saving}>
                                 {saving ? (
-                                    <><Loader2 size={16} className="mr-2 animate-spin" /> Saving...</>
+                                    <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Saving...</>
                                 ) : (
-                                    <><Save size={16} className="mr-2" /> Save booking settings</>
+                                    <><Save size={16} aria-hidden="true" /> Save booking settings</>
                                 )}
-                            </button>
+                            </Button>
                             {isDirty && !saving && saveMessage?.type !== 'error' && (
-                                <span className={`text-xs font-medium ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Unsaved changes</span>
+                                <StatusPill isDark={isDark} tone="amber" className="h-6 text-[11.5px]">Unsaved changes</StatusPill>
                             )}
                             <span aria-live="polite" className="inline-flex">
                                 {saveMessage && (
                                     <span
-                                        className={`inline-flex items-center gap-1.5 text-sm ${
+                                        className={cn(
+                                            'inline-flex items-center gap-1.5 text-[13.5px] font-semibold',
                                             saveMessage.type === 'success'
-                                                ? isDark ? 'text-green-400' : 'text-green-600'
-                                                : isDark ? 'text-red-400' : 'text-red-600'
-                                        }`}
+                                                ? (isDark ? 'text-green-300' : 'text-[#166534]')
+                                                : (isDark ? 'text-red-300' : 'text-[#B91C1C]'),
+                                        )}
                                     >
-                                        {saveMessage.type === 'success' ? <CheckCircle size={16} className="shrink-0" /> : <AlertCircle size={16} className="shrink-0" />}
+                                        {saveMessage.type === 'success'
+                                            ? <CheckCircle size={16} className="shrink-0" aria-hidden="true" />
+                                            : <AlertCircle size={16} className="shrink-0" aria-hidden="true" />}
                                         {saveMessage.text}
                                     </span>
                                 )}
                             </span>
                         </div>
-                        <p className={`${hintClass} mt-2`}>Saved separately from the rest of this page.</p>
-                    </>
+                        <Hint isDark={isDark}>Saved separately from the rest of this page.</Hint>
+                    </div>
                 )}
             </div>
-        </div>
+        </Card>
     );
 };
 

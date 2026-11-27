@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, CalendarCheck, ChevronRight, Phone, RefreshCw } from 'lucide-react';
+import { AlertCircle, Calendar, ChevronRight, Phone, RefreshCw } from 'lucide-react';
 import { bookingService, TenantBooking } from '../../services/bookingService';
 import { formatBookingDateTime } from '../../utils/bookingFormat';
+import { cn } from '../../utils/cn';
+import { Button, Card, Segmented, StatusPill, tone, type PillTone } from './ui/kit';
 
 /**
  * Calls booked by website-chat visitors for one client.
@@ -18,6 +20,11 @@ interface ClientBookingsListProps {
 
 type View = 'upcoming' | 'all';
 
+const VIEW_OPTIONS: { value: View; label: string }[] = [
+    { value: 'upcoming', label: 'Upcoming' },
+    { value: 'all', label: 'All' },
+];
+
 const isPastBooking = (b: TenantBooking, now: number): boolean => {
     const ref = Date.parse(b.end_time || b.start_time);
     return !Number.isNaN(ref) && ref < now;
@@ -29,12 +36,24 @@ const statusLabel = (status: string): string => {
     return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
+/** Booked (upcoming) green, cancelled red, rescheduled amber, past / anything else grey. */
+const statusTone = (status: string, past: boolean): PillTone => {
+    const s = (status || 'BOOKED').toUpperCase();
+    if (s === 'CANCELLED' || s === 'CANCELED') return 'red';
+    if (past) return 'grey';
+    if (s === 'BOOKED') return 'green';
+    if (s === 'RESCHEDULED') return 'amber';
+    return 'grey';
+};
+
 export const ClientBookingsList: React.FC<ClientBookingsListProps> = ({ tenantId, isDark }) => {
     const navigate = useNavigate();
 
     const [view, setView] = useState<View>('upcoming');
     const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading');
     const [bookings, setBookings] = useState<TenantBooking[]>([]);
+    // "now" for the past/upcoming split, captured when the list loads (keeps render pure)
+    const [now, setNow] = useState(0);
 
     const load = useCallback(async (which: View, isCancelled: () => boolean = () => false) => {
         setStatus('loading');
@@ -44,6 +63,7 @@ export const ClientBookingsList: React.FC<ClientBookingsListProps> = ({ tenantId
             const list = Array.isArray(data) ? data : [];
             // API returns "all" oldest first; show newest first
             setBookings(which === 'all' ? [...list].reverse() : list);
+            setNow(Date.now());
             setStatus('ready');
         } catch {
             if (isCancelled()) return;
@@ -64,38 +84,14 @@ export const ClientBookingsList: React.FC<ClientBookingsListProps> = ({ tenantId
         navigate(`/${tenantId}/leads?leadId=${encodeURIComponent(b.lead_id)}`);
     };
 
-    const cardClass = `p-4 sm:p-6 rounded-xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`;
-    const mutedText = isDark ? 'text-slate-400' : 'text-gray-500';
-    const now = Date.now();
-
-    const segmentButton = (value: View, label: string) => {
-        const active = view === value;
-        return (
-            <button
-                type="button"
-                aria-pressed={active}
-                onClick={() => setView(value)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                    active
-                        ? isDark
-                            ? 'bg-slate-700 text-white shadow-sm'
-                            : 'bg-white text-gray-900 shadow-sm'
-                        : isDark
-                            ? 'text-slate-400 hover:text-white'
-                            : 'text-gray-500 hover:text-gray-900'
-                }`}
-            >
-                {label}
-            </button>
-        );
-    };
+    const t = tone(isDark);
 
     let body: React.ReactNode;
     if (status === 'loading') {
         body = (
-            <div className="space-y-2.5 animate-pulse" aria-busy="true" aria-label="Loading call bookings">
+            <div className="flex flex-col gap-2.5 animate-pulse" aria-busy="true" aria-label="Loading call bookings">
                 {[0, 1, 2].map((i) => (
-                    <div key={i} className={`h-[68px] rounded-lg ${isDark ? 'bg-slate-700/60' : 'bg-gray-100'}`} />
+                    <div key={i} className={cn('h-[78px] rounded-xl', t.subtle)} />
                 ))}
             </div>
         );
@@ -103,77 +99,67 @@ export const ClientBookingsList: React.FC<ClientBookingsListProps> = ({ tenantId
         body = (
             <div
                 role="alert"
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border ${isDark ? 'bg-red-500/10 border-red-500/20 text-red-300' : 'bg-red-50 border-red-200 text-red-700'}`}
+                className={cn(
+                    'flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3.5 rounded-xl border',
+                    isDark ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-[#FEE2E2] border-[#FECACA] text-[#991B1B]',
+                )}
             >
-                <span className="flex items-center gap-2 text-sm">
-                    <AlertCircle size={16} className="shrink-0" /> Couldn't load call bookings.
+                <span className="flex items-center gap-2 text-[13.5px] font-semibold">
+                    <AlertCircle size={16} className="shrink-0" aria-hidden="true" /> Couldn't load call bookings.
                 </span>
-                <button
-                    type="button"
-                    onClick={() => load(view)}
-                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors shrink-0 ${isDark ? 'border-slate-600 bg-slate-800 text-white hover:bg-slate-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
-                >
-                    <RefreshCw size={14} /> Retry
-                </button>
+                <Button isDark={isDark} variant="secondary" onClick={() => load(view)} className="min-h-[36px] px-3.5 text-[13px] shrink-0">
+                    <RefreshCw size={14} aria-hidden="true" /> Retry
+                </Button>
             </div>
         );
     } else if (bookings.length === 0) {
         body = (
-            <p className={`text-sm text-center py-8 ${mutedText}`}>
+            <p className={cn('m-0 text-sm text-center py-8 rounded-xl border border-dashed', t.muted, isDark ? 'border-neutral-700' : 'border-[#D4D4D4]')}>
                 {view === 'upcoming' ? 'No upcoming calls booked yet.' : 'No calls booked yet.'}
             </p>
         );
     } else {
         body = (
-            <ul className="space-y-2.5 max-h-[28rem] overflow-y-auto pr-1">
+            <ul className="list-none m-0 p-0 flex flex-col gap-2.5 max-h-[28rem] overflow-y-auto pr-1">
                 {bookings.map((b) => {
                     const past = isPastBooking(b, now);
                     const isBooked = (b.status || 'BOOKED').toUpperCase() === 'BOOKED';
                     const pillText = past && isBooked ? 'Past' : statusLabel(b.status);
-                    const pillClass = past || !isBooked
-                        ? isDark
-                            ? 'bg-slate-700/60 border-slate-600 text-slate-300'
-                            : 'bg-gray-100 border-gray-200 text-gray-600'
-                        : isDark
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                            : 'bg-emerald-50 border-emerald-200 text-emerald-700';
                     const clickable = Boolean(b.lead_id);
                     const name = b.attendee_name || 'Website visitor';
                     const when = formatBookingDateTime(b.start_time, b.timezone);
 
                     const content = (
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                                <p
-                                    className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}
+                        <>
+                            <span className="flex-1 min-w-0 flex flex-col gap-[3px]">
+                                <span
+                                    className={cn('text-sm font-extrabold', t.text)}
                                     title={b.timezone ? `Time shown in ${b.timezone}` : undefined}
                                 >
                                     {when}
-                                </p>
-                                <p className={`text-sm font-medium truncate mt-0.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
-                                    {name}
-                                </p>
+                                </span>
+                                <span className={cn('text-[13.5px] truncate', t.text)}>{name}</span>
                                 {b.attendee_phone && (
-                                    <p className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${mutedText}`}>
+                                    <span className={cn('flex items-center gap-1.5 text-[12.5px] min-w-0', t.muted)}>
                                         <Phone size={12} className="shrink-0" aria-hidden="true" />
                                         <span className="truncate">{b.attendee_phone}</span>
-                                    </p>
+                                    </span>
                                 )}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className={`px-2 py-0.5 rounded-full border text-[11px] font-semibold whitespace-nowrap ${pillClass}`}>
-                                    {pillText}
-                                </span>
-                                {clickable && (
-                                    <ChevronRight size={16} aria-hidden="true" className={isDark ? 'text-slate-500' : 'text-gray-400'} />
-                                )}
-                            </div>
-                        </div>
+                            </span>
+                            <StatusPill isDark={isDark} tone={statusTone(b.status, past)} className="h-6 text-[11.5px] shrink-0">
+                                {pillText}
+                            </StatusPill>
+                            {clickable && (
+                                <ChevronRight size={15} aria-hidden="true" className={cn('shrink-0', t.hint)} />
+                            )}
+                        </>
                     );
 
-                    const rowBase = `w-full text-left p-3 rounded-lg border transition-colors ${past ? 'opacity-60' : ''} ${
-                        isDark ? 'bg-slate-900/40 border-slate-700' : 'bg-gray-50 border-gray-100'
-                    }`;
+                    const rowBase = cn(
+                        'w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-left transition-colors',
+                        past && 'opacity-60',
+                        isDark ? 'bg-neutral-950 border-neutral-800' : 'bg-[#FAFAFA] border-[#E5E5E5]',
+                    );
 
                     return (
                         <li key={b.meeting_id}>
@@ -182,9 +168,13 @@ export const ClientBookingsList: React.FC<ClientBookingsListProps> = ({ tenantId
                                     type="button"
                                     onClick={() => openLead(b)}
                                     aria-label={`${when}, ${name}${b.attendee_phone ? `, ${b.attendee_phone}` : ''}, ${pillText}. Open lead`}
-                                    className={`${rowBase} cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                                        isDark ? 'hover:bg-slate-700/60 hover:border-slate-600' : 'hover:bg-indigo-50/60 hover:border-indigo-200'
-                                    }`}
+                                    className={cn(
+                                        rowBase,
+                                        'cursor-pointer focus:outline-none focus-visible:ring-[3px]',
+                                        isDark
+                                            ? 'hover:bg-neutral-800/70 hover:border-neutral-700 focus-visible:ring-white/25'
+                                            : 'hover:bg-[#F2F2F2] hover:border-[#D4D4D4] focus-visible:ring-black/15',
+                                    )}
                                 >
                                     {content}
                                 </button>
@@ -199,25 +189,18 @@ export const ClientBookingsList: React.FC<ClientBookingsListProps> = ({ tenantId
     }
 
     return (
-        <div className={cardClass}>
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
-                <div className="min-w-0">
-                    <h2 className={`text-lg font-semibold flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        <CalendarCheck size={20} /> Call Bookings
+        <Card isDark={isDark}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-col gap-1 min-w-0">
+                    <h2 className={cn('m-0 flex items-center gap-2.5 text-[18px] font-extrabold tracking-[-0.02em]', t.text)}>
+                        <Calendar size={18} strokeWidth={1.8} aria-hidden="true" /> Call Bookings
                     </h2>
-                    <p className={`text-sm mt-1 ${mutedText}`}>Calls booked by visitors in the website chat.</p>
+                    <p className={cn('m-0 text-[13px] leading-[1.55]', t.muted)}>Calls booked by visitors in the website chat.</p>
                 </div>
-                <div
-                    role="group"
-                    aria-label="Show bookings"
-                    className={`inline-flex self-start p-1 rounded-lg border shrink-0 ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-gray-100 border-gray-200'}`}
-                >
-                    {segmentButton('upcoming', 'Upcoming')}
-                    {segmentButton('all', 'All')}
-                </div>
+                <Segmented<View> isDark={isDark} ariaLabel="Show bookings" value={view} onChange={setView} options={VIEW_OPTIONS} />
             </div>
             {body}
-        </div>
+        </Card>
     );
 };
 

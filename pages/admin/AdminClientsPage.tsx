@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, Users, Calendar, ChevronRight, Pause, Play, RefreshCw, Building2, LayoutGrid, ListFilter, X } from 'lucide-react';
+import { Plus, Users, Calendar, ChevronRight, RefreshCw, LayoutGrid, List, X } from 'lucide-react';
 import { Client } from '@/types/admin';
 import { getClientsPaginated, getAllClientConversationCounts } from '../../services/adminService';
 import { useAdminTheme } from '../../contexts/AdminThemeContext';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { SkeletonClientsGrid } from '../../components/admin/SkeletonLoader';
+import {
+    PageContainer, PageHeader, StatusPill, clientStatusTone, FilterChip, Segmented, SearchField, Select,
+    IconButton, SmallLabel, Mono, InitialTile, TableCard, Table, Th, Td, trClass, EmptyState, ListFooterText,
+    Card, Mark, buttonClass, tone,
+} from '../../components/admin/ui/kit';
+import { cn } from '../../utils/cn';
+
+/** Plan code → display label (matches previous behaviour: S3_MAX / S3_MAPPING get spaces, others shown as-is). */
+const planLabel = (plan: string) => (plan === 'S3_MAX' ? 'S3 MAX' : plan === 'S3_MAPPING' ? 'S3 MAPPING' : plan);
 
 export const AdminClientsPage: React.FC = () => {
     const { isDark } = useAdminTheme();
@@ -15,10 +24,10 @@ export const AdminClientsPage: React.FC = () => {
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [totalClients, setTotalClients] = useState<number>(0);
     const [serverPlanCounts, setServerPlanCounts] = useState<Record<string, number>>({});
-    
+
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    
+
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -48,6 +57,12 @@ export const AdminClientsPage: React.FC = () => {
         S3: serverPlanCounts['S3'] ?? clients.filter(c => c.plan === 'S3').length,
         S3_MAX: serverPlanCounts['S3_MAX'] ?? clients.filter(c => c.plan === 'S3_MAX').length,
         S3_MAPPING: serverPlanCounts['S3_MAPPING'] ?? clients.filter(c => c.plan === 'S3_MAPPING').length,
+        // The server's planCounts has no S3_INTERNATIONAL bucket yet: only count from the loaded list when it
+        // is the complete, unfiltered (or S3_INTERNATIONAL-filtered) result, otherwise hide the count.
+        S3_INTERNATIONAL: serverPlanCounts['S3_INTERNATIONAL']
+            ?? (!loading && !nextCursor && statusFilter === 'all' && !debouncedSearch && (planFilter === 'all' || planFilter === 'S3_INTERNATIONAL')
+                ? clients.filter(c => c.plan === 'S3_INTERNATIONAL').length
+                : undefined),
     };
 
     // Function to fetch conversation counts incrementally for loaded clients
@@ -107,7 +122,7 @@ export const AdminClientsPage: React.FC = () => {
                 plan: planFilter,
                 sort: sortOption,
             });
-            
+
             setClients(prev => [...prev, ...res.clients]);
             setNextCursor(res.nextCursor);
             if (res.total) setTotalClients(res.total);
@@ -182,379 +197,254 @@ export const AdminClientsPage: React.FC = () => {
         return matchesDateRange;
     });
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'Active':
-                return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
-            case 'Onboarding':
-                return 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20';
-            case 'Paused':
-                return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
-            default:
-                return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700';
-        }
-    };
+    const t = tone(isDark);
 
-    const getAvatarColor = (name: string) => {
-        const charCode = name.charCodeAt(0) || 0;
-        const colors = [
-            'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
-            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
-            'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30',
-            'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
-            'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30',
-            'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30',
-            'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
-            'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
-        ];
-        return colors[charCode % colors.length];
-    };
+    const planOptions: { id: string; label: string; count?: number }[] = [
+        { id: 'all', label: 'All Plans', count: planCounts.all },
+        { id: 'S1', label: 'S1', count: planCounts.S1 },
+        { id: 'S2', label: 'S2', count: planCounts.S2 },
+        { id: 'S3', label: 'S3', count: planCounts.S3 },
+        { id: 'S3_INTERNATIONAL', label: 'S3 INTERNATIONAL', count: planCounts.S3_INTERNATIONAL },
+        { id: 'S3_MAX', label: 'S3 MAX', count: planCounts.S3_MAX },
+        { id: 'S3_MAPPING', label: 'S3 MAPPING', count: planCounts.S3_MAPPING },
+    ];
+
+    const statusOptions = [
+        { id: 'all', label: 'All Statuses' },
+        { id: 'Active', label: 'Active' },
+        { id: 'Onboarding', label: 'Onboarding' },
+        { id: 'Paused', label: 'Paused' },
+        { id: 'Inactive', label: 'Inactive' },
+    ];
+
+    const dividerBorder = isDark ? 'border-neutral-800' : 'border-[#EEEEEE]';
+    const iconMuted = isDark ? 'text-neutral-400' : 'text-[#525252]';
+    const dateInputClass = cn(
+        'h-9 px-2.5 rounded-[10px] border-[1.5px] text-[12.5px] font-semibold cursor-pointer focus:outline-none focus:ring-[3px]',
+        isDark
+            ? 'bg-neutral-950 border-neutral-700 text-white focus:border-white focus:ring-white/15 [color-scheme:dark]'
+            : 'bg-white border-[#E5E5E5] text-[#0A0A0A] focus:border-[#111111] focus:ring-black/10',
+    );
+
+    const usersLabel = (client: Client) => `${(conversationCounts[client.id] ?? 0).toLocaleString()} users`;
+    const dateLabel = (client: Client) => client.onboardedDate || '—';
 
     return (
-        <AdminLayout>
-            <div className="space-y-6 pb-8">
-                {/* Header Banner - Black & White Theme */}
-                <div className={`p-6 sm:p-8 rounded-3xl border shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6 transition-all ${
-                    isDark 
-                        ? 'bg-slate-900 border-slate-800 text-white' 
-                        : 'bg-white border-slate-200/80 text-slate-900'
-                }`}>
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
-                                isDark 
-                                    ? 'bg-slate-800 text-slate-200 border-slate-700' 
-                                    : 'bg-slate-100 text-slate-800 border-slate-200'
-                            }`}>
-                                <Building2 size={13} />
-                                Tenant Management
-                            </span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                                isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
-                            }`}>
-                                {totalClients || filteredClients.length} total
-                            </span>
+        <AdminLayout breadcrumb={[{ label: 'Operations' }, { label: 'Clients' }]}>
+            <PageContainer>
+                {/* Header */}
+                <PageHeader
+                    isDark={isDark}
+                    eyebrow="Tenant Management"
+                    eyebrowIcon={
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-6h6v6" /></svg>
+                    }
+                    badge={<StatusPill isDark={isDark} tone="out">{totalClients || filteredClients.length} total</StatusPill>}
+                    title={<>Client <Mark isDark={isDark}>Directory</Mark></>}
+                    description="Manage client configurations, multi-tenant permissions, and automated WhatsApp integrations."
+                    actions={
+                        <>
+                            <IconButton
+                                isDark={isDark}
+                                label="Refresh clients list"
+                                size={44}
+                                onClick={() => loadInitialClients()}
+                                disabled={loading}
+                            >
+                                <RefreshCw size={16} strokeWidth={2} className={loading ? 'animate-spin' : ''} />
+                            </IconButton>
+                            {user?.role !== 'sales_team' && (
+                                <Link to="/admin/clients/new" className={buttonClass(isDark, 'primary')}>
+                                    <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
+                                    Add New Client
+                                </Link>
+                            )}
+                        </>
+                    }
+                />
+
+                {/* Filters */}
+                <Card isDark={isDark} className="gap-4 p-[18px]">
+                    {/* Plan chips + Grid/List toggle */}
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                        <div role="tablist" aria-label="Plan" className="flex flex-wrap gap-1.5">
+                            {planOptions.map(plan => (
+                                <FilterChip
+                                    key={plan.id}
+                                    isDark={isDark}
+                                    selected={planFilter === plan.id}
+                                    onClick={() => setPlanFilter(plan.id)}
+                                    count={plan.count}
+                                >
+                                    {plan.label}
+                                </FilterChip>
+                            ))}
                         </div>
-                        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Client Directory</h1>
-                        <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Manage client configurations, multi-tenant permissions, and automated WhatsApp integrations.
-                        </p>
+                        <Segmented
+                            isDark={isDark}
+                            ariaLabel="View"
+                            value={viewMode}
+                            onChange={setViewMode}
+                            options={[
+                                { value: 'grid', label: <><LayoutGrid size={14} strokeWidth={2} aria-hidden="true" />Grid</> },
+                                { value: 'list', label: <><List size={14} strokeWidth={2} aria-hidden="true" />List</> },
+                            ]}
+                        />
                     </div>
 
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button
-                            onClick={() => loadInitialClients()}
-                            disabled={loading}
-                            className={`p-3.5 rounded-xl border transition-all flex items-center justify-center ${
-                                isDark 
-                                    ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200' 
-                                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 shadow-sm'
-                            }`}
-                            title="Refresh Clients List"
-                        >
-                            <RefreshCw size={18} className={loading ? 'animate-spin text-slate-900 dark:text-white' : ''} />
-                        </button>
-                        {user?.role !== 'sales_team' && (
-                            <Link 
-                                to="/admin/clients/new" 
-                                className="flex-1 md:flex-initial px-6 py-3.5 bg-slate-900 hover:bg-black text-white dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 rounded-xl font-bold text-sm shadow-md border border-slate-800 dark:border-white transition-all flex items-center justify-center gap-2 group"
-                            >
-                                <Plus size={18} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
-                                <span>Add New Client</span>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
-                {/* Filters Section */}
-                <div className={`p-5 rounded-3xl border shadow-sm transition-all ${
-                    isDark 
-                        ? 'bg-slate-900 border-slate-800' 
-                        : 'bg-white border-slate-200/80'
-                }`}>
-                    {/* Top Row: Plan Filter Pills (Left) & Layout View Switcher (Right) */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        {/* Plan Filter Capsule Pills with Count Badges */}
-                        <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-                            {[
-                                { id: 'all', label: 'All Plans', count: planCounts['all'] },
-                                { id: 'S1', label: 'S1', count: planCounts['S1'] },
-                                { id: 'S2', label: 'S2', count: planCounts['S2'] },
-                                { id: 'S3', label: 'S3', count: planCounts['S3'] },
-                                { id: 'S3_MAX', label: 'S3 MAX', count: planCounts['S3_MAX'] },
-                                { id: 'S3_MAPPING', label: 'S3 MAPPING', count: planCounts['S3_MAPPING'] },
-                            ].map(plan => {
-                                const isActive = planFilter === plan.id;
-                                return (
-                                    <button
-                                        key={plan.id}
-                                        onClick={() => setPlanFilter(plan.id)}
-                                        className={`px-4 py-2.5 rounded-full font-semibold text-sm flex items-center gap-2 transition-all shrink-0 ${
-                                            isActive
-                                                ? (isDark ? 'bg-white text-slate-900 font-bold shadow-sm' : 'bg-slate-950 text-white font-bold shadow-sm')
-                                                : (isDark ? 'bg-slate-950 border border-slate-800 text-slate-300 hover:bg-slate-800' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50')
-                                        }`}
-                                    >
-                                        <span className="tracking-tight">{plan.label}</span>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                                            isActive
-                                                ? (isDark ? 'bg-slate-200 text-slate-900' : 'bg-zinc-800 text-zinc-200')
-                                                : (isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700')
-                                        }`}>
-                                            {plan.count}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Layout View Switcher Segmented Control */}
-                        <div className={`p-1 rounded-full flex items-center gap-1 border shrink-0 ${
-                            isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100/90 border-slate-200/80'
-                        }`}>
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                                    viewMode === 'grid'
-                                        ? (isDark ? 'bg-slate-800 text-white font-bold shadow-sm border border-slate-700' : 'bg-white text-slate-900 font-bold shadow-sm border border-slate-200/80')
-                                        : (isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900')
-                                }`}
-                            >
-                                <LayoutGrid size={15} />
-                                <span>Grid</span>
-                            </button>
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className={`px-4 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                                    viewMode === 'list'
-                                        ? (isDark ? 'bg-slate-800 text-white font-bold shadow-sm border border-slate-700' : 'bg-white text-slate-900 font-bold shadow-sm border border-slate-200/80')
-                                        : (isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900')
-                                }`}
-                            >
-                                <ListFilter size={15} />
-                                <span>List</span>
-                            </button>
+                    {/* Search + status chips */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <SearchField
+                            isDark={isDark}
+                            label="Search clients"
+                            placeholder="Search by client name, slug, or ID..."
+                            value={searchTerm}
+                            onChange={setSearchTerm}
+                            className="flex-[1_1_260px]"
+                        />
+                        <div role="tablist" aria-label="Status" className="flex flex-wrap gap-1.5">
+                            {statusOptions.map(status => (
+                                <FilterChip
+                                    key={status.id}
+                                    isDark={isDark}
+                                    selected={statusFilter === status.id}
+                                    onClick={() => setStatusFilter(status.id)}
+                                >
+                                    {status.label}
+                                </FilterChip>
+                            ))}
                         </div>
                     </div>
 
-                    <div className={`border-b my-3.5 ${isDark ? 'border-slate-800' : 'border-slate-100'}`} />
-
-                    {/* Bottom Row: Search Box & Status Filter Pills */}
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                        <div className="relative flex-1">
-                            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-400' : 'text-slate-400'}`} size={17} />
+                    {/* Date range + sort */}
+                    <div className={cn('flex flex-wrap items-center justify-between gap-2.5 pt-3.5 border-t', dividerBorder)}>
+                        <span className="flex flex-wrap items-center gap-2">
+                            <SmallLabel isDark={isDark} className="flex items-center gap-1.5">
+                                <Calendar size={15} strokeWidth={1.8} className={iconMuted} aria-hidden="true" />
+                                Date range:
+                            </SmallLabel>
+                            <label htmlFor="clients-date-from" className={cn('text-[12.5px]', t.muted)}>
+                                From<span className="sr-only"> date</span>
+                            </label>
                             <input
-                                type="text"
-                                placeholder="Search by client name, slug, or ID..."
-                                className={`w-full pl-11 pr-4 py-2.5 border rounded-full text-sm font-medium focus:outline-none focus:ring-2 transition-all ${
-                                    isDark
-                                        ? 'bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:ring-slate-700'
-                                        : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:ring-slate-300'
-                                }`}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                id="clients-date-from"
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className={dateInputClass}
                             />
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 overflow-x-auto">
-                            {[
-                                { id: 'all', label: 'All Statuses' },
-                                { id: 'Active', label: 'Active' },
-                                { id: 'Onboarding', label: 'Onboarding' },
-                                { id: 'Paused', label: 'Paused' },
-                                { id: 'Inactive', label: 'Inactive' },
-                            ].map(status => {
-                                const isActive = statusFilter === status.id;
-                                return (
-                                    <button
-                                        key={status.id}
-                                        onClick={() => setStatusFilter(status.id)}
-                                        className={`px-4 py-2 rounded-full font-semibold text-sm transition-all shrink-0 ${
-                                            isActive
-                                                ? (isDark ? 'bg-white text-slate-900 font-bold shadow-sm' : 'bg-slate-950 text-white font-bold shadow-sm')
-                                                : (isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200/70')
-                                        }`}
-                                    >
-                                        {status.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Date Range & Sort Order */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3.5 mt-3.5 border-t border-slate-100 dark:border-slate-800/80">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                <Calendar size={14} className="text-slate-400" />
-                                <span>Date Range:</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-semibold text-slate-400">From</span>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border focus:outline-none focus:ring-2 transition-all ${
-                                        isDark
-                                            ? 'bg-slate-950 border-slate-800 text-white focus:ring-slate-700'
-                                            : 'bg-white border-slate-200 text-slate-800 focus:ring-slate-300 shadow-sm'
-                                    }`}
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-semibold text-slate-400">To</span>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border focus:outline-none focus:ring-2 transition-all ${
-                                        isDark
-                                            ? 'bg-slate-950 border-slate-800 text-white focus:ring-slate-700'
-                                            : 'bg-white border-slate-200 text-slate-800 focus:ring-slate-300 shadow-sm'
-                                    }`}
-                                />
-                            </div>
-
+                            <label htmlFor="clients-date-to" className={cn('text-[12.5px]', t.muted)}>
+                                To<span className="sr-only"> date</span>
+                            </label>
+                            <input
+                                id="clients-date-to"
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className={dateInputClass}
+                            />
                             {(startDate || endDate) && (
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         setStartDate('');
                                         setEndDate('');
                                     }}
-                                    className="px-3 py-1.5 rounded-full text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-all flex items-center gap-1"
+                                    className={buttonClass(isDark, 'ghost', 'min-h-[36px] text-[12.5px] gap-1')}
                                 >
-                                    <X size={13} />
-                                    <span>Reset Dates</span>
+                                    <X size={13} aria-hidden="true" />
+                                    Reset dates
                                 </button>
                             )}
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sort:</span>
-                            <select
+                        </span>
+                        <span className="flex items-center gap-2">
+                            <label htmlFor="clients-sort"><SmallLabel isDark={isDark}>Sort:</SmallLabel></label>
+                            <Select
+                                id="clients-sort"
+                                isDark={isDark}
+                                size="sm"
                                 value={sortOption}
                                 onChange={(e) => setSortOption(e.target.value)}
-                                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border focus:outline-none focus:ring-2 transition-all cursor-pointer ${
-                                    isDark
-                                        ? 'bg-slate-950 border-slate-800 text-white focus:ring-slate-700'
-                                        : 'bg-white border-slate-200 text-slate-900 focus:ring-slate-300 shadow-sm'
-                                }`}
                             >
                                 <option value="newest">Newest First (Date ↓)</option>
                                 <option value="oldest">Oldest First (Date ↑)</option>
                                 <option value="a-z">Name (A - Z)</option>
                                 <option value="z-a">Name (Z - A)</option>
-                            </select>
-                        </div>
+                            </Select>
+                        </span>
                     </div>
-                </div>
+                </Card>
 
-                {/* Clients Grid or List View */}
+                {/* Clients grid / list */}
                 {loading ? (
                     <SkeletonClientsGrid isDark={isDark} count={6} />
                 ) : filteredClients.length === 0 ? (
-                    <div className={`text-center py-16 rounded-3xl border ${
-                        isDark ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
-                    }`}>
-                        <p className="text-sm font-medium">No clients found matching your filter criteria.</p>
-                    </div>
+                    <EmptyState
+                        isDark={isDark}
+                        title="No clients found"
+                        description="No clients found matching your filter criteria."
+                    />
                 ) : viewMode === 'list' ? (
-                    <div className={`rounded-3xl border overflow-hidden shadow-sm transition-all ${
-                        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
-                    }`}>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className={`border-b text-[11px] font-bold uppercase tracking-wider ${
-                                        isDark ? 'border-slate-800 text-slate-400 bg-slate-950/60' : 'border-slate-100 text-slate-500 bg-slate-50/80'
-                                    }`}>
-                                        <th className="py-3.5 px-6">Client Name</th>
-                                        <th className="py-3.5 px-4">Status</th>
-                                        <th className="py-3.5 px-4">Subscription Plan</th>
-                                        <th className="py-3.5 px-4">Users</th>
-                                        <th className="py-3.5 px-4">Onboarded</th>
-                                        <th className="py-3.5 px-6 text-right">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className={`divide-y text-xs font-medium ${
-                                    isDark ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-100 text-slate-700'
-                                }`}>
-                                    {filteredClients.map((client) => {
-                                        const isS3Max = client.plan === 'S3_MAX';
-                                        const isS3Mapping = client.plan === 'S3_MAPPING';
-                                        return (
-                                            <tr 
-                                                key={client.id}
-                                                className={`transition-colors ${
-                                                    isS3Max
-                                                        ? (isDark ? 'bg-amber-500/[0.04] hover:bg-amber-500/10' : 'bg-amber-50/40 hover:bg-amber-50/80')
-                                                        : isS3Mapping
-                                                        ? (isDark ? 'bg-sky-500/[0.04] hover:bg-sky-500/10' : 'bg-sky-50/40 hover:bg-sky-50/80')
-                                                        : (isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50/80')
-                                                }`}
-                                            >
-                                                <td className="py-3.5 px-6">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm font-extrabold border shadow-sm ${getAvatarColor(client.name)}`}>
-                                                            {client.name.charAt(0).toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <div className={`font-extrabold text-sm flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                                                                <span>{client.name}</span>
-                                                            </div>
-                                                            <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-tight">/{client.slug}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="py-3.5 px-4">
-                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(client.status)}`}>
-                                                        {client.status}
+                    <TableCard isDark={isDark}>
+                        <Table>
+                            <thead>
+                                <tr>
+                                    <Th isDark={isDark}>Client Name</Th>
+                                    <Th isDark={isDark}>Status</Th>
+                                    <Th isDark={isDark}>Subscription Plan</Th>
+                                    <Th isDark={isDark}>Users</Th>
+                                    <Th isDark={isDark}>Onboarded</Th>
+                                    <Th isDark={isDark} className="text-right">Action</Th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredClients.map((client) => {
+                                    const isS3Max = client.plan === 'S3_MAX';
+                                    return (
+                                        <tr
+                                            key={client.id}
+                                            className={cn(
+                                                trClass(isDark),
+                                                'transition-colors',
+                                                isS3Max
+                                                    ? (isDark ? 'bg-neutral-800/40' : 'bg-[#FAFAFA]')
+                                                    : (isDark ? 'hover:bg-neutral-800/30' : 'hover:bg-[#FAFAFA]'),
+                                            )}
+                                        >
+                                            <Td isDark={isDark}>
+                                                <span className="flex items-center gap-3">
+                                                    <InitialTile isDark={isDark} name={client.name} size={34} />
+                                                    <span className="flex flex-col gap-px min-w-0">
+                                                        <span className="font-bold">{client.name}</span>
+                                                        <Mono isDark={isDark}>/{client.slug}</Mono>
                                                     </span>
-                                                </td>
-                                                <td className="py-3.5 px-4">
-                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
-                                                        isS3Max
-                                                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                                                            : isS3Mapping
-                                                            ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30'
-                                                            : (isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700')
-                                                    }`}>
-                                                        {client.plan === 'S3_MAX' ? 'S3 MAX' : client.plan === 'S3_MAPPING' ? 'S3 MAPPING' : client.plan}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3.5 px-4 font-bold text-sm text-slate-700 dark:text-slate-300">
-                                                    {(conversationCounts[client.id] ?? 0).toLocaleString()} users
-                                                </td>
-                                                <td className="py-3.5 px-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                                    {client.onboardedDate || '2026-01-15'}
-                                                </td>
-                                                <td className="py-3.5 px-6 text-right">
-                                                    <Link 
-                                                        to={`/admin/clients/${client.id}`}
-                                                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                                                            isS3Max
-                                                                ? 'bg-amber-500 text-white hover:bg-amber-600 border-amber-600 shadow-sm'
-                                                                : isS3Mapping
-                                                                ? 'bg-sky-600 text-white hover:bg-sky-700 border-sky-700 shadow-sm'
-                                                                : (isDark ? 'bg-slate-800 border-slate-700 text-white hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200')
-                                                        }`}
-                                                    >
-                                                        <span>View Tenant</span>
-                                                        <ChevronRight size={14} />
-                                                    </Link>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                                </span>
+                                            </Td>
+                                            <Td isDark={isDark}>
+                                                <StatusPill isDark={isDark} tone={clientStatusTone(client.status)}>{client.status}</StatusPill>
+                                            </Td>
+                                            <Td isDark={isDark}>
+                                                <StatusPill isDark={isDark} tone="soft">{planLabel(client.plan)}</StatusPill>
+                                            </Td>
+                                            <Td isDark={isDark} className="font-bold whitespace-nowrap">{usersLabel(client)}</Td>
+                                            <Td isDark={isDark} className="font-semibold whitespace-nowrap">{dateLabel(client)}</Td>
+                                            <Td isDark={isDark} className="text-right">
+                                                <Link
+                                                    to={`/admin/clients/${client.id}`}
+                                                    className={buttonClass(isDark, isS3Max ? 'primary' : 'secondary', 'min-h-[38px] px-3 text-[13px]')}
+                                                >
+                                                    View Tenant
+                                                    <ChevronRight size={14} strokeWidth={2.2} aria-hidden="true" />
+                                                </Link>
+                                            </Td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </Table>
+                    </TableCard>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
                         {filteredClients.map((client) => {
                             const isS3Max = client.plan === 'S3_MAX';
                             const isS3Mapping = client.plan === 'S3_MAPPING';
@@ -563,110 +453,98 @@ export const AdminClientsPage: React.FC = () => {
                                 <Link
                                     key={client.id}
                                     to={`/admin/clients/${client.id}`}
-                                    className={`group relative p-6 rounded-3xl border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between ${
+                                    className={cn(
+                                        'group relative flex flex-col gap-3.5 rounded-2xl no-underline transition-colors',
+                                        'focus-visible:outline-none focus-visible:ring-[3px]',
+                                        isDark ? 'bg-neutral-900 text-white focus-visible:ring-white/20' : 'bg-white text-[#0A0A0A] focus-visible:ring-black/15',
                                         isS3Max
-                                            ? (isDark 
-                                                ? 'bg-slate-900 border-amber-500/50 hover:border-amber-400 shadow-lg shadow-amber-500/5' 
-                                                : 'bg-gradient-to-b from-amber-50/50 via-white to-white border-amber-400 hover:border-amber-500 shadow-lg shadow-amber-500/10')
-                                            : isS3Mapping
-                                            ? (isDark 
-                                                ? 'bg-slate-900 border-sky-500/50 hover:border-sky-400 shadow-lg shadow-sky-500/5' 
-                                                : 'bg-gradient-to-b from-sky-50/50 via-white to-white border-sky-400 hover:border-sky-500 shadow-lg shadow-sky-500/10')
-                                            : (isDark 
-                                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700' 
-                                                : 'bg-white border-slate-200/90 hover:border-slate-300')
-                                    } ${isDark ? 'text-white' : 'text-slate-900'}`}
+                                            ? cn('border-2 p-[19px]', isDark ? 'border-white' : 'border-[#0A0A0A]')
+                                            : cn('border p-5', isDark ? 'border-neutral-800 hover:border-neutral-600' : 'border-[#E5E5E5] hover:border-[#D4D4D4]'),
+                                    )}
                                 >
                                     {isS3Max && (
-                                        <div className="absolute -top-3.5 right-6 px-3.5 py-1 rounded-full text-[11px] font-bold bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-white shadow-md border border-amber-300/40">
-                                            <span>S3 MAX PLATFORM</span>
-                                        </div>
+                                        <span className={cn(
+                                            'absolute -top-[11px] right-4 text-[10.5px] font-extrabold tracking-[0.06em] px-2.5 py-1 rounded-full',
+                                            isDark ? 'bg-white text-black' : 'bg-[#0A0A0A] text-white',
+                                        )}>
+                                            S3 MAX PLATFORM
+                                        </span>
                                     )}
-
                                     {isS3Mapping && (
-                                        <div className="absolute -top-3.5 right-6 px-3.5 py-1 rounded-full text-[11px] font-bold bg-gradient-to-r from-sky-500 via-blue-600 to-sky-500 text-white shadow-md border border-sky-300/40">
-                                            <span>S3 MAPPING ENGINE</span>
-                                        </div>
+                                        <span className={cn(
+                                            'absolute -top-[11px] right-4 text-[10.5px] font-extrabold tracking-[0.06em] px-2.5 py-[3px] rounded-full border',
+                                            isDark ? 'bg-neutral-900 text-white border-neutral-600' : 'bg-white text-[#0A0A0A] border-[#0A0A0A]',
+                                        )}>
+                                            S3 MAPPING ENGINE
+                                        </span>
                                     )}
 
-                                    <div>
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="flex items-center gap-3.5">
-                                                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-lg font-black border shadow-sm transition-transform duration-300 group-hover:scale-105 ${getAvatarColor(client.name)}`}>
-                                                    {client.name.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-extrabold text-lg flex items-center gap-1.5 tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                                        <span>{client.name}</span>
-                                                    </h3>
-                                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-tight mt-0.5">
-                                                        /{client.slug}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
-                                                isS3Max 
-                                                    ? 'bg-amber-500/10 text-amber-600 group-hover:bg-amber-500 group-hover:text-white' 
-                                                    : isS3Mapping
-                                                    ? 'bg-sky-500/10 text-sky-600 group-hover:bg-sky-500 group-hover:text-white'
-                                                    : (isDark ? 'bg-slate-800 text-slate-400 group-hover:text-white group-hover:bg-slate-700' : 'bg-slate-100 text-slate-400 group-hover:text-slate-900 group-hover:bg-slate-200')
-                                            }`}>
-                                                <ChevronRight className="transition-transform duration-200 group-hover:translate-x-0.5" size={16} />
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap items-center gap-2 mb-6">
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(client.status)}`}>
-                                                {client.status === 'Paused' && <Pause size={11} className="mr-1" />}
-                                                {client.status === 'Active' && <Play size={11} className="mr-1" />}
-                                                {client.status}
-                                            </span>
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
-                                                isS3Max
-                                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                                                    : isS3Mapping
-                                                    ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30'
-                                                    : (isDark ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700')
-                                            }`}>
-                                                {client.plan === 'S3_MAX' ? 'S3 MAX' : client.plan === 'S3_MAPPING' ? 'S3 MAPPING' : client.plan}
-                                            </span>
-                                        </div>
+                                    <div className="flex items-start gap-3">
+                                        <InitialTile isDark={isDark} name={client.name} size={40} />
+                                        <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                            <span className="text-base font-extrabold break-words">{client.name}</span>
+                                            <Mono isDark={isDark} className="truncate">/{client.slug}</Mono>
+                                        </span>
+                                        <span className={cn(
+                                            'w-7 h-7 flex-none rounded-full border flex items-center justify-center transition-colors',
+                                            isDark ? 'border-neutral-700 group-hover:bg-neutral-800' : 'border-[#E5E5E5] group-hover:bg-[#F2F2F2]',
+                                        )}>
+                                            <ChevronRight size={14} strokeWidth={2.2} className={iconMuted} aria-hidden="true" />
+                                        </span>
                                     </div>
 
-                                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                                        <div className="flex items-center gap-2 font-medium text-sm text-slate-700 dark:text-slate-300">
+                                    <span className="flex flex-wrap gap-1.5">
+                                        <StatusPill isDark={isDark} tone={clientStatusTone(client.status)}>{client.status}</StatusPill>
+                                        <StatusPill isDark={isDark} tone="soft">{planLabel(client.plan)}</StatusPill>
+                                    </span>
+
+                                    <span className={cn(
+                                        'mt-auto flex justify-between gap-3 pt-3 border-t text-[13px]',
+                                        dividerBorder,
+                                        isDark ? 'text-neutral-300' : 'text-[#333333]',
+                                    )}>
+                                        <span className="flex items-center gap-1.5">
                                             {countsLoading ? (
-                                                <RefreshCw size={15} className="animate-spin text-slate-900 dark:text-white" />
+                                                <RefreshCw size={15} strokeWidth={1.8} className={cn('animate-spin', iconMuted)} aria-hidden="true" />
                                             ) : (
-                                                <Users size={18} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+                                                <Users size={15} strokeWidth={1.8} className={iconMuted} aria-hidden="true" />
                                             )}
-                                            <span>{(conversationCounts[client.id] ?? 0).toLocaleString()} users</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                            <Calendar size={16} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
-                                            <span>{client.onboardedDate || '2026-01-15'}</span>
-                                        </div>
-                                    </div>
+                                            {usersLabel(client)}
+                                        </span>
+                                        <span className="flex items-center gap-1.5">
+                                            <Calendar size={15} strokeWidth={1.8} className={iconMuted} aria-hidden="true" />
+                                            {dateLabel(client)}
+                                        </span>
+                                    </span>
                                 </Link>
                             );
                         })}
                     </div>
                 )}
 
-                {/* Infinite Scroll Bottom Trigger & Loading Indicator */}
-                <div ref={observerTargetRef} className="py-8 flex flex-col items-center justify-center text-slate-500 font-medium text-sm">
+                {/* Infinite scroll trigger + footer */}
+                <div ref={observerTargetRef} className="min-h-[20px] flex flex-col items-center justify-center">
                     {loadingMore ? (
-                        <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm text-slate-700 dark:text-slate-300">
-                            <RefreshCw size={18} className="animate-spin text-blue-600 dark:text-blue-400" />
-                            <span>Loading more clients...</span>
-                        </div>
+                        <span
+                            role="status"
+                            className={cn(
+                                'inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[13px] font-semibold',
+                                t.card,
+                                t.muted,
+                            )}
+                        >
+                            <RefreshCw size={16} className="animate-spin" aria-hidden="true" />
+                            Loading more clients...
+                        </span>
                     ) : !nextCursor && clients.length > 0 && !loading ? (
-                        <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 tracking-wide uppercase">
-                            Showing all {clients.length} of {totalClients || clients.length} clients
-                        </div>
+                        <p className="m-0 text-center">
+                            <ListFooterText isDark={isDark}>
+                                Showing all {clients.length} of {totalClients || clients.length} clients
+                            </ListFooterText>
+                        </p>
                     ) : null}
                 </div>
-            </div>
+            </PageContainer>
         </AdminLayout>
     );
 };

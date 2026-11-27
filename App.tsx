@@ -8,7 +8,7 @@ import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminLeadsPage } from './pages/admin/AdminLeadsPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminClientsPage } from './pages/admin/AdminClientsPage';
-import { AddClientPage } from './pages/admin/AddClientPage';
+import { OnboardingWizardPage } from './pages/admin/OnboardingWizardPage';
 import { AdminClientDetailPage } from './pages/admin/AdminClientDetailPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { AdminGuidePage } from './pages/admin/AdminGuidePage';
@@ -61,7 +61,7 @@ export default function App() {
             } />
             <Route path="/admin/clients/new" element={
               <ProtectedRoute>
-                <AddClientPage />
+                <OnboardingWizardPage />
               </ProtectedRoute>
             } />
             <Route path="/admin/clients/:clientId" element={

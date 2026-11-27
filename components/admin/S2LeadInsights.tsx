@@ -1,6 +1,7 @@
 import React from 'react';
-import { Brain, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Brain, AlertTriangle } from 'lucide-react';
 import { PriorityBadge } from './PriorityBadge';
+import { InsightCard, InsightSection, InsightText, ObjectionList, NextStep } from './LeadInsightsParts';
 
 interface S2LeadOutput {
     lead_priority: string;
@@ -14,66 +15,30 @@ interface S2LeadInsightsProps {
     isDark?: boolean;
 }
 
-export const S2LeadInsights: React.FC<S2LeadInsightsProps> = ({ data, isDark = false }) => {
-    const cardBg = isDark ? 'bg-slate-800/50' : 'bg-gradient-to-br from-indigo-50/50 to-purple-50/30';
-    const borderColor = isDark ? 'border-indigo-500/20' : 'border-indigo-200/60';
-    const textMain = isDark ? 'text-white' : 'text-gray-900';
-    const textSub = isDark ? 'text-slate-400' : 'text-gray-600';
-    const sectionBg = isDark ? 'bg-slate-900/40' : 'bg-white/70';
+export const S2LeadInsights: React.FC<S2LeadInsightsProps> = ({ data, isDark = false }) => (
+    <InsightCard
+        isDark={isDark}
+        icon={<Brain size={18} strokeWidth={2} />}
+        title="S2 Lead Intelligence"
+        right={<PriorityBadge isDark={isDark} priority={data.lead_priority} size="md" />}
+    >
+        {/* Reasoning */}
+        <InsightSection isDark={isDark} label="Reasoning">
+            <InsightText isDark={isDark}>
+                {typeof data.reasoning_summary === 'string' ? data.reasoning_summary : String(data.reasoning_summary || '')}
+            </InsightText>
+        </InsightSection>
 
-    return (
-        <div className={`rounded-xl border ${borderColor} ${cardBg} p-4 space-y-4`}>
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${isDark ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}>
-                        <Brain size={16} className="text-indigo-500" />
-                    </div>
-                    <h4 className={`text-sm font-semibold ${textMain}`}>S2 Lead Intelligence</h4>
-                </div>
-                <PriorityBadge isDark={isDark} priority={data.lead_priority} size="md" />
-            </div>
+        {/* Key Objections */}
+        {data.key_objections && Array.isArray(data.key_objections) && data.key_objections.length > 0 && (
+            <InsightSection isDark={isDark} label="Key Objections" icon={<AlertTriangle size={12} className="text-[#D97706]" aria-hidden="true" />}>
+                <ObjectionList isDark={isDark} items={data.key_objections} />
+            </InsightSection>
+        )}
 
-            {/* Reasoning */}
-            <div className={`rounded-lg ${sectionBg} p-3`}>
-                <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className={`text-xs font-medium uppercase tracking-wider ${textSub}`}>Reasoning</span>
-                </div>
-                <p className={`text-sm leading-relaxed ${textMain}`}>
-                    {typeof data.reasoning_summary === 'string' ? data.reasoning_summary : String(data.reasoning_summary || '')}
-                </p>
-            </div>
-
-            {/* Key Objections */}
-            {data.key_objections && Array.isArray(data.key_objections) && data.key_objections.length > 0 && (
-                <div className={`rounded-lg ${sectionBg} p-3`}>
-                    <div className="flex items-center gap-1.5 mb-2">
-                        <AlertTriangle size={12} className="text-amber-500" />
-                        <span className={`text-xs font-medium uppercase tracking-wider ${textSub}`}>Key Objections</span>
-                    </div>
-                    <ul className="space-y-1.5">
-                        {data.key_objections.map((objection, i) => (
-                            <li key={i} className={`flex items-start gap-2 text-sm ${textMain}`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
-                                {typeof objection === 'string' ? objection : String(objection)}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Recommended Next Step */}
-            <div className={`rounded-lg border ${isDark ? 'border-emerald-500/20 bg-emerald-900/10' : 'border-emerald-200 bg-emerald-50/50'} p-3`}>
-                <div className="flex items-center gap-1.5 mb-1.5">
-                    <ArrowRight size={12} className="text-emerald-500" />
-                    <span className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                        Recommended Next Step
-                    </span>
-                </div>
-                <p className={`text-sm font-medium ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>
-                    {typeof data.recommended_next_step === 'string' ? data.recommended_next_step : String(data.recommended_next_step || '')}
-                </p>
-            </div>
-        </div>
-    );
-};
+        {/* Recommended Next Step */}
+        <NextStep isDark={isDark}>
+            {typeof data.recommended_next_step === 'string' ? data.recommended_next_step : String(data.recommended_next_step || '')}
+        </NextStep>
+    </InsightCard>
+);

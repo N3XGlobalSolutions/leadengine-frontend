@@ -71,6 +71,8 @@ module.exports = {
             },
             fontFamily: {
                 chat: ["Outfit", "Inter", "system-ui", "-apple-system", "sans-serif"],
+                jakarta: ["\"Plus Jakarta Sans\"", "system-ui", "sans-serif"],
+                techmono: ["\"JetBrains Mono\"", "ui-monospace", "monospace"],
             },
             backgroundImage: {
                 "le-page": "linear-gradient(170deg, var(--le-bg-1) 0%, var(--le-bg-2) 50%, var(--le-bg-3) 100%)",

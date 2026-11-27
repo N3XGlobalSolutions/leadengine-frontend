@@ -1,6 +1,10 @@
 import React from 'react';
 import { Route, CheckCircle2, XCircle, AlertTriangle, ListChecks, Activity } from 'lucide-react';
 import { PriorityBadge } from './PriorityBadge';
+import { cn } from '../../utils/cn';
+import { SmallLabel, StatusPill, tone } from './ui/kit';
+import type { PillTone } from './ui/kit';
+import { InsightCard, InsightSection, VerdictBanner } from './LeadInsightsParts';
 
 interface S3MappingAnswer {
     id?: string;
@@ -29,24 +33,15 @@ interface S3MappingLeadInsightsProps {
     isDark?: boolean;
 }
 
+/** Answer signal → pill tone (high green, medium amber, low red, disqualify purple). */
+const SIGNAL_TONE: Record<string, PillTone> = { high: 'green', medium: 'amber', low: 'red', disqualify: 'purple' };
+
 export const S3MappingLeadInsights: React.FC<S3MappingLeadInsightsProps> = ({ data, isDark = false }) => {
     // Defensive: if data is missing or incomplete, render nothing
     if (!data || typeof data !== 'object') return null;
 
-    const cardBg = isDark ? 'bg-slate-800/50' : 'bg-gradient-to-br from-indigo-50/50 to-blue-50/30';
-    const borderColor = isDark ? 'border-indigo-500/20' : 'border-indigo-200/60';
-    const textMain = isDark ? 'text-white' : 'text-gray-900';
-    const textSub = isDark ? 'text-slate-300' : 'text-gray-700';
-    const sectionBg = isDark ? 'bg-slate-900/40' : 'bg-white/70';
-
     const isDisqualified = !!data.disqualified;
     const VerdictIcon = isDisqualified ? XCircle : CheckCircle2;
-    const verdictColor = isDisqualified
-        ? (isDark ? 'text-red-400' : 'text-red-600')
-        : (isDark ? 'text-emerald-400' : 'text-emerald-600');
-    const verdictBg = isDisqualified
-        ? (isDark ? 'bg-red-900/20 border-red-500/20' : 'bg-red-50 border-red-200')
-        : (isDark ? 'bg-emerald-900/20 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200');
 
     const avgScore = (() => {
         // Re-compute from signal_breakdown to avoid DynamoDB Decimal → float deserialization issue
@@ -66,85 +61,58 @@ export const S3MappingLeadInsights: React.FC<S3MappingLeadInsightsProps> = ({ da
     const answers = Array.isArray(data.answers) ? data.answers : [];
     const breakdown = data.signal_breakdown && typeof data.signal_breakdown === 'object' ? data.signal_breakdown : {};
 
-    return (
-        <div className={`rounded-xl border ${borderColor} ${cardBg} p-4 space-y-4`}>
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${isDark ? 'bg-indigo-500/20' : 'bg-indigo-100'}`}>
-                        <Route size={16} className="text-indigo-500" />
-                    </div>
-                    <h4 className={`text-sm font-semibold ${textMain}`}>S3 Mapping Intelligence</h4>
-                </div>
-                <PriorityBadge isDark={isDark} priority={leadPriority} size="md" />
-            </div>
+    const signalTiles: { label: string; value: number; dot: string }[] = [
+        { label: 'High', value: breakdown.high ?? 0, dot: '#16A34A' },
+        { label: 'Medium', value: breakdown.medium ?? 0, dot: '#D97706' },
+        { label: 'Low', value: breakdown.low ?? 0, dot: '#DC2626' },
+    ];
 
+    return (
+        <InsightCard
+            isDark={isDark}
+            icon={<Route size={18} strokeWidth={2} />}
+            title="S3 Mapping Intelligence"
+            right={<PriorityBadge isDark={isDark} priority={leadPriority} size="md" />}
+        >
             {/* Verdict Banner */}
-            <div className={`rounded-lg border ${verdictBg} p-3 flex items-center gap-3`}>
-                <VerdictIcon size={20} className={verdictColor} />
-                <div>
-                    <span className={`text-sm font-bold ${verdictColor}`}>
-                        {isDisqualified ? 'DISQUALIFIED' : 'QUALIFIED TO CONTINUE'}
-                    </span>
-                    <span className={`text-xs ml-2 ${textSub}`}>
-                        Avg Signal: {avgScore.toFixed(1)} / 3.0
-                    </span>
-                </div>
-                {/* Score bar */}
-                <div className="flex-1 ml-2">
-                    <div className={`w-full h-2 rounded-full ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`}>
-                        <div
-                            className={`h-2 rounded-full transition-all duration-500 ${
-                                isDisqualified ? 'bg-red-400' : (scorePercent > 66 ? 'bg-emerald-500' : scorePercent > 33 ? 'bg-amber-400' : 'bg-red-400')
-                            }`}
-                            style={{ width: `${Math.max(0, Math.min(100, scorePercent))}%` }}
-                        />
-                    </div>
-                </div>
-            </div>
+            <VerdictBanner
+                isDark={isDark}
+                qualified={!isDisqualified}
+                verdict={isDisqualified ? 'DISQUALIFIED' : 'QUALIFIED TO CONTINUE'}
+                icon={<VerdictIcon size={14} strokeWidth={2.4} aria-hidden="true" />}
+                metric={<>Avg Signal: <span className={cn('font-extrabold', tone(isDark).text)}>{avgScore.toFixed(1)}</span> / 3.0</>}
+                percent={scorePercent}
+                level={isDisqualified ? 'low' : (scorePercent > 66 ? 'high' : scorePercent > 33 ? 'mid' : 'low')}
+                barLabel="Average signal score"
+            />
 
             {/* Signal Breakdown */}
             {Object.keys(breakdown).length > 0 && (
-                <div className={`rounded-lg ${sectionBg} p-3`}>
-                    <div className="flex items-center gap-1.5 mb-2">
-                        <Activity size={12} className="text-indigo-500" />
-                        <span className={`text-xs font-medium uppercase tracking-wider ${textSub}`}>Signal Insights</span>
+                <InsightSection isDark={isDark} label="Signal Insights" icon={<Activity size={12} aria-hidden="true" />}>
+                    <div className="grid grid-cols-3 gap-2.5">
+                        {signalTiles.map((t) => (
+                            <div
+                                key={t.label}
+                                className={cn('flex flex-col gap-1.5 rounded-xl border px-3 py-2.5', isDark ? 'bg-neutral-950 border-neutral-800' : 'bg-[#F7F7F7] border-[#E5E5E5]')}
+                            >
+                                <span className="inline-flex items-center gap-1.5">
+                                    <span aria-hidden="true" className="w-[7px] h-[7px] rounded-full flex-none" style={{ background: t.dot }} />
+                                    <SmallLabel isDark={isDark}>{t.label}</SmallLabel>
+                                </span>
+                                <span className={cn('text-[22px] leading-none font-extrabold tracking-[-0.02em] tabular-nums', tone(isDark).text)}>{t.value}</span>
+                            </div>
+                        ))}
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className={`flex flex-col items-center justify-center p-2 rounded-md ${isDark ? 'bg-emerald-900/10 border border-emerald-500/10' : 'bg-emerald-50 border border-emerald-100'}`}>
-                            <span className={`text-lg font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{breakdown.high ?? 0}</span>
-                            <span className={`text-[10px] uppercase font-semibold ${isDark ? 'text-emerald-500' : 'text-emerald-700'}`}>High</span>
-                        </div>
-                        <div className={`flex flex-col items-center justify-center p-2 rounded-md ${isDark ? 'bg-amber-900/10 border border-amber-500/10' : 'bg-amber-50 border border-amber-100'}`}>
-                            <span className={`text-lg font-bold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{breakdown.medium ?? 0}</span>
-                            <span className={`text-[10px] uppercase font-semibold ${isDark ? 'text-amber-500' : 'text-amber-700'}`}>Medium</span>
-                        </div>
-                        <div className={`flex flex-col items-center justify-center p-2 rounded-md ${isDark ? 'bg-red-900/10 border border-red-500/10' : 'bg-red-50 border border-red-100'}`}>
-                            <span className={`text-lg font-bold ${isDark ? 'text-red-400' : 'text-red-600'}`}>{breakdown.low ?? 0}</span>
-                            <span className={`text-[10px] uppercase font-semibold ${isDark ? 'text-red-500' : 'text-red-700'}`}>Low</span>
-                        </div>
-                    </div>
-                </div>
+                </InsightSection>
             )}
 
             {/* Deterministic Answers */}
             {answers.length > 0 && (
-                <div className={`rounded-lg ${sectionBg} p-3`}>
-                    <div className="flex items-center gap-1.5 mb-2.5">
-                        <ListChecks size={12} className="text-indigo-500" />
-                        <span className={`text-xs font-medium uppercase tracking-wider ${textSub}`}>Collected Map Data</span>
-                    </div>
-                    <ul className="space-y-3">
+                <InsightSection isDark={isDark} label="Collected Map Data" icon={<ListChecks size={12} aria-hidden="true" />}>
+                    <ul className="m-0 p-0 list-none flex flex-col">
                         {answers.map((answerObj, i) => {
                             if (!answerObj || typeof answerObj !== 'object') return null;
                             const sigStatus = String(answerObj.signal || '');
-                            let sigColor = isDark ? 'text-gray-400' : 'text-gray-500';
-                            let sigBg = 'bg-transparent';
-
-                            if (sigStatus === 'high') { sigColor = isDark ? 'text-emerald-400' : 'text-emerald-600'; sigBg = isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'; }
-                            if (sigStatus === 'medium') { sigColor = isDark ? 'text-amber-400' : 'text-amber-600'; sigBg = isDark ? 'bg-amber-500/10' : 'bg-amber-50'; }
-                            if (sigStatus === 'low') { sigColor = isDark ? 'text-red-400' : 'text-red-500'; sigBg = isDark ? 'bg-red-500/10' : 'bg-red-50'; }
-                            if (sigStatus === 'disqualify') { sigColor = isDark ? 'text-purple-400' : 'text-purple-600'; sigBg = isDark ? 'bg-purple-500/10' : 'bg-purple-50'; }
 
                             const questionText = typeof answerObj.question === 'string' ? answerObj.question : '';
                             const answerText = answerObj.answer !== null && answerObj.answer !== undefined
@@ -152,37 +120,44 @@ export const S3MappingLeadInsights: React.FC<S3MappingLeadInsightsProps> = ({ da
                                 : '—';
 
                             return (
-                                <li key={i} className="flex flex-col gap-1">
-                                    {questionText && <span className={`text-xs ${textSub}`}>{questionText}</span>}
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-sm font-medium ${textMain}`}>{answerText}</span>
+                                <li
+                                    key={i}
+                                    className={cn('flex flex-col gap-1 py-2.5 border-b first:pt-0 last:pb-0 last:border-b-0', isDark ? 'border-neutral-800' : 'border-[#EEEEEE]')}
+                                >
+                                    {questionText && <span className={cn('text-[12.5px] leading-[1.45]', tone(isDark).muted)}>{questionText}</span>}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className={cn('text-sm font-bold', tone(isDark).text)}>{answerText}</span>
                                         {sigStatus && (
-                                            <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${sigColor} ${sigBg}`}>
+                                            <StatusPill
+                                                isDark={isDark}
+                                                tone={SIGNAL_TONE[sigStatus] ?? 'grey'}
+                                                className="h-[22px] px-2 text-[10.5px] uppercase tracking-[0.06em]"
+                                            >
                                                 {sigStatus}
-                                            </span>
+                                            </StatusPill>
                                         )}
                                     </div>
                                 </li>
                             );
                         })}
                     </ul>
-                </div>
+                </InsightSection>
             )}
 
             {/* Auto Disqualification Alert */}
             {isDisqualified && (
-                <div className={`rounded-lg border ${isDark ? 'border-red-500/20 bg-red-900/10' : 'border-red-200 bg-red-50/50'} p-3`}>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                        <AlertTriangle size={12} className="text-red-500" />
-                        <span className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-red-400' : 'text-red-700'}`}>
+                <div className={cn('flex items-start gap-3 rounded-xl border p-4', isDark ? 'bg-red-500/10 border-red-500/30' : 'bg-[#FEF2F2] border-[#FECACA]')}>
+                    <AlertTriangle size={16} className={cn('flex-none mt-px', isDark ? 'text-red-300' : 'text-[#B91C1C]')} aria-hidden="true" />
+                    <div className="flex flex-col gap-1 min-w-0">
+                        <span className={cn('text-[11.5px] font-bold tracking-[0.08em] uppercase', isDark ? 'text-red-300' : 'text-[#991B1B]')}>
                             Auto-Exit Triggered
                         </span>
+                        <p className={cn('m-0 text-sm font-semibold leading-[1.5]', isDark ? 'text-red-200' : 'text-[#7F1D1D]')}>
+                            Conversation was terminated immediately due to an exclusionary answer choice.
+                        </p>
                     </div>
-                    <p className={`text-sm font-medium ${isDark ? 'text-red-300' : 'text-red-800'}`}>
-                        Conversation was terminated immediately due to an exclusionary answer choice.
-                    </p>
                 </div>
             )}
-        </div>
+        </InsightCard>
     );
 };

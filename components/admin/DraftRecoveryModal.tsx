@@ -5,11 +5,13 @@
  * - Resume: Populate form with saved draft data
  * - Discard: Delete draft and start with a fresh form
  *
- * Follows the same visual style as the downgrade modal in AddClientPage.
+ * variant="default" keeps the original indigo look (client detail page);
+ * variant="onboarding" matches the black/white onboarding wizard design.
  */
 
 import React from 'react';
 import { FileText, RotateCcw, Trash2, Clock } from 'lucide-react';
+import { buttonClass, tone } from './onboarding/ui';
 
 interface DraftRecoveryModalProps {
     isOpen: boolean;
@@ -17,6 +19,7 @@ interface DraftRecoveryModalProps {
     onDiscard: () => void;
     lastSavedAt: string;
     isDark: boolean;
+    variant?: 'default' | 'onboarding';
 }
 
 export const DraftRecoveryModal: React.FC<DraftRecoveryModalProps> = ({
@@ -25,6 +28,7 @@ export const DraftRecoveryModal: React.FC<DraftRecoveryModalProps> = ({
     onDiscard,
     lastSavedAt,
     isDark,
+    variant = 'default',
 }) => {
     if (!isOpen) return null;
 
@@ -52,6 +56,41 @@ export const DraftRecoveryModal: React.FC<DraftRecoveryModalProps> = ({
             return 'unknown';
         }
     };
+
+    if (variant === 'onboarding') {
+        const t = tone(isDark);
+        return (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-jakarta" role="dialog" aria-modal="true" aria-labelledby="draft-recovery-title">
+                <div className={`w-full max-w-md rounded-2xl border p-6 flex flex-col gap-5 shadow-2xl ${t.card}`}>
+                    <div className="flex items-start gap-3">
+                        <span className={`w-11 h-11 flex-none rounded-xl flex items-center justify-center ${isDark ? 'bg-white text-black' : 'bg-[#111111] text-white'}`}>
+                            <FileText size={20} />
+                        </span>
+                        <div className="flex flex-col gap-1 min-w-0">
+                            <h3 id="draft-recovery-title" className={`m-0 text-[18px] font-extrabold tracking-[-0.02em] ${t.text}`}>
+                                Pick up where you left off?
+                            </h3>
+                            <span className={`flex items-center gap-1.5 text-[12.5px] font-semibold ${t.hint}`}>
+                                <Clock size={12} /> Draft saved {formatTimestamp(lastSavedAt)}
+                            </span>
+                        </div>
+                    </div>
+                    <p className={`m-0 text-sm leading-[1.55] ${t.muted}`}>
+                        You have a client you started adding earlier. Continue it, or start a new one from scratch.
+                        Starting over deletes the saved draft. A document you picked is not kept in the draft, so add it again in step 3.
+                    </p>
+                    <div className="flex flex-wrap gap-2.5 justify-end">
+                        <button type="button" onClick={onDiscard} className={buttonClass(isDark, 'secondary')}>
+                            <Trash2 size={16} /> Start over
+                        </button>
+                        <button type="button" onClick={onResume} className={buttonClass(isDark, 'primary')} autoFocus>
+                            <RotateCcw size={16} /> Continue draft
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">

@@ -1,107 +1,275 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Users, CheckCircle, MessageSquare, ArrowUpRight, MoreHorizontal, Clock, ChevronRight, LogOut, TrendingUp, Bot, Megaphone, Lock, Shield, Eye, EyeOff, AlertCircle, Cpu, Sun, Moon, CalendarClock, Phone, Video } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import {
+    Users, CheckCircle, MessageSquare, ArrowUpRight, MoreHorizontal, Clock, ChevronRight, LogOut, TrendingUp, Bot,
+    Send, Cpu, Sun, Moon, Calendar, Phone, Video, Link2, Copy, type LucideIcon,
+} from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getDashboardMetrics, getDailyMetrics, getRecentLeads, getClientById, getTenantLeads, resetUserPassword } from '../services/adminService';
+import { getDashboardMetrics, getDailyMetrics, getRecentLeads, getClientById, getTenantLeads } from '../services/adminService';
 import { DashboardMetrics, DailyMetric, DashboardLead, Client } from '../types/admin';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
 import { useAdminTheme } from '../contexts/AdminThemeContext';
-import { SkeletonDashboard } from '../components/admin/SkeletonLoader';
 import { bookingService, TenantBooking } from '../services/bookingService';
 import { formatBookingDateTime } from '../utils/bookingFormat';
+import { cn } from '../utils/cn';
+import {
+    Card, Button, IconButton, Select, PageHeader, Mark, SmallLabel, Icon, tone, leadStatusTone, type PillTone,
+} from '../components/admin/ui/kit';
 
 const MAX_UPCOMING_CALLS = 6;
 
-// Branded Header Component
-const DashboardHeader = ({ companyName, dateRange, setDateRange, onLogout, isDark, toggleTheme }: any) => {
+/* ── Small local helpers (client-facing dashboard has its own chrome, no AdminLayout) ───────── */
+
+/** Visible keyboard focus ring (design: 2px ink outline, 2px offset). */
+const focusRing = (isDark: boolean) => cn(
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+    isDark ? 'focus-visible:ring-white focus-visible:ring-offset-neutral-900' : 'focus-visible:ring-[#0A0A0A] focus-visible:ring-offset-white',
+);
+
+/** Bordered list row (design `.hov` rows). */
+const rowClass = (isDark: boolean, interactive = true) => cn(
+    'flex items-center gap-3 rounded-xl border no-underline transition-colors',
+    isDark ? 'bg-neutral-900 border-neutral-800 text-white' : 'bg-white border-[#EEEEEE] text-[#0A0A0A]',
+    interactive && (isDark ? 'hover:bg-neutral-800/60 hover:border-neutral-700' : 'hover:bg-[#FAFAFA] hover:border-[#D4D4D4]'),
+    interactive && focusRing(isDark),
+);
+
+/** Same pill classes as the kit StatusPill, at the 22px size the design uses inside headings / rows. */
+const PILL_SM: Record<PillTone, { light: string; dark: string }> = {
+    green: { light: 'bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]', dark: 'bg-green-500/10 text-green-300 border border-green-500/30' },
+    amber: { light: 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]', dark: 'bg-amber-500/10 text-amber-300 border border-amber-500/30' },
+    red: { light: 'bg-[#FEE2E2] text-[#991B1B] border border-[#FECACA]', dark: 'bg-red-500/10 text-red-300 border border-red-500/30' },
+    orange: { light: 'bg-[#FFEDD5] text-[#9A3412] border border-[#FED7AA]', dark: 'bg-orange-500/10 text-orange-300 border border-orange-500/30' },
+    purple: { light: 'bg-[#F3E8FF] text-[#6B21A8] border border-[#E9D5FF]', dark: 'bg-purple-500/10 text-purple-300 border border-purple-500/30' },
+    grey: { light: 'bg-[#F2F2F2] text-[#404040] border border-[#E5E5E5]', dark: 'bg-neutral-800 text-neutral-300 border border-neutral-700' },
+    on: { light: 'bg-[#0A0A0A] text-white', dark: 'bg-white text-black' },
+    out: { light: 'bg-white text-[#333333] border border-[#D4D4D4]', dark: 'bg-transparent text-neutral-200 border border-neutral-700' },
+    soft: { light: 'bg-[#F2F2F2] text-[#333333]', dark: 'bg-neutral-800 text-neutral-200' },
+};
+const SmallPill: React.FC<{ isDark: boolean; tone: PillTone; children: React.ReactNode; className?: string }> = ({ isDark, tone: t, children, className }) => (
+    <span className={cn('inline-flex items-center h-[22px] px-2.5 rounded-full text-[11.5px] font-bold whitespace-nowrap', isDark ? PILL_SM[t].dark : PILL_SM[t].light, className)}>
+        {children}
+    </span>
+);
+
+/** Card heading (design `.h2`, 18px/800). */
+const h2Class = (isDark: boolean) => cn('m-0 flex items-center gap-2.5 text-lg font-extrabold tracking-[-0.02em]', tone(isDark).text);
+
+/** Coloured stat tiles used in the Lead Quality card (Qualified / Disqualified / Hot / Warm / Cold). */
+type TileTone = 'green' | 'red' | 'amber' | 'grey';
+const TILE: Record<TileTone, { light: string; dark: string; dot: string }> = {
+    green: { light: 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]', dark: 'border-green-500/30 bg-green-500/10 text-green-300', dot: '#16A34A' },
+    red: { light: 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]', dark: 'border-red-500/30 bg-red-500/10 text-red-300', dot: '#DC2626' },
+    amber: { light: 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]', dark: 'border-amber-500/30 bg-amber-500/10 text-amber-300', dot: '#F59E0B' },
+    grey: { light: 'border-[#E5E5E5] bg-[#FAFAFA] text-[#404040]', dark: 'border-neutral-700 bg-neutral-800/60 text-neutral-300', dot: '#A3A3A3' },
+};
+
+const StatTile: React.FC<{
+    isDark: boolean;
+    tone: TileTone;
+    label: string;
+    value: number;
+    marker?: React.ReactNode;   // defaults to a coloured dot
+    sub?: string;
+    centered?: boolean;
+}> = ({ isDark, tone: t, label, value, marker, sub, centered }) => (
+    <div className={cn('flex flex-col gap-1.5 rounded-xl border-[1.5px] min-w-0', centered ? 'items-center px-2 py-3.5 gap-1' : 'px-4 py-3.5', isDark ? TILE[t].dark : TILE[t].light)}>
+        <span className="flex items-center gap-1.5 text-xs font-extrabold tracking-[0.06em] uppercase">
+            {marker ?? <span aria-hidden="true" className="w-[7px] h-[7px] rounded-full flex-none" style={{ background: TILE[t].dot }} />}
+            {label}
+        </span>
+        <span className="text-[28px] font-extrabold leading-[1.1] tabular-nums">{value}</span>
+        {sub && <span className="text-xs">{sub}</span>}
+    </div>
+);
+
+/** KPI card: black 52px icon tile + label / value / sub line. */
+const KpiCard: React.FC<{ isDark: boolean; icon: LucideIcon; label: string; value: number; sub: React.ReactNode }> = ({ isDark, icon: KpiIcon, label, value, sub }) => (
+    <section className={cn(
+        'rounded-2xl border flex flex-row items-center gap-[18px] p-[22px] transition-[box-shadow,transform] duration-150 hover:-translate-y-px',
+        isDark ? 'bg-neutral-900 border-neutral-800 hover:shadow-[0_6px_18px_rgba(0,0,0,.4)]' : 'bg-white border-[#E5E5E5] hover:shadow-[0_6px_18px_rgba(0,0,0,.06)]',
+    )}>
+        <span className={cn('w-[52px] h-[52px] flex-none rounded-[14px] flex items-center justify-center', isDark ? 'bg-white text-black' : 'bg-[#0A0A0A] text-white')}>
+            <KpiIcon size={22} strokeWidth={1.9} aria-hidden="true" />
+        </span>
+        <span className="flex flex-col gap-1.5 min-w-0">
+            <SmallLabel isDark={isDark}>{label}</SmallLabel>
+            <span className={cn('text-[34px] font-extrabold tracking-[-0.03em] leading-none tabular-nums', tone(isDark).text)}>{value}</span>
+            {sub}
+        </span>
+    </section>
+);
+
+/** Inbound / Outbound action row (54px, grey icon tile, trailing icon). Renders a router Link when `to` is set. */
+const ActionRow: React.FC<{
+    isDark: boolean;
+    icon: LucideIcon;
+    label: string;
+    trailing: LucideIcon;
+    to?: string;
+    onClick?: () => void;
+}> = ({ isDark, icon: RowIcon, label, trailing: Trailing, to, onClick }) => {
+    const className = cn(
+        rowClass(isDark),
+        'w-full min-h-[54px] pl-2 pr-3 text-left text-[13.5px] font-bold cursor-pointer',
+        isDark ? 'border-neutral-800' : 'border-[#E5E5E5]',
+    );
+    const content = (
+        <>
+            <span className={cn('w-9 h-9 flex-none rounded-[10px] flex items-center justify-center', isDark ? 'bg-neutral-800 text-white' : 'bg-[#F2F2F2] text-[#0A0A0A]')}>
+                <RowIcon size={17} strokeWidth={1.9} aria-hidden="true" />
+            </span>
+            <span className="flex-1 min-w-0">{label}</span>
+            <Trailing size={15} strokeWidth={2.2} aria-hidden="true" className={isDark ? 'text-neutral-500' : 'text-[#8A8A8A]'} />
+        </>
+    );
+    return to
+        ? <Link to={to} className={className}>{content}</Link>
+        : <button type="button" onClick={onClick} className={className}>{content}</button>;
+};
+
+/** Dashed empty / info box (design: Upcoming Calls empty state). */
+const DashedNote: React.FC<{ isDark: boolean; icon?: React.ReactNode; children: React.ReactNode }> = ({ isDark, icon, children }) => (
+    <div className={cn('flex flex-col items-center gap-2.5 px-3 py-[22px] rounded-xl border-[1.5px] border-dashed text-center',
+        isDark ? 'border-neutral-700 bg-neutral-950/40' : 'border-[#E5E5E5] bg-[#FAFAFA]')}>
+        {icon && (
+            <span className={cn('w-11 h-11 rounded-full border flex items-center justify-center',
+                isDark ? 'bg-neutral-900 border-neutral-700 text-neutral-400' : 'bg-white border-[#E5E5E5] text-[#6B6B6B]')}>
+                {icon}
+            </span>
+        )}
+        <span className={cn('text-[13.5px]', tone(isDark).muted)}>{children}</span>
+    </div>
+);
+
+/* ── Top bar + footer ──────────────────────────────────────────────────────── */
+
+const DashboardTopBar: React.FC<{ isDark: boolean; companyName: string; onToggleTheme: () => void; onLogout: () => void }> = ({ isDark, companyName, onToggleTheme, onLogout }) => {
+    const t = tone(isDark);
     return (
-        <header className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 rounded-2xl p-6 shadow-xl overflow-hidden">
-            {/* Background decoration */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLW9wYWNpdHk9IjAuMDUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-30"></div>
-
-            <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg">
-                        <Bot className="text-white" size={28} />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight drop-shadow-sm">
-                            {companyName}
-                        </h1>
-                        <p className="text-indigo-100 mt-1 text-sm sm:text-base font-medium">
-                            Real-time Performance Dashboard
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3 w-full sm:w-auto">
-                    <select
-                        value={dateRange}
-                        onChange={(e) => setDateRange(e.target.value)}
-                        className="bg-white/20 backdrop-blur-md border border-white/30 py-2.5 px-4 rounded-xl text-sm font-medium text-white shadow-lg hover:bg-white/30 transition-all cursor-pointer flex-1 sm:flex-none focus:outline-none focus:ring-2 focus:ring-white/50"
-                    >
-                        <option value="7" className="text-gray-900">Last 7 Days</option>
-                        <option value="30" className="text-gray-900">Last 30 Days</option>
-                    </select>
-                    <button
-                        onClick={toggleTheme}
-                        className="flex items-center justify-center gap-2 p-2.5 bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium rounded-xl hover:bg-white/30 transition-all shadow-lg text-sm sm:flex-none focus:outline-none"
-                        title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                    >
-                        {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                    </button>
-                    <button
-                        onClick={onLogout}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/20 backdrop-blur-md border border-white/30 text-white font-medium rounded-xl hover:bg-red-500 hover:border-red-400 transition-all shadow-lg group flex-1 sm:flex-none text-sm"
-                    >
-                        <LogOut size={16} className="group-hover:rotate-12 transition-transform" />
-                        <span>Logout</span>
-                    </button>
-                </div>
+        <header className={cn('min-h-[64px] flex flex-wrap items-center justify-between gap-3 px-4 sm:px-8 py-2.5 border-b',
+            isDark ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-[#E5E5E5]')}>
+            <div className="flex items-center gap-3 min-w-0">
+                <span className={cn('w-[34px] h-[34px] flex-none rounded-[10px] flex items-center justify-center', isDark ? 'bg-white text-black' : 'bg-[#0A0A0A] text-white')}>
+                    <Bot size={18} strokeWidth={2} aria-hidden="true" />
+                </span>
+                <nav aria-label="Breadcrumb" className={cn('flex items-center gap-2 text-sm min-w-0', t.hint)}>
+                    <span className={cn('font-semibold truncate', t.muted)}>{companyName}</span>
+                    <span aria-hidden="true">/</span>
+                    <span aria-current="page" className={cn('font-bold', t.text)}>Dashboard</span>
+                </nav>
+            </div>
+            <div className="flex items-center gap-2">
+                <IconButton
+                    isDark={isDark}
+                    label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                    onClick={onToggleTheme}
+                    className={cn('border-transparent bg-transparent', focusRing(isDark))}
+                >
+                    {isDark ? <Sun size={18} strokeWidth={1.9} aria-hidden="true" /> : <Moon size={18} strokeWidth={1.9} aria-hidden="true" />}
+                </IconButton>
+                <Button isDark={isDark} variant="secondary" onClick={onLogout} className={cn('min-h-[40px]', focusRing(isDark))}>
+                    <LogOut size={16} aria-hidden="true" />
+                    Logout
+                </Button>
             </div>
         </header>
     );
 };
 
-// Branded Footer Component
-const DashboardFooter = ({ companyName }: { companyName: string }) => {
+const DashboardFooter: React.FC<{ isDark: boolean; companyName: string }> = ({ isDark, companyName }) => {
     const currentYear = new Date().getFullYear();
-
+    const t = tone(isDark);
     return (
-        <footer className="relative bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-2xl p-8 shadow-xl overflow-hidden mt-8">
-            {/* Background decoration */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZG90cyIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSIxLjUiIGZpbGw9IndoaXRlIiBvcGFjaXR5PSIwLjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZG90cykiLz48L3N2Zz4=')] opacity-50"></div>
-
-            <div className="relative flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-500/20 backdrop-blur-sm rounded-lg border border-indigo-400/30">
-                        <Bot className="text-indigo-400" size={20} />
-                    </div>
-                    <div className="text-center sm:text-left">
-                        <p className="text-white font-bold text-lg">{companyName}</p>
-                        <p className="text-gray-400 text-sm">Powered by LeadEngine AI</p>
-                    </div>
-                </div>
-
-                <div className="text-center sm:text-right">
-                    <p className="text-gray-400 text-sm">
-                        © {currentYear} {companyName}. All rights reserved.
-                    </p>
-                    <p className="text-gray-500 text-xs mt-1">
-                        Intelligent Lead Qualification System
-                        <br />
-                        Version 1.3.0
-                    </p>
-                </div>
+        <footer className={cn('flex flex-wrap items-center justify-between gap-4 px-6 py-[22px] rounded-2xl border', t.card)}>
+            <div className="flex items-center gap-3 min-w-0">
+                <span className={cn('w-10 h-10 flex-none rounded-[10px] flex items-center justify-center', isDark ? 'bg-white text-black' : 'bg-[#0A0A0A] text-white')}>
+                    <Bot size={18} strokeWidth={2} aria-hidden="true" />
+                </span>
+                <span className="flex flex-col gap-0.5 min-w-0">
+                    <span className={cn('text-[15px] font-extrabold', t.text)}>{companyName}</span>
+                    <span className={cn('text-[12.5px]', t.hint)}>Powered by LeadEngine AI</span>
+                </span>
+            </div>
+            <div className="flex flex-col items-start sm:items-end gap-0.5 text-left sm:text-right">
+                <span className={cn('text-[13px]', isDark ? 'text-neutral-300' : 'text-[#333333]')}>
+                    © {currentYear} {companyName}. All rights reserved.
+                </span>
+                <span className={cn('text-xs', t.hint)}>Intelligent Lead Qualification System · Version 1.3.0</span>
             </div>
         </footer>
     );
 };
 
+/* ── Loading skeleton (same layout as the page) ────────────────────────────── */
+
+const DashboardSkeleton: React.FC<{ isDark: boolean }> = ({ isDark }) => {
+    const block = cn('animate-pulse rounded-lg', isDark ? 'bg-neutral-800' : 'bg-[#EDEDED]');
+    const card = cn('rounded-2xl border p-6', tone(isDark).card);
+    return (
+        <div className={cn('min-h-screen font-jakarta', tone(isDark).page)} aria-busy="true">
+            <span role="status" className="sr-only">Loading dashboard…</span>
+            <div className={cn('min-h-[64px] flex items-center justify-between gap-3 px-4 sm:px-8 py-2.5 border-b', isDark ? 'bg-neutral-900 border-neutral-800' : 'bg-white border-[#E5E5E5]')}>
+                <div className="flex items-center gap-3">
+                    <div className={cn(block, 'w-[34px] h-[34px] rounded-[10px]')} />
+                    <div className={cn(block, 'w-44 h-4')} />
+                </div>
+                <div className={cn(block, 'w-28 h-10 rounded-[11px]')} />
+            </div>
+            <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-8 pt-8 pb-10 flex flex-col gap-5">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div className="flex flex-col gap-3">
+                        <div className={cn(block, 'w-60 h-6 rounded-full')} />
+                        <div className={cn(block, 'w-80 max-w-full h-10')} />
+                    </div>
+                    <div className={cn(block, 'w-40 h-11 rounded-[10px]')} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {[0, 1, 2].map((i) => (
+                        <div key={i} className={cn(card, 'flex items-center gap-[18px] p-[22px]')}>
+                            <div className={cn(block, 'w-[52px] h-[52px] flex-none rounded-[14px]')} />
+                            <div className="flex flex-col gap-2 flex-1">
+                                <div className={cn(block, 'w-28 h-3')} />
+                                <div className={cn(block, 'w-16 h-8')} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div className={cn(card, 'lg:col-span-2 flex flex-col gap-4')}>
+                        <div className={cn(block, 'w-48 h-5')} />
+                        <div className={cn(block, 'h-[300px] w-full rounded-xl')} />
+                    </div>
+                    <div className={cn(card, 'flex flex-col gap-4')}>
+                        <div className={cn(block, 'w-32 h-5')} />
+                        <div className={cn(block, 'h-24 rounded-xl')} />
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className={cn(block, 'h-20 rounded-xl')} />
+                            <div className={cn(block, 'h-20 rounded-xl')} />
+                        </div>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    <div className={cn(card, 'lg:col-span-2 flex flex-col gap-2')}>
+                        <div className={cn(block, 'w-40 h-5 mb-2')} />
+                        {[0, 1, 2, 3, 4].map((i) => <div key={i} className={cn(block, 'h-[62px] rounded-xl')} />)}
+                    </div>
+                    <div className={cn(card, 'flex flex-col gap-3')}>
+                        <div className={cn(block, 'w-36 h-5')} />
+                        <div className={cn(block, 'h-28 rounded-xl')} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+/* ── Page ──────────────────────────────────────────────────────────────────── */
+
 export const DashboardPage = () => {
     const { tenantId } = useParams<{ tenantId: string }>();
     const navigate = useNavigate();
-    const { logout, user } = useAdminAuth();
+    const { logout } = useAdminAuth();
     const { isDark, toggleTheme } = useAdminTheme();
 
     const [client, setClient] = useState<Client | null>(null);
@@ -176,15 +344,17 @@ export const DashboardPage = () => {
         navigate('/admin/login');
     };
 
+    const t = tone(isDark);
+
     if (loading) {
-        return <SkeletonDashboard />;
+        return <DashboardSkeleton isDark={isDark} />;
     }
 
     if (!client || !metrics || !client.config) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-                <div className="text-center p-8 bg-white rounded-2xl shadow-xl">
-                    <p className="text-gray-900 font-semibold text-lg">Client or Data not found</p>
+            <div className={cn('min-h-screen flex items-center justify-center p-4 font-jakarta', t.page)}>
+                <div className={cn('text-center px-8 py-7 rounded-2xl border', t.card)}>
+                    <p className={cn('m-0 text-lg font-extrabold', t.text)}>Client or Data not found</p>
                 </div>
             </div>
         );
@@ -206,6 +376,8 @@ export const DashboardPage = () => {
     const hotLeadsCount = isS2orS3 ? allLeads.filter(l => getPriority(l) === 'high').length : metrics.leads_by_status.qualified;
     const warmLeadsCount = isS2orS3 ? allLeads.filter(l => getPriority(l) === 'medium').length : 0;
     const coldLeadsCount = isS2orS3 ? allLeads.filter(l => getPriority(l) === 'low').length : metrics.leads_by_status.new + metrics.leads_by_status.disqualified;
+    const priorityTotal = hotLeadsCount + warmLeadsCount + coldLeadsCount;
+    const priorityPct = (n: number) => (priorityTotal ? (n / priorityTotal) * 100 : 0);
 
     // Qualification rate
     const hotLeads = metrics.leads_by_status.qualified;
@@ -213,267 +385,269 @@ export const DashboardPage = () => {
     const totalLeads = metrics.leads || 1;
     const qualRate = Math.round((hotLeads / totalLeads) * 100);
 
+    // Leads inside the selected date range (sum of the daily series shown in the chart)
+    const periodLeads = dailyMetrics.reduce((sum, d) => sum + (Number(d.leads) || 0), 0);
+
+    // Chart palette: ink line + soft fill (white series in dark mode)
+    const chartInk = isDark ? '#FFFFFF' : '#0A0A0A';
+    const chartSurface = isDark ? '#171717' : '#FFFFFF';
+    const chartGrid = isDark ? '#262626' : '#EEEEEE';
+    const chartTick = isDark ? '#A3A3A3' : '#8A8A8A';
+
+    const copyWidgetLink = () => {
+        const url = `${window.location.origin}/${tenantId}`;
+        navigator.clipboard.writeText(url);
+        alert('Chatbot link copied to clipboard!');
+    };
+
     return (
-        <div className={`min-h-screen p-4 sm:p-6 lg:p-8 transition-colors duration-300 ${
-            isDark 
-                ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white' 
-                : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 text-gray-900'
-        }`}>
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Branded Header */}
-                <DashboardHeader
-                    companyName={companyName}
-                    dateRange={dateRange}
-                    setDateRange={setDateRange}
-                    onLogout={handleLogout}
+        <div className={cn('min-h-screen font-jakarta antialiased transition-colors duration-300', t.page, t.text)}>
+            <DashboardTopBar isDark={isDark} companyName={companyName} onToggleTheme={toggleTheme} onLogout={handleLogout} />
+
+            <main className="w-full max-w-[1180px] mx-auto px-4 sm:px-8 pt-8 pb-10 flex flex-col gap-5">
+                {/* Header */}
+                <PageHeader
                     isDark={isDark}
-                    toggleTheme={toggleTheme}
+                    eyebrow="Real-time Performance Dashboard"
+                    eyebrowIcon={<span aria-hidden="true" className="w-[7px] h-[7px] rounded-full bg-[#16A34A] shadow-[0_0_0_3px_rgba(22,163,74,.2)]" />}
+                    title={<Mark isDark={isDark}>{companyName}</Mark>}
+                    actions={
+                        <>
+                            <label className="sr-only" htmlFor="client-dashboard-range">Date range</label>
+                            <Select
+                                id="client-dashboard-range"
+                                isDark={isDark}
+                                value={dateRange}
+                                onChange={(e) => setDateRange(e.target.value)}
+                                className="h-11"
+                            >
+                                <option value="7">Last 7 Days</option>
+                                <option value="30">Last 30 Days</option>
+                            </Select>
+                        </>
+                    }
                 />
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatsCard
-                        title="Total Conversations"
-                        value={metrics.conversations}
+                {/* KPI cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <KpiCard
+                        isDark={isDark}
                         icon={MessageSquare}
-                        color="blue"
-                        gradient="from-blue-500 to-cyan-500"
-                        isDark={isDark}
+                        label="Total Conversations"
+                        value={metrics.conversations}
+                        sub={<span className={cn('text-[12.5px] leading-[22px]', t.hint)}>All time</span>}
                     />
-                    <StatsCard
-                        title="Total Leads"
-                        value={metrics.leads}
+                    <KpiCard
+                        isDark={isDark}
                         icon={Users}
-                        color="indigo"
-                        gradient="from-indigo-500 to-purple-500"
-                        isDark={isDark}
+                        label="Total Leads"
+                        value={metrics.leads}
+                        sub={<span className={cn('text-[12.5px] leading-[22px]', t.hint)}>All time</span>}
                     />
-                    <StatsCard
-                        title="Qualified Leads"
-                        value={metrics.leads_by_status.qualified}
-                        subtitle={`${qualRate}% Rate`}
-                        icon={CheckCircle}
-                        color="emerald"
-                        gradient="from-emerald-500 to-teal-500"
+                    <KpiCard
                         isDark={isDark}
+                        icon={CheckCircle}
+                        label="Qualified Leads"
+                        value={metrics.leads_by_status.qualified}
+                        sub={<SmallPill isDark={isDark} tone="soft" className="self-start">{qualRate}% Rate</SmallPill>}
                     />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Main Chart */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
-                            <div className="flex justify-between items-center mb-6">
-                                <div className="flex items-center gap-2">
-                                    <TrendingUp className="text-indigo-500" size={20} />
-                                    <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Lead Volume Trend</h3>
-                                </div>
-                                <button className={`hover:text-indigo-400 transition-colors p-2 rounded-lg ${isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-gray-400 hover:bg-indigo-50'}`}>
-                                    <MoreHorizontal size={20} />
-                                </button>
+                {/* Chart + Lead Quality */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+                    <Card isDark={isDark} className="lg:col-span-2 min-w-0 gap-3.5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex flex-col gap-1 min-w-0">
+                                <h2 className={h2Class(isDark)}>
+                                    <TrendingUp size={18} strokeWidth={2} aria-hidden="true" />
+                                    Lead Volume Trend
+                                </h2>
+                                <p className={cn('m-0 text-[13px] leading-[1.55]', t.muted)}>
+                                    <b className={t.text}>{periodLeads} {periodLeads === 1 ? 'lead' : 'leads'}</b> in the last {dateRange} days
+                                </p>
                             </div>
-                            <div className="h-[300px] w-full">
+                            <IconButton isDark={isDark} label="More options" size={36} className={focusRing(isDark)}>
+                                <MoreHorizontal size={18} strokeWidth={2.5} aria-hidden="true" className={t.muted} />
+                            </IconButton>
+                        </div>
+                        <div className="relative flex-1 min-h-[300px] w-full">
+                            <div className="absolute inset-0">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={dailyMetrics}>
+                                    <AreaChart data={dailyMetrics} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
                                         <defs>
-                                            <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.05} />
+                                            <linearGradient id="clientLeadVolumeFill" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor={chartInk} stopOpacity={isDark ? 0.18 : 0.14} />
+                                                <stop offset="100%" stopColor={chartInk} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#E5E7EB'} />
+                                        <CartesianGrid strokeDasharray="4 6" vertical={false} stroke={chartGrid} />
                                         <XAxis
                                             dataKey="date"
                                             axisLine={false}
                                             tickLine={false}
-                                            tick={{ fill: isDark ? '#94A3B8' : '#9CA3AF', fontSize: 12, fontWeight: 500 }}
+                                            tick={{ fill: chartTick, fontSize: 12 }}
                                             dy={10}
                                             tickFormatter={(value) => value.slice(5)}
                                         />
                                         <YAxis
                                             axisLine={false}
                                             tickLine={false}
-                                            tick={{ fill: isDark ? '#94A3B8' : '#9CA3AF', fontSize: 12, fontWeight: 500 }}
+                                            allowDecimals={false}
+                                            tick={{ fill: chartTick, fontSize: 12 }}
                                         />
                                         <Tooltip
+                                            cursor={{ stroke: chartInk, strokeDasharray: '4 5', strokeOpacity: 0.35 }}
                                             contentStyle={{
-                                                borderRadius: '12px',
+                                                borderRadius: 12,
                                                 border: 'none',
-                                                boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)',
-                                                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                                                color: isDark ? '#FFF' : '#000',
-                                                backdropFilter: 'blur(10px)'
+                                                padding: '10px 14px',
+                                                backgroundColor: isDark ? '#FFFFFF' : '#0A0A0A',
+                                                boxShadow: '0 6px 18px rgba(0,0,0,.12)',
                                             }}
+                                            labelStyle={{ color: isDark ? '#525252' : '#BDBDBD', fontSize: 12, marginBottom: 4 }}
+                                            itemStyle={{ color: isDark ? '#0A0A0A' : '#FFFFFF', fontSize: 14, fontWeight: 700, padding: 0 }}
                                         />
                                         <Area
                                             type="monotone"
                                             dataKey="leads"
-                                            stroke="#6366F1"
+                                            stroke={chartInk}
                                             strokeWidth={3}
                                             fillOpacity={1}
-                                            fill="url(#colorLeads)"
+                                            fill="url(#clientLeadVolumeFill)"
                                             name="Leads"
+                                            dot={{ r: 4, fill: chartSurface, stroke: chartInk, strokeWidth: 2.5 }}
+                                            activeDot={{ r: 6, fill: chartSurface, stroke: chartInk, strokeWidth: 3 }}
                                         />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
+                    </Card>
 
-                        <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Recent Leads</h3>
-                                <button
-                                    onClick={() => navigate(`/${tenantId}/leads`)}
-                                    className="relative flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-indigo-300 group"
-                                >
-                                    <span>View All Leads</span>
-                                    <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-                                </button>
+                    <Card isDark={isDark} className="min-w-0 gap-4">
+                        <h2 className={h2Class(isDark)}>Lead Quality</h2>
+
+                        <div className={cn('flex flex-col gap-2.5 p-4 rounded-xl border', isDark ? 'bg-neutral-950/40 border-neutral-800' : 'bg-[#FAFAFA] border-[#EEEEEE]')}>
+                            <div className="flex items-baseline justify-between gap-3">
+                                <span className={cn('text-[13.5px] font-semibold', t.muted)}>Qualification Rate</span>
+                                <span className={cn('text-[28px] font-extrabold tracking-[-0.02em] tabular-nums', t.text)}>{qualRate}%</span>
                             </div>
-                            <div className="space-y-3">
-                                {recentLeads.length === 0 ? (
-                                    <p className={`${isDark ? 'text-slate-400' : 'text-gray-500'} text-sm text-center py-8`}>No recent leads found.</p>
-                                ) : (
-                                    recentLeads.map((lead) => (
-                                        <div
-                                            key={lead.id}
-                                            onClick={() => navigate(`/${tenantId}/leads?leadId=${lead.id}`)}
-                                            className={`flex items-center justify-between p-4 rounded-xl transition-all cursor-pointer group border border-transparent hover:shadow-md ${
-                                                isDark
-                                                    ? 'bg-gradient-to-r from-slate-900/60 to-slate-900/20 hover:from-slate-900 hover:to-indigo-950/40 hover:border-indigo-500/50 text-slate-200 hover:text-white'
-                                                    : 'bg-gradient-to-r from-gray-50 to-indigo-50/30 hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-200 text-gray-700 hover:text-gray-900'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-xl group-hover:scale-110 transition-transform shadow-lg">
-                                                    <Users size={18} />
-                                                </div>
-                                                <div>
-                                                    <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{lead.name}</p>
-                                                    <p className={`text-xs capitalize font-medium ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>{lead.status} Lead</p>
-                                                </div>
-                                            </div>
-                                            <div className={`flex items-center text-xs group-hover:text-indigo-400 font-medium ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                                <Clock size={12} className="mr-1" />
+                            <span aria-hidden="true" className={cn('h-2 rounded overflow-hidden flex', isDark ? 'bg-neutral-800' : 'bg-[#E5E5E5]')}>
+                                <span className="bg-[#16A34A] transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, qualRate)}%` }} />
+                            </span>
+                            <span className={cn('text-xs', t.hint)}>
+                                {hotLeads} of {metrics.leads} {metrics.leads === 1 ? 'lead' : 'leads'} qualified
+                            </span>
+                        </div>
+
+                        {isS2orS3 ? (
+                            // S2/S3: Status row + AI priority breakdown
+                            <>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <StatTile isDark={isDark} tone="green" label="Qualified" value={metrics.leads_by_status.qualified} marker={<Icon.check size={13} />} />
+                                    <StatTile isDark={isDark} tone="red" label="Disqualified" value={metrics.leads_by_status.disqualified} marker={<Icon.x size={13} />} />
+                                </div>
+
+                                <div className="flex items-center gap-2.5">
+                                    <span className={cn('flex-1 h-px', isDark ? 'bg-neutral-800' : 'bg-[#E5E5E5]')} />
+                                    <SmallLabel isDark={isDark}>AI Priority</SmallLabel>
+                                    <span className={cn('flex-1 h-px', isDark ? 'bg-neutral-800' : 'bg-[#E5E5E5]')} />
+                                </div>
+
+                                <span aria-hidden="true" className={cn('h-2 rounded overflow-hidden flex gap-0.5', priorityTotal === 0 && (isDark ? 'bg-neutral-800' : 'bg-[#E5E5E5]'))}>
+                                    {hotLeadsCount > 0 && <span style={{ width: `${priorityPct(hotLeadsCount)}%`, background: TILE.green.dot }} />}
+                                    {warmLeadsCount > 0 && <span style={{ width: `${priorityPct(warmLeadsCount)}%`, background: TILE.amber.dot }} />}
+                                    {coldLeadsCount > 0 && <span style={{ width: `${priorityPct(coldLeadsCount)}%`, background: TILE.grey.dot }} />}
+                                </span>
+
+                                <div className="grid grid-cols-3 gap-2.5">
+                                    <StatTile isDark={isDark} tone="green" label="Hot" value={hotLeadsCount} sub="leads" centered />
+                                    <StatTile isDark={isDark} tone="amber" label="Warm" value={warmLeadsCount} sub="leads" centered />
+                                    <StatTile isDark={isDark} tone="grey" label="Cold" value={coldLeadsCount} sub="leads" centered />
+                                </div>
+                            </>
+                        ) : (
+                            // S1: Original two-column Hot / Cold
+                            <div className="grid grid-cols-2 gap-3">
+                                <StatTile isDark={isDark} tone="green" label="Hot Leads" value={hotLeads} />
+                                <StatTile isDark={isDark} tone="grey" label="Cold Leads" value={coldLeads} />
+                            </div>
+                        )}
+                    </Card>
+                </div>
+
+                {/* Recent Leads + side column */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+                    <Card isDark={isDark} className="lg:col-span-2 min-w-0">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h2 className={h2Class(isDark)}>
+                                Recent Leads
+                                {recentLeads.length > 0 && <SmallPill isDark={isDark} tone="soft">{recentLeads.length}</SmallPill>}
+                            </h2>
+                            <Link
+                                to={`/${tenantId}/leads`}
+                                className={cn(
+                                    'inline-flex items-center justify-center gap-2 min-h-[38px] px-3.5 rounded-[11px] text-[13px] font-bold whitespace-nowrap no-underline transition-colors',
+                                    isDark ? 'bg-white text-black hover:bg-neutral-200' : 'bg-[#111111] text-white hover:bg-black hover:text-white',
+                                    focusRing(isDark),
+                                )}
+                            >
+                                View All Leads
+                                <ArrowUpRight size={14} strokeWidth={2.2} aria-hidden="true" />
+                            </Link>
+                        </div>
+                        {recentLeads.length === 0 ? (
+                            <DashedNote isDark={isDark} icon={<Users size={18} strokeWidth={1.8} aria-hidden="true" />}>No recent leads found.</DashedNote>
+                        ) : (
+                            <ul className="list-none m-0 p-0 flex flex-col gap-2">
+                                {recentLeads.map((lead) => (
+                                    <li key={lead.id}>
+                                        <Link to={`/${tenantId}/leads?leadId=${lead.id}`} className={cn(rowClass(isDark), 'px-3.5 py-3')}>
+                                            <span className={cn('w-[38px] h-[38px] flex-none rounded-full flex items-center justify-center text-sm font-extrabold', isDark ? 'bg-white text-black' : 'bg-[#0A0A0A] text-white')}>
+                                                {(lead.name || '?').trim().charAt(0).toUpperCase() || '?'}
+                                            </span>
+                                            <span className="flex-1 min-w-0 flex flex-wrap items-center gap-2.5">
+                                                <span className="text-[14.5px] font-bold truncate max-w-full">{lead.name}</span>
+                                                <SmallPill isDark={isDark} tone={leadStatusTone(lead.status)} className="capitalize">{lead.status} Lead</SmallPill>
+                                            </span>
+                                            <span className={cn('flex items-center gap-1.5 text-[12.5px] whitespace-nowrap tabular-nums', t.hint)}>
+                                                <Clock size={13} strokeWidth={2} aria-hidden="true" className={isDark ? 'text-neutral-500' : 'text-[#8A8A8A]'} />
                                                 {new Date(lead.created_at).toLocaleDateString()}
-                                                <ChevronRight size={16} className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                                            </span>
+                                            <ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" className={cn('flex-none', isDark ? 'text-neutral-500' : 'text-[#8A8A8A]')} />
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </Card>
 
-                    {/* Right Column: Lead Quality & Actions */}
-                    <div className="space-y-6">
-                        {/* Lead Quality Card */}
-                        <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
-                            <h3 className={`font-bold mb-6 text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Lead Quality</h3>
-                            <div className="flex items-center justify-between mb-3">
-                                <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>Qualification Rate</span>
-                                <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">{qualRate}%</span>
-                            </div>
-                            <div className={`w-full rounded-full h-3 mb-6 overflow-hidden shadow-inner ${isDark ? 'bg-slate-950' : 'bg-gray-200'}`}>
-                                <div
-                                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full transition-all duration-1000 ease-out shadow-lg"
-                                    style={{ width: `${qualRate}%` }}
-                                ></div>
-                            </div>
-
-                            {isS2orS3 ? (
-                                // S2/S3: Status row + AI priority breakdown
-                                <div className="space-y-4">
-                                    {/* Row 1: Qualified / Disqualified */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className={`p-3.5 rounded-xl border hover:shadow-md transition-shadow ${
-                                            isDark 
-                                                ? 'bg-gradient-to-br from-emerald-950/20 to-teal-950/20 border-emerald-900/50' 
-                                                : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'
-                                        }`}>
-                                            <p className={`text-xs font-bold mb-1 uppercase tracking-wide ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>Qualified</p>
-                                            <p className="text-2xl font-black bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">{metrics.leads_by_status.qualified}</p>
-                                        </div>
-                                        <div className={`p-3.5 rounded-xl border hover:shadow-md transition-shadow ${
-                                            isDark 
-                                                ? 'bg-gradient-to-br from-red-950/20 to-orange-950/20 border-red-900/50' 
-                                                : 'bg-gradient-to-br from-red-50 to-orange-50 border-red-200'
-                                        }`}>
-                                            <p className={`text-xs font-bold mb-1 uppercase tracking-wide ${isDark ? 'text-red-400' : 'text-red-700'}`}>Disqualified</p>
-                                            <p className="text-2xl font-black bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">{metrics.leads_by_status.disqualified}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Divider + AI label */}
-                                    <div className="flex items-center gap-2">
-                                        <div className={`flex-1 h-px ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
-                                        <span className="text-xs text-gray-400 font-semibold uppercase tracking-widest whitespace-nowrap">AI Priority</span>
-                                        <div className={`flex-1 h-px ${isDark ? 'bg-slate-700' : 'bg-gray-200'}`} />
-                                    </div>
-
-                                    {/* Row 2: Hot / Warm / Cold */}
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div className="p-3 bg-transparent rounded-xl border border-emerald-500 hover:shadow-md transition-shadow text-center">
-                                            <p className="text-xs text-emerald-700 font-bold mb-1 uppercase tracking-wide">Hot</p>
-                                            <p className="text-2xl font-black text-emerald-700">{hotLeadsCount}</p>
-                                            <p className="text-[10px] text-emerald-600 mt-0.5">leads</p>
-                                        </div>
-                                        <div className="p-3 bg-transparent rounded-xl border border-amber-500 hover:shadow-md transition-shadow text-center">
-                                            <p className="text-xs text-amber-700 font-bold mb-1 uppercase tracking-wide">Warm</p>
-                                            <p className="text-2xl font-black text-amber-700">{warmLeadsCount}</p>
-                                            <p className="text-[10px] text-amber-600 mt-0.5">leads</p>
-                                        </div>
-                                        <div className="p-3 bg-transparent rounded-xl border border-rose-500 hover:shadow-md transition-shadow text-center">
-                                            <p className="text-xs text-rose-700 font-bold mb-1 uppercase tracking-wide">Cold</p>
-                                            <p className="text-2xl font-black text-rose-700">{coldLeadsCount}</p>
-                                            <p className="text-[10px] text-rose-600 mt-0.5">leads</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                // S1: Original two-column Hot / Cold
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 hover:shadow-lg transition-shadow">
-                                        <p className="text-xs text-emerald-700 font-bold mb-2 uppercase tracking-wide">Hot Leads</p>
-                                        <p className="text-2xl font-black bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">{hotLeads}</p>
-                                    </div>
-                                    <div className="p-4 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border border-red-200 hover:shadow-lg transition-shadow">
-                                        <p className="text-xs text-red-700 font-bold mb-2 uppercase tracking-wide">Cold Leads</p>
-                                        <p className="text-2xl font-black bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">{coldLeads}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Upcoming Calls Card */}
-                        <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
-                            <div className="flex items-center justify-between gap-3 mb-4">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <CalendarClock className="text-indigo-500 shrink-0" size={20} />
-                                    <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Upcoming Calls</h3>
-                                </div>
+                    <div className="min-w-0 flex flex-col gap-5">
+                        {/* Upcoming Calls */}
+                        <Card isDark={isDark} className="gap-3">
+                            <h2 className={h2Class(isDark)}>
+                                <Calendar size={18} strokeWidth={1.9} aria-hidden="true" />
+                                Upcoming Calls
                                 {!bookingsLoading && !bookingsError && bookings.length > 0 && (
-                                    <span
-                                        className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-bold ${isDark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}
-                                        aria-label={`${bookings.length} upcoming ${bookings.length === 1 ? 'call' : 'calls'}`}
-                                    >
-                                        {bookings.length}
-                                    </span>
+                                    <SmallPill isDark={isDark} tone="soft">
+                                        <span aria-hidden="true">{bookings.length}</span>
+                                        <span className="sr-only">{`${bookings.length} upcoming ${bookings.length === 1 ? 'call' : 'calls'}`}</span>
+                                    </SmallPill>
                                 )}
-                            </div>
+                            </h2>
 
                             {bookingsLoading ? (
-                                <div className="space-y-2.5" aria-busy="true">
+                                <div className="flex flex-col gap-2" aria-busy="true">
                                     {[0, 1].map((i) => (
-                                        <div key={i} className={`h-[76px] rounded-xl animate-pulse ${isDark ? 'bg-slate-900/60' : 'bg-gray-100'}`} />
+                                        <div key={i} className={cn('h-[76px] rounded-xl animate-pulse', isDark ? 'bg-neutral-800' : 'bg-[#F2F2F2]')} />
                                     ))}
                                 </div>
                             ) : bookingsError ? (
-                                <p className={`${isDark ? 'text-slate-400' : 'text-gray-500'} text-sm text-center py-6`}>Couldn't load upcoming calls.</p>
+                                <DashedNote isDark={isDark} icon={<Phone size={18} strokeWidth={1.8} aria-hidden="true" />}>Couldn't load upcoming calls.</DashedNote>
                             ) : bookings.length === 0 ? (
-                                <p className={`${isDark ? 'text-slate-400' : 'text-gray-500'} text-sm text-center py-6`}>No upcoming calls booked yet.</p>
+                                <DashedNote isDark={isDark} icon={<Phone size={18} strokeWidth={1.8} aria-hidden="true" />}>No upcoming calls booked yet.</DashedNote>
                             ) : (
-                                <div className="space-y-2.5">
+                                <div className="flex flex-col gap-2">
                                     {bookings.slice(0, MAX_UPCOMING_CALLS).map((booking) => {
                                         const openLead = booking.lead_id
                                             ? () => navigate(`/${tenantId}/leads?leadId=${booking.lead_id}`)
@@ -491,189 +665,72 @@ export const DashboardPage = () => {
                                                 } : undefined}
                                                 role={openLead ? 'button' : undefined}
                                                 tabIndex={openLead ? 0 : undefined}
-                                                className={`p-3.5 rounded-xl border border-transparent transition-all ${
-                                                    isDark
-                                                        ? 'bg-gradient-to-r from-slate-900/60 to-slate-900/20 text-slate-200'
-                                                        : 'bg-gradient-to-r from-gray-50 to-indigo-50/30 text-gray-700'
-                                                } ${
-                                                    openLead
-                                                        ? `cursor-pointer hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                                                            isDark
-                                                                ? 'hover:from-slate-900 hover:to-indigo-950/40 hover:border-indigo-500/50'
-                                                                : 'hover:from-indigo-50 hover:to-purple-50 hover:border-indigo-200'
-                                                        }`
-                                                        : ''
-                                                }`}
+                                                className={cn(rowClass(isDark, !!openLead), 'items-start px-3.5 py-3', openLead && 'cursor-pointer')}
                                             >
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <p
-                                                            className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}
-                                                            title={booking.timezone ? `Time shown in ${booking.timezone}` : undefined}
-                                                        >
-                                                            {formatBookingDateTime(booking.start_time, booking.timezone)}
+                                                <div className="flex-1 min-w-0">
+                                                    <p
+                                                        className={cn('m-0 text-sm font-bold', t.text)}
+                                                        title={booking.timezone ? `Time shown in ${booking.timezone}` : undefined}
+                                                    >
+                                                        {formatBookingDateTime(booking.start_time, booking.timezone)}
+                                                    </p>
+                                                    <p className={cn('m-0 mt-0.5 text-[13.5px] font-medium truncate', t.muted)}>
+                                                        {booking.attendee_name || 'Website visitor'}
+                                                    </p>
+                                                    {booking.attendee_phone && (
+                                                        <p className={cn('m-0 mt-0.5 flex items-center gap-1 text-xs font-medium', t.hint)}>
+                                                            <Phone size={12} className="shrink-0" aria-hidden="true" />
+                                                            <span className="truncate">{booking.attendee_phone}</span>
                                                         </p>
-                                                        <p className={`text-sm font-medium truncate mt-0.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>
-                                                            {booking.attendee_name || 'Website visitor'}
-                                                        </p>
-                                                        {booking.attendee_phone && (
-                                                            <p className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                                                                <Phone size={12} className="shrink-0" />
-                                                                <span className="truncate">{booking.attendee_phone}</span>
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    {booking.meet_link && (
-                                                        <div className="flex flex-col items-end gap-2 shrink-0">
-                                                            <a
-                                                                href={booking.meet_link}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                                                                    isDark
-                                                                        ? 'text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/20'
-                                                                        : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100'
-                                                                }`}
-                                                            >
-                                                                <Video size={12} />
-                                                                Join
-                                                            </a>
-                                                        </div>
                                                     )}
                                                 </div>
+                                                {booking.meet_link && (
+                                                    <a
+                                                        href={booking.meet_link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className={cn(
+                                                            'shrink-0 inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border text-xs font-bold no-underline transition-colors',
+                                                            isDark ? 'bg-neutral-900 border-neutral-700 text-white hover:bg-neutral-800' : 'bg-white border-[#D4D4D4] text-[#0A0A0A] hover:bg-[#F7F7F7] hover:text-[#0A0A0A]',
+                                                            focusRing(isDark),
+                                                        )}
+                                                    >
+                                                        <Video size={12} aria-hidden="true" />
+                                                        Join
+                                                    </a>
+                                                )}
                                             </div>
                                         );
                                     })}
                                     {bookings.length > MAX_UPCOMING_CALLS && (
-                                        <p className={`text-xs font-medium text-center pt-1 ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>
+                                        <p className={cn('m-0 pt-1 text-xs font-semibold text-center', t.hint)}>
                                             +{bookings.length - MAX_UPCOMING_CALLS} more
                                         </p>
                                     )}
                                 </div>
                             )}
-                        </div>
+                        </Card>
 
-                        {/* Inbound Bot System Card */}
-                        <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
-                            <h3 className={`font-bold mb-4 text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Inbound Bot System</h3>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => {
-                                        const url = `${window.location.origin}/${tenantId}`;
-                                        navigator.clipboard.writeText(url);
-                                        alert('Chatbot link copied to clipboard!');
-                                    }}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all group shadow-sm hover:shadow-md ${
-                                        isDark
-                                            ? 'border-indigo-900/60 hover:border-indigo-800 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-indigo-300 hover:text-indigo-200'
-                                            : 'border-indigo-200 hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 hover:text-indigo-900'
-                                    }`}
-                                >
-                                    <span className="font-semibold text-sm">Copy Chatbot Widget Link</span>
-                                    <ArrowUpRight size={18} className="text-indigo-500 group-hover:text-indigo-700 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                                </button>
+                        {/* Inbound Bot System */}
+                        <Card isDark={isDark} className="gap-2.5">
+                            <h2 className={cn(h2Class(isDark), 'pb-1')}>Inbound Bot System</h2>
+                            <ActionRow isDark={isDark} icon={Link2} label="Copy Chatbot Widget Link" trailing={Copy} onClick={copyWidgetLink} />
+                            <ActionRow isDark={isDark} icon={Bot} label="Configure Inbound Bot" trailing={ChevronRight} to={`/admin/clients/${tenantId}`} />
+                            <ActionRow isDark={isDark} icon={Calendar} label="Call Booking Slots" trailing={ChevronRight} to={`/admin/clients/${tenantId}?tab=settings`} />
+                        </Card>
 
-                                <button
-                                    onClick={() => navigate(`/admin/clients/${tenantId}`)}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all group shadow-sm hover:shadow-md ${
-                                        isDark
-                                            ? 'border-indigo-900/60 hover:border-indigo-800 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-indigo-300 hover:text-indigo-200'
-                                            : 'border-indigo-200 hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 hover:text-indigo-900'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Bot size={18} className="text-indigo-500" />
-                                        <span className="font-semibold text-sm">Configure Inbound Bot</span>
-                                    </div>
-                                    <ChevronRight size={18} className="text-indigo-500 group-hover:text-indigo-700 group-hover:translate-x-1 transition-transform" />
-                                </button>
-
-                                <button
-                                    onClick={() => navigate(`/admin/clients/${tenantId}?tab=settings`)}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all group shadow-sm hover:shadow-md ${
-                                        isDark
-                                            ? 'border-indigo-900/60 hover:border-indigo-800 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-indigo-300 hover:text-indigo-200'
-                                            : 'border-indigo-200 hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 hover:text-indigo-900'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <CalendarClock size={18} className="text-indigo-500" />
-                                        <span className="font-semibold text-sm">Call Booking Slots</span>
-                                    </div>
-                                    <ChevronRight size={18} className="text-indigo-500 group-hover:text-indigo-700 group-hover:translate-x-1 transition-transform" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Outbound Bot System Card */}
-                        <div className={`${isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'} backdrop-blur-lg rounded-2xl shadow-xl border p-6 hover:shadow-2xl transition-shadow duration-300`}>
-                            <h3 className={`font-bold mb-4 text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Outbound Bot System</h3>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => navigate(`/admin/clients/${tenantId}/outbound/ai-settings`)}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all group shadow-sm hover:shadow-md ${
-                                        isDark
-                                            ? 'border-indigo-900/60 hover:border-indigo-800 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-indigo-300 hover:text-indigo-200'
-                                            : 'border-indigo-200 hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 hover:text-indigo-900'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Cpu size={18} className="text-indigo-500" />
-                                        <span className="font-semibold text-sm">Configure Outbound Bot</span>
-                                    </div>
-                                    <ChevronRight size={18} className="text-indigo-500 group-hover:text-indigo-700 group-hover:translate-x-1 transition-transform" />
-                                </button>
-
-                                <button
-                                    onClick={() => navigate(`/admin/clients/${tenantId}/outbound`)}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all group shadow-sm hover:shadow-md ${
-                                        isDark
-                                            ? 'border-indigo-900/60 hover:border-indigo-800 bg-gradient-to-r from-slate-900/80 to-slate-950/80 text-indigo-300 hover:text-indigo-200'
-                                            : 'border-indigo-200 hover:border-indigo-400 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 hover:text-indigo-900'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Megaphone size={18} className="text-indigo-500" />
-                                        <span className="font-semibold text-sm">Manage Outbound Campaigns</span>
-                                    </div>
-                                    <ChevronRight size={18} className="text-indigo-500 group-hover:text-indigo-700 group-hover:translate-x-1 transition-transform" />
-                                </button>
-                            </div>
-                        </div>
+                        {/* Outbound Bot System */}
+                        <Card isDark={isDark} className="gap-2.5">
+                            <h2 className={cn(h2Class(isDark), 'pb-1')}>Outbound Bot System</h2>
+                            <ActionRow isDark={isDark} icon={Cpu} label="Configure Outbound Bot" trailing={ChevronRight} to={`/admin/clients/${tenantId}/outbound/ai-settings`} />
+                            <ActionRow isDark={isDark} icon={Send} label="Manage Outbound Campaigns" trailing={ChevronRight} to={`/admin/clients/${tenantId}/outbound`} />
+                        </Card>
                     </div>
                 </div>
 
-                {/* Branded Footer */}
-                <DashboardFooter companyName={companyName} />
-            </div>
-        </div>
-    );
-};
-
-const StatsCard = ({ title, value, subtitle, icon: Icon, color, gradient, isDark }: any) => {
-    const colorStyles: Record<string, string> = {
-        indigo: 'from-indigo-500 to-purple-500',
-        emerald: 'from-emerald-500 to-teal-500',
-        blue: 'from-blue-500 to-cyan-500',
-    };
-
-    return (
-        <div className={`backdrop-blur-lg p-6 rounded-2xl shadow-xl border transition-all hover:shadow-2xl hover:scale-105 duration-300 group ${
-            isDark ? 'bg-slate-800/70 border-slate-700/50' : 'bg-white/70 border-white/50'
-        }`}>
-            <div className="flex justify-between items-start mb-4">
-                <div className={`p-3.5 rounded-xl bg-gradient-to-br ${gradient || colorStyles[color]} shadow-lg group-hover:scale-110 transition-transform`}>
-                    <Icon size={26} className="text-white" />
-                </div>
-            </div>
-            <div>
-                <p className={`text-sm font-semibold mb-2 uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-gray-600'}`}>{title}</p>
-                <h3 className={`text-4xl font-black mb-1 ${isDark ? 'text-white' : 'bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent'}`}>{value}</h3>
-                {subtitle && (
-                    <p className={`text-xs font-medium ${isDark ? 'text-slate-500' : 'text-gray-500'}`}>{subtitle}</p>
-                )}
-            </div>
+                <DashboardFooter isDark={isDark} companyName={companyName} />
+            </main>
         </div>
     );
 };

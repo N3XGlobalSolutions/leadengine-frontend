@@ -26,7 +26,7 @@ const transcriptStyle = (config?: TenantConfig): React.CSSProperties => ({
 const ConversationViewer: React.FC<ConversationViewerProps> = ({ conversationId, config }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
-    const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const fetchMessages = async () => {
@@ -47,10 +47,10 @@ const ConversationViewer: React.FC<ConversationViewerProps> = ({ conversationId,
         }
     }, [conversationId]);
 
-    // Auto-scroll to bottom
+    // Auto-scroll only the transcript container (avoid scrollIntoView, which scrolls the outer page)
     useEffect(() => {
-        if (!loading) {
-            bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+        if (!loading && scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
         }
     }, [messages, loading]);
 
@@ -67,6 +67,7 @@ const ConversationViewer: React.FC<ConversationViewerProps> = ({ conversationId,
         // Theme vars give ChatBubble its colours (it is styled with the chat brand tokens); the bubble
         // tokens are pinned to the design's black/white and the bot border is overridden to #EAEAEA.
         <div
+            ref={scrollContainerRef}
             className="h-full bg-[#F7F7F7] overflow-y-auto p-4 sm:p-5 flex flex-col gap-3.5 [&_.border-le-bot-border]:border-[#EAEAEA]"
             style={transcriptStyle(config)}
         >
@@ -77,7 +78,6 @@ const ConversationViewer: React.FC<ConversationViewerProps> = ({ conversationId,
                     <ChatBubble key={msg.id} message={msg} />
                 ))
             )}
-            <div ref={bottomRef} />
         </div>
     );
 };
